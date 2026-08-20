@@ -1,0 +1,6 @@
+# Volcados de base de datos (contienen datos reales, no se suben)
+backup_*.sql
+
+# Entornos locales
+*.env.local
+*.env.production
