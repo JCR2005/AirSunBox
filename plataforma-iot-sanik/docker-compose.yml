@@ -1,0 +1,126 @@
+services:
+
+  # ─────────────────────────────────────────
+  # BASE DE DATOS — TimescaleDB
+  # ─────────────────────────────────────────
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: iot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: iot_user
+      POSTGRES_PASSWORD: iot_password
+      POSTGRES_DB: iot_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # CACHE — Redis
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # MQTT BROKER — EMQX
+  # ─────────────────────────────────────────
+  emqx:
+    image: emqx:5
+    container_name: iot_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT
+      - "8083:8083"    # MQTT sobre WebSocket
+      - "8084:8084"    # MQTT sobre WebSocket seguro
+      - "8883:8883"    # MQTT seguro (TLS)
+      - "18083:18083"  # Panel de administración EMQX
+    volumes:
+      - emqx_data:/opt/emqx/data
+    environment:
+      EMQX_NAME: iot_broker
+      EMQX_HOST: 127.0.0.1
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # BACKEND — Node.js + Fastify
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: iot_backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Base de datos
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_USER: iot_user
+      DB_PASSWORD: iot_password
+      DB_NAME: iot_platform
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      # SMTP (recuperación de contraseña) — se toma del backend/.env (no se inyectan vacías)
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:80}
+
+      JWT_SECRET: 
+    depends_on:
+      - timescaledb
+      - redis
+      - emqx
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # FRONTEND — React + Vite
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: iot_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      VITE_API_URL: http://localhost:3000
+      VITE_WS_URL: ws://localhost:3000
+    depends_on:
+      - backend
+    networks:
+      - iot_network
+
+# ─────────────────────────────────────────
+# VOLÚMENES (datos persistentes)
+# ─────────────────────────────────────────
+volumes:
+  timescale_data:
+  redis_data:
+  emqx_data:
+
+# ─────────────────────────────────────────
+# RED INTERNA
+# ─────────────────────────────────────────
+networks:
+  iot_network:
+    driver: bridge
