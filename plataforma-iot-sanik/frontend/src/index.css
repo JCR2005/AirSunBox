@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+/* ── Variables de tema ── */
+:root, [data-theme="dark"] {
+  --bg:       #0A0F0D;
+  --bg2:      #111810;
+  --card:     #121A16;
+  --border:   #1E2E28;
+  --text:     #F0F5F2;
+  --text2:    #8FA899;
+  --green:    #4DB6FF;   /* celeste principal */
+  --green-l:  #2F9FE6;   /* celeste hover */
+  --accent:   #2CB67D;   /* verde de apoyo */
+  --accent-l: #37C98A;
+}
+
+[data-theme="light"] {
+  --bg:       #F4F7F5;
+  --bg2:      #EAEFEC;
+  --card:     #FFFFFF;
+  --border:   #D4E0D8;
+  --text:     #0F1F18;
+  --text2:    #4A6B5A;
+  --green:    #3AA6F5;
+  --green-l:  #2E8ED3;
+  --accent:   #24A66F;
+  --accent-l: #2FBA7D;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  transition: background .2s, color .2s;
+}
+
+/* Aplicar variables a clases de Tailwind usadas */
+.bg-\[\#0A0F0D\]  { background: var(--bg) !important; }
+.bg-\[\#111810\]  { background: var(--bg2) !important; }
+.bg-\[\#121A16\]  { background: var(--card) !important; }
+.border-\[\#1E2E28\] { border-color: var(--border) !important; }
+.text-white       { color: var(--text) !important; }
+.text-\[\#8FA899\]{ color: var(--text2) !important; }
+.text-\[\#F0F5F2\]{ color: var(--text) !important; }
+.bg-\[\#1D9E75\] { background: var(--green) !important; }
+.text-\[\#1D9E75\] { color: var(--green) !important; }
+.border-\[\#1D9E75\] { border-color: var(--green) !important; }
+.hover\:bg-\[\#25C48F\]:hover { background: var(--green-l) !important; }
+.bg-\[\#1D9E75\]\/10 { background: rgba(77,182,255,0.1) !important; }
+.bg-\[\#1D9E75\]\/20 { background: rgba(77,182,255,0.2) !important; }
+.border-\[\#1D9E75\]\/20 { border-color: rgba(77,182,255,0.2) !important; }
+.hover\:border-\[\#1D9E75\]\/40:hover { border-color: rgba(77,182,255,0.4) !important; }
+.text-\[\#25C48F\] { color: var(--accent-l) !important; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Map marker ── */
+.map-marker-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.map-marker-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px rgba(77, 182, 255, 0.2);
+  border: 2px solid #fff;
+}
+
+@layer utilities {
+  .text-responsive-h1 {
+    @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
+  }
+  .text-responsive-h2 {
+    @apply text-lg sm:text-xl md:text-2xl lg:text-3xl;
+  }
+  .font-syne {
+    font-family: 'Syne', sans-serif;
+  }
+}
+
+/* ── Fondo de las páginas: textura nítida (sin difuminado) ── */
+.page-bg {
+  background-image: radial-gradient(rgba(103, 183, 232, 0.15) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
