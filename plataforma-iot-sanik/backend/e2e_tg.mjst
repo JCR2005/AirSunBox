@@ -1,0 +1,48 @@
+import { readFileSync } from 'node:fs'
+import { createSigner } from 'fast-jwt'
+
+const env = Object.fromEntries(
+  readFileSync('/app/.env', 'utf8').split('\n')
+    .filter(l => l.includes('=') && !l.trim().startsWith('#'))
+    .map(l => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim()] })
+)
+const SECRET = env.JWT_SECRET
+const ORG    = 'ffc11d58-7896-495a-8c7e-2fd77ce15051'
+const DEVICE = '4ec2986e-253b-451f-99f2-d27af855b6c7'
+const BASE   = 'http://localhost:3000/api'
+
+const token = createSigner({ key: SECRET, algorithm: 'HS256' })(
+  { userId: '1', orgId: ORG, role: 'client', iat: Math.floor(Date.now() / 1000) }
+)
+const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+const get  = async url => (await fetch(BASE + url, { headers: H })).json()
+const post = async (url, body) => (await fetch(BASE + url, { method: 'POST', headers: H, body: JSON.stringify(body) })).json()
+const log  = m => process.stdout.write(m + '\n')
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// token del dispositivo via GET /devices
+const devices = await get('/devices')
+const devRow  = devices.find(d => d.id === DEVICE)
+const { rows } = [{ rows: null }]
+// traemos token del device directo a DB via API no expone token; usar pg no está. En su lugar: usar el token que devuelve GET /devices (d.* incluye token)
+const devToken = devRow.token || (await get(`/devices/${DEVICE}`)).token
+
+const alert = await post('/alerts', {
+  deviceId: DEVICE, variable: 'f', condition: '>', threshold: 60,
+  cooldownMinutes: 0, channel: 'telegram',
+  botToken: '777000:falso_token_e2e_1234', chatId: '-1007770001111',
+  message: 'PRUEBA TELEGRAM {estacion} · {variable} = {valor} · {hora}'
+})
+log(`→ alerta creada: id=${alert.id} | channel=${alert.channel} | bot=${!!alert.telegram_bot_token} | chat=${!!alert.telegram_chat_id}`)
+if (!alert.telegram_bot_token) { log(`   ERROR: ${JSON.stringify(alert)}`); process.exit(1) }
+
+log('\n→ POST dots f=80 → DEBE intentar Telegram (token falso → 401 en log del backend)')
+await post(`/dots/${devToken}`, { f: 80 })
+await sleep(1800)
+
+const logs = await get(`/alerts/${DEVICE}/logs`)
+const last = logs.find(l => alert.variable === 'f') || logs[0]
+log(`   [alert_logs] channels=${last?.channel} | status=${last?.status} | msg=${JSON.stringify((last?.message || '').slice(0, 50))}`)
+
+log('\n→ Logs del backend (error Telegram esperado):')
+process.exit(0)
