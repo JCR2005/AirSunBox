@@ -1,0 +1,7 @@
+{
+  "login": "screenshots/00_login.png",
+  "espacios_lista": "screenshots/01_espacios_lista.png",
+  "espacio_nuevo": "screenshots/02_espacio_nuevo_modal.png",
+  "mapa_publico": "screenshots/09_mapa_publico.png",
+  "recuperar": "screenshots/10_recuperar_password.png"
+}
