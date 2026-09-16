@@ -1,0 +1,230 @@
+import type { Queryable } from '../types/index.js'
+import type { Role } from '../types/index.js'
+
+export interface LoginUserRow {
+  id: string
+  email: string
+  password_hash: string
+  role: Role
+  name: string | null
+  status: string
+  org_id: string | null
+  org_name: string | null
+  org_slug: string | null
+  plan: string | null
+  org_status: string | null
+  org_type: string | null
+  org_category: string | null
+  org_b_category: string | null
+  org_payment_exempt: boolean | null
+  org_account_type: string | null
+}
+
+export interface MeUserRow {
+  id: string
+  email: string
+  role: Role
+  name: string | null
+  phone: string | null
+  org_id: string | null
+  org_name: string | null
+  slug: string | null
+  plan: string | null
+  location: string | null
+}
+
+export interface ForgotPasswordRow {
+  id: string
+  status: string
+  org_id: string | null
+  org_status: string | null
+  org_slug: string | null
+}
+
+export interface ResetTokenRow {
+  id: string
+  status: string
+  reset_token_hash: string | null
+  reset_token_expires_at: Date | null
+  org_status: string | null
+  org_slug: string | null
+}
+
+export interface ClientUserRow {
+  id: string
+  email: string
+  temp_password: string | null
+  org_id: string | null
+}
+
+export interface IdRow {
+  id: string
+}
+
+export async function findByEmail(db: Queryable, email: string): Promise<LoginUserRow[]> {
+  const { rows } = await db.query<LoginUserRow>(
+    `SELECT u.id, u.email, u.password_hash, u.role, u.name, u.status,
+            u.org_id, o.name as org_name, o.slug as org_slug, o.plan, o.status as org_status,
+            o.type as org_type, o.category as org_category, o.b_category as org_b_category,
+            o.payment_exempt as org_payment_exempt, o.account_type as org_account_type
+     FROM users u
+     LEFT JOIN organizations o ON o.id = u.org_id
+     WHERE u.email = $1`,
+    [email]
+  )
+  return rows
+}
+
+export async function findMe(db: Queryable, userId: string): Promise<MeUserRow[]> {
+  const { rows } = await db.query<MeUserRow>(
+    `SELECT u.id, u.email, u.role, u.name, u.phone,
+            o.id as org_id, o.name as org_name, o.slug, o.plan, o.location
+     FROM users u
+     LEFT JOIN organizations o ON o.id = u.org_id
+     WHERE u.id = $1`,
+    [userId]
+  )
+  return rows
+}
+
+export async function existsByEmail(db: Queryable, email: string): Promise<boolean> {
+  const { rows } = await db.query<IdRow>('SELECT id FROM users WHERE email = $1', [email])
+  return rows.length > 0
+}
+
+export async function createUser(
+  db: Queryable,
+  params: { orgId: string | null; email: string; passwordHash: string; role: Role; name?: string | null; phone?: string | null }
+): Promise<{ id: string; email: string; role: Role; name: string | null } | undefined> {
+  const { rows: [user] } = await db.query<{ id: string; email: string; role: Role; name: string | null }>(
+    `INSERT INTO users (org_id, email, password_hash, role, name, phone)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, role, name`,
+    [params.orgId, params.email, params.passwordHash, params.role, params.name ?? null, params.phone ?? null]
+  )
+  return user
+}
+
+export async function createClientWithTempPassword(
+  db: Queryable,
+  params: { email: string; passwordHash: string; tempPassword: string; orgId: string; status?: string }
+): Promise<void> {
+  await db.query(
+    `INSERT INTO users (email, password_hash, temp_password, role, org_id, status)
+     VALUES ($1, $2, $3, 'client', $4, $5)`,
+    [params.email, params.passwordHash, params.tempPassword, params.orgId, params.status || 'active']
+  )
+}
+
+export async function findPasswordAndRoleById(db: Queryable, userId: string): Promise<{ password_hash: string; role: Role }[]> {
+  const { rows } = await db.query<{ password_hash: string; role: Role }>(
+    'SELECT password_hash, role FROM users WHERE id = $1',
+    [userId]
+  )
+  return rows
+}
+
+export async function listTeam(db: Queryable) {
+  const { rows } = await db.query(
+    `SELECT u.id, u.email, u.role, u.name, u.status, u.created_at
+     FROM users u
+     LEFT JOIN organizations o ON o.id = u.org_id
+     WHERE (o.slug = 'sanik-internal' OR u.org_id IS NULL)
+     ORDER BY u.created_at ASC`
+  )
+  return rows
+}
+
+export async function updateUserStatusAndRole(
+  db: Queryable,
+  userId: string,
+  status?: string | null,
+  role?: string | null
+): Promise<{ id: string; email: string; role: Role; status: string } | undefined> {
+  const updates: string[] = []
+  const values: Array<string | null> = []
+  let i = 1
+
+  if (status) { updates.push(`status = $${i++}`); values.push(status) }
+  if (role) { updates.push(`role = $${i++}`); values.push(role) }
+
+  values.push(userId)
+
+  const { rows: [user] } = await db.query<{ id: string; email: string; role: Role; status: string }>(
+    `UPDATE users SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, email, role, status`,
+    values
+  )
+  return user
+}
+
+export async function findForgotPasswordUser(db: Queryable, email: string): Promise<ForgotPasswordRow[]> {
+  const { rows } = await db.query<ForgotPasswordRow>(
+    `SELECT u.id, u.status, u.org_id,
+            o.status as org_status, o.slug as org_slug
+     FROM users u
+     LEFT JOIN organizations o ON o.id = u.org_id
+     WHERE u.email = $1`,
+    [email]
+  )
+  return rows
+}
+
+export async function setResetToken(db: Queryable, userId: string, tokenHash: string): Promise<void> {
+  await db.query(
+    `UPDATE users
+     SET reset_token_hash = $1, reset_token_expires_at = NOW() + INTERVAL '60 minutes'
+     WHERE id = $2`,
+    [tokenHash, userId]
+  )
+}
+
+export async function listValidResetTokens(db: Queryable): Promise<ResetTokenRow[]> {
+  const { rows } = await db.query<ResetTokenRow>(
+    `SELECT u.id, u.status, u.reset_token_hash, u.reset_token_expires_at,
+            o.status as org_status, o.slug as org_slug
+     FROM users u
+     LEFT JOIN organizations o ON o.id = u.org_id
+     WHERE u.reset_token_hash IS NOT NULL
+       AND u.reset_token_expires_at > NOW()`
+  )
+  return rows
+}
+
+export async function clearResetTokenAndSetPassword(db: Queryable, userId: string, passwordHash: string): Promise<void> {
+  await db.query(
+    `UPDATE users
+     SET password_hash = $1, reset_token_hash = NULL, reset_token_expires_at = NULL
+     WHERE id = $2`,
+    [passwordHash, userId]
+  )
+}
+
+export async function findClientUserByOrg(db: Queryable, orgId: string, fields: 'credentials' | 'reset' = 'reset'): Promise<ClientUserRow[]> {
+  const select = fields === 'credentials'
+    ? 'email, temp_password'
+    : 'id, email, temp_password, org_id'
+  const { rows } = await db.query<ClientUserRow>(
+    `SELECT ${select} FROM users WHERE org_id = $1 AND role = 'client' LIMIT 1`,
+    [orgId]
+  )
+  return rows
+}
+
+export async function resetClientPassword(
+  db: Queryable,
+  userId: string,
+  passwordHash: string,
+  newPassword: string
+): Promise<void> {
+  await db.query(
+    "UPDATE users SET password_hash = $1, temp_password = $2, status = 'active' WHERE id = $3",
+    [passwordHash, newPassword, userId]
+  )
+}
+
+export async function setClientEmail(db: Queryable, orgId: string, email: string): Promise<number> {
+  const result = await db.query(
+    "UPDATE users SET email = $1 WHERE org_id = $2 AND role = 'client'",
+    [email, orgId]
+  )
+  return result.rowCount ?? 0
+}
