@@ -55,6 +55,9 @@ export interface OtpUserRow {
   id: string
   otp_code_hash: string | null
   otp_expires_at: Date | null
+  backup_codes: string[] | null
+  otp_failed_attempts: number | null
+  otp_locked_until: Date | null
 }
 
 export interface ClientUserRow {
@@ -238,7 +241,7 @@ export async function setClientEmail(db: Queryable, orgId: string, email: string
 
 export async function findById(db: Queryable, userId: string): Promise<OtpUserRow[]> {
   const { rows } = await db.query<OtpUserRow>(
-    `SELECT id, otp_code_hash, otp_expires_at FROM users WHERE id = $1`,
+    `SELECT id, otp_code_hash, otp_expires_at, backup_codes, otp_failed_attempts, otp_locked_until FROM users WHERE id = $1`,
     [userId]
   )
   return rows
@@ -255,5 +258,49 @@ export async function clearOtp(db: Queryable, userId: string): Promise<void> {
   await db.query(
     `UPDATE users SET otp_code_hash = NULL, otp_expires_at = NULL WHERE id = $1`,
     [userId]
+  )
+}
+
+export async function setBackupCodes(db: Queryable, userId: string, codesHash: string[]): Promise<void> {
+  await db.query(
+    `UPDATE users SET backup_codes = $1 WHERE id = $2`,
+    [codesHash, userId]
+  )
+}
+
+export async function clearBackupCodes(db: Queryable, userId: string): Promise<void> {
+  await db.query(
+    `UPDATE users SET backup_codes = NULL WHERE id = $1`,
+    [userId]
+  )
+}
+
+export async function consumeBackupCode(db: Queryable, userId: string, remainingCodes: string[]): Promise<void> {
+  await db.query(
+    `UPDATE users SET backup_codes = $1 WHERE id = $2`,
+    [remainingCodes, userId]
+  )
+}
+
+export async function incrementOtpFailedAttempts(db: Queryable, userId: string): Promise<number> {
+  const { rows } = await db.query<{ attempts: number }>(
+    `UPDATE users SET otp_failed_attempts = COALESCE(otp_failed_attempts, 0) + 1 
+     WHERE id = $1 RETURNING otp_failed_attempts`,
+    [userId]
+  )
+  return rows[0]?.attempts ?? 0
+}
+
+export async function resetOtpFailedAttempts(db: Queryable, userId: string): Promise<void> {
+  await db.query(
+    `UPDATE users SET otp_failed_attempts = 0, otp_locked_until = NULL WHERE id = $1`,
+    [userId]
+  )
+}
+
+export async function lockOtpUntil(db: Queryable, userId: string, until: Date): Promise<void> {
+  await db.query(
+    `UPDATE users SET otp_locked_until = $1 WHERE id = $2`,
+    [until, userId]
   )
 }

@@ -309,8 +309,8 @@ export async function verifyOtpLogin(
       return { ok: false, status: 400, error: 'Token inválido' }
     }
 
-    const valid = await verifyOtp(app, decoded.userId, code)
-    if (!valid) {
+    const result = await verifyOtp(app, decoded.userId, code)
+    if (!result.valid) {
       return { ok: false, status: 401, error: 'Código inválido o expirado' }
     }
 
@@ -347,4 +347,56 @@ export async function verifyOtpLogin(
   } catch (err) {
     return { ok: false, status: 401, error: 'Token inválido o expirado' }
   }
+}
+
+export async function enableTwoFactor(
+  app: FastifyInstance,
+  userId: string,
+  code: string
+): Promise<{ ok: boolean; status?: number; error?: string; backupCodes?: string[] }> {
+  const userRows = await usersRepo.findById(app.db, userId)
+  const user = userRows[0]
+  if (!user?.otp_code_hash || !user?.otp_expires_at) {
+    return { ok: false, status: 400, error: 'No hay configuración 2FA pendiente' }
+  }
+  if (new Date() > user.otp_expires_at) {
+    return { ok: false, status: 400, error: 'Código expirado' }
+  }
+
+  const valid = await bcrypt.compare(code, user.otp_code_hash)
+  if (!valid) {
+    return { ok: false, status: 401, error: 'Código inválido' }
+  }
+
+  // Generate backup codes
+  const { generateBackupCodes, hashBackupCodes } = await import('./otpService.js')
+  const plainCodes = generateBackupCodes()
+  const hashedCodes = await hashBackupCodes(plainCodes)
+
+  // Enable 2FA: clear OTP, set backup codes
+  await usersRepo.clearOtp(app.db, userId)
+  await usersRepo.setBackupCodes(app.db, userId, await Promise.all(plainCodes.map(c => bcrypt.hash(c.toUpperCase(), 10))))
+
+  return { ok: true, backupCodes: plainCodes }
+}
+
+export async function disableTwoFactor(
+  app: FastifyInstance,
+  userId: string,
+  code: string
+): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const userRows = await usersRepo.findById(app.db, userId)
+  const user = userRows[0]
+
+  // Verify using OTP or backup code
+  const result = await verifyOtp(app, userId, code)
+  if (!result.valid) {
+    return { ok: false, status: 401, error: 'Código inválido o expirado' }
+  }
+
+  // Disable 2FA: clear everything
+  await usersRepo.clearOtp(app.db, userId)
+  await usersRepo.clearBackupCodes(app.db, userId)
+
+  return { ok: true }
 }

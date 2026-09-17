@@ -4,7 +4,7 @@ import { Type } from '@sinclair/typebox'
 import bcrypt from 'bcrypt'
 import * as usersRepo from '../repositories/users.js'
 import * as orgsRepo from '../repositories/organizations.js'
-import { login, register, requestPasswordReset, resetPassword, isSanikRole, verifyOtpLogin } from '../services/authService.js'
+import { login, register, requestPasswordReset, resetPassword, isSanikRole, verifyOtpLogin, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
 import { createMailer } from '../lib/mailer.js'
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -59,9 +59,37 @@ export default async function authRoutes(app: FastifyInstance) {
     const orgRows = await orgsRepo.findById(app.db, req.user.orgId || '')
     const org = orgRows[0]
     return {
-      enabled: !!user?.otp_code_hash,
+      enabled: !!user?.otp_code_hash || !!user?.backup_codes?.length,
       policy: org?.two_fa_policy || 'optional'
     }
+  })
+
+  // ── Habilitar 2FA ─────────────────────────────────
+  api.post('/2fa/enable', {
+    schema: {
+      body: Type.Object({
+        code: Type.String({ pattern: '^[0-9]{6}$' })
+      })
+    },
+    onRequest: [app.authenticate]
+  }, async (req, reply) => {
+    const result = await enableTwoFactor(app, req.user.userId, req.body.code)
+    if (!result.ok) return reply.code(result.status || 400).send({ error: result.error })
+    return { backupCodes: result.backupCodes }
+  })
+
+  // ── Deshabilitar 2FA ──────────────────────────────
+  api.post('/2fa/disable', {
+    schema: {
+      body: Type.Object({
+        code: Type.String({ pattern: '^[0-9A-F]{4}-[0-9A-F]{4}|[0-9]{6}' })
+      })
+    },
+    onRequest: [app.authenticate]
+  }, async (req, reply) => {
+    const result = await disableTwoFactor(app, req.user.userId, req.body.code)
+    if (!result.ok) return reply.code(result.status || 401).send({ error: result.error })
+    return { message: '2FA deshabilitado correctamente' }
   })
 
   // ── Perfil del usuario actual ──────────────────
