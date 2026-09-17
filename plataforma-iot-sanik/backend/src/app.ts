@@ -9,6 +9,7 @@ import dbPlugin from './plugins/db.js'
 import redisPlugin from './plugins/redis.js'
 import mqttPlugin from './plugins/mqtt.js'
 import realtimePlugin from './plugins/realtime.js'
+import alertQueuePlugin from './plugins/queue.js'
 
 import authRoutes from './routes/auth.js'
 import devicesRoutes from './routes/devices.js'
@@ -69,6 +70,7 @@ await app.register(dbPlugin)
 await app.register(redisPlugin)
 await app.register(mqttPlugin)
 await app.register(realtimePlugin)
+await app.register(alertQueuePlugin)
 
 // ── Rutas ──────────────────────────────────────
 await app.register(authRoutes, { prefix: '/api/auth' })

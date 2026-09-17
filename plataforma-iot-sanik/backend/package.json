@@ -18,13 +18,14 @@
     "@fastify/websocket": "^10.0.1",
     "@sinclair/typebox": "^0.33.24",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.81.5",
     "dotenv": "^16.6.1",
     "fastify": "^4.29.1",
     "fastify-plugin": "^5.1.0",
     "mqtt": "^5.15.1",
     "nodemailer": "^10.0.10",
     "pg": "^8.21.0",
-    "redis": "^4.7.1"
+    "redis": "^5.12.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
