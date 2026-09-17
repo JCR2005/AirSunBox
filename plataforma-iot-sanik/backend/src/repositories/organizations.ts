@@ -21,6 +21,7 @@ export interface OrganizationRow {
   device_count?: number
   active_devices?: number
   space_count?: number
+  two_fa_policy?: string | null
 }
 
 export interface OrganizationListRow extends OrganizationRow {
@@ -75,6 +76,14 @@ export async function findByIdWithEmail(db: Queryable, id: string): Promise<Orga
     WHERE o.id = $1
     LIMIT 1
   `, [id])
+  return rows
+}
+
+export async function findById(db: Queryable, id: string): Promise<OrganizationRow[]> {
+  const { rows } = await db.query<OrganizationRow>(
+    `SELECT * FROM organizations WHERE id = $1`,
+    [id]
+  )
   return rows
 }
 

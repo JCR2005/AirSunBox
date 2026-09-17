@@ -6,6 +6,7 @@ import * as orgsRepo from '../repositories/organizations.js'
 import type { Role } from '../types/index.js'
 import type { Mailer } from '../lib/mailer.js'
 import { createMailer } from '../lib/mailer.js'
+import { generateOtp, createOtp, sendOtp, verifyOtp } from './otpService.js'
 
 export const SANIK_ROLES = ['superadmin', 'admin', 'worker'] as const
 
@@ -33,6 +34,9 @@ export interface AuthResult {
   redirect?: string
   user?: { id: string; email: string; role: Role; name: string | null }
   org?: LoginOrg
+  requiresOtp?: boolean
+  tempToken?: string
+  message?: string
 }
 
 export async function login(app: FastifyInstance, email: string, password: string): Promise<AuthResult> {
@@ -52,6 +56,33 @@ export async function login(app: FastifyInstance, email: string, password: strin
   const valid = await bcrypt.compare(password, user.password_hash)
   if (!valid)
     return { ok: false, status: 401, error: 'Correo o contraseña incorrectos' }
+
+  // Check if OTP is required
+  const orgRows = await orgsRepo.findById(app.db, user.org_id || '')
+  const org = orgRows[0]
+  const requiresOtp = (user as any).otp_code_hash !== null && (user as any).otp_code_hash !== undefined
+    || (org?.two_fa_policy === 'required_all')
+    || (org?.two_fa_policy === 'required_admins' && isSanikRole(user.role))
+
+  if (requiresOtp) {
+    const code = generateOtp()
+    await createOtp(app, user.id, code)
+    await sendOtp(app, user.email, code)
+
+    const tempToken = app.jwt.sign({
+      userId: user.id,
+      orgId: user.org_id as string,
+      role: user.role,
+      otp_pending: true
+    }, { expiresIn: '10m' })
+
+    return {
+      ok: true,
+      requiresOtp: true,
+      tempToken,
+      message: 'Código enviado a tu email'
+    }
+  }
 
   const token = app.jwt.sign({
     userId: user.id,
@@ -265,4 +296,55 @@ export async function resetPassword(
   await usersRepo.clearResetTokenAndSetPassword(app.db, match.id, hash)
 
   return { ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' }
+}
+
+export async function verifyOtpLogin(
+  app: FastifyInstance,
+  tempToken: string,
+  code: string
+): Promise<AuthResult> {
+  try {
+    const decoded = app.jwt.verify<{ userId: string; orgId: string; role: Role; otp_pending: boolean }>(tempToken)
+    if (!decoded.otp_pending) {
+      return { ok: false, status: 400, error: 'Token inválido' }
+    }
+
+    const valid = await verifyOtp(app, decoded.userId, code)
+    if (!valid) {
+      return { ok: false, status: 401, error: 'Código inválido o expirado' }
+    }
+
+    const token = app.jwt.sign({
+      userId: decoded.userId,
+      orgId: decoded.orgId,
+      role: decoded.role
+    })
+
+    const orgRows = await orgsRepo.findById(app.db, decoded.orgId)
+    const org = orgRows[0]
+
+    const redirect = isSanikRole(decoded.role)
+      ? '/admin'
+      : (org?.type === 'B' ? '/espacios' : '/dispositivos')
+
+    return {
+      ok: true,
+      token,
+      redirect,
+      user: { id: decoded.userId, email: '', role: decoded.role, name: null },
+      org: org ? {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        plan: org.plan,
+        type: org.type,
+        category: org.category,
+        bCategory: org.b_category,
+        accountType: org.account_type,
+        paymentExempt: org.payment_exempt
+      } : undefined
+    }
+  } catch (err) {
+    return { ok: false, status: 401, error: 'Token inválido o expirado' }
+  }
 }

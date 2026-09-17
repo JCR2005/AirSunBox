@@ -11,6 +11,7 @@ export interface JwtPayload {
   userId: string
   orgId: string
   role: Role
+  otp_pending?: boolean
 }
 
 export interface RedisLike {

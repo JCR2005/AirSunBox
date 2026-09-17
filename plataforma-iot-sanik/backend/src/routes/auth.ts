@@ -3,7 +3,8 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import bcrypt from 'bcrypt'
 import * as usersRepo from '../repositories/users.js'
-import { login, register, requestPasswordReset, resetPassword, isSanikRole } from '../services/authService.js'
+import * as orgsRepo from '../repositories/organizations.js'
+import { login, register, requestPasswordReset, resetPassword, isSanikRole, verifyOtpLogin } from '../services/authService.js'
 import { createMailer } from '../lib/mailer.js'
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -25,7 +26,41 @@ export default async function authRoutes(app: FastifyInstance) {
       token: result.token,
       redirect: result.redirect,
       user: result.user,
+      org: result.org,
+      requiresOtp: result.requiresOtp,
+      tempToken: result.tempToken,
+      message: result.message
+    }
+  })
+
+  // ── OTP Verification (2do factor) ──────────────
+  api.post('/otp/verify', {
+    schema: {
+      body: Type.Object({
+        code: Type.String({ pattern: '^[0-9]{6}$' }),
+        tempToken: Type.String()
+      })
+    }
+  }, async (req, reply) => {
+    const result = await verifyOtpLogin(app, req.body.tempToken, req.body.code)
+    if (!result.ok) return reply.code(result.status || 401).send({ error: result.error })
+    return {
+      token: result.token,
+      redirect: result.redirect,
+      user: result.user,
       org: result.org
+    }
+  })
+
+  // ── Estado 2FA ─────────────────────────────────
+  api.get('/2fa/status', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const rows = await usersRepo.findById(app.db, req.user.userId)
+    const user = rows[0]
+    const orgRows = await orgsRepo.findById(app.db, req.user.orgId || '')
+    const org = orgRows[0]
+    return {
+      enabled: !!user?.otp_code_hash,
+      policy: org?.two_fa_policy || 'optional'
     }
   })
 

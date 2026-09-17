@@ -18,6 +18,7 @@ export interface LoginUserRow {
   org_b_category: string | null
   org_payment_exempt: boolean | null
   org_account_type: string | null
+  otp_code_hash: string | null
 }
 
 export interface MeUserRow {
@@ -50,6 +51,12 @@ export interface ResetTokenRow {
   org_slug: string | null
 }
 
+export interface OtpUserRow {
+  id: string
+  otp_code_hash: string | null
+  otp_expires_at: Date | null
+}
+
 export interface ClientUserRow {
   id: string
   email: string
@@ -64,7 +71,7 @@ export interface IdRow {
 export async function findByEmail(db: Queryable, email: string): Promise<LoginUserRow[]> {
   const { rows } = await db.query<LoginUserRow>(
     `SELECT u.id, u.email, u.password_hash, u.role, u.name, u.status,
-            u.org_id, o.name as org_name, o.slug as org_slug, o.plan, o.status as org_status,
+            u.org_id, u.otp_code_hash, o.name as org_name, o.slug as org_slug, o.plan, o.status as org_status,
             o.type as org_type, o.category as org_category, o.b_category as org_b_category,
             o.payment_exempt as org_payment_exempt, o.account_type as org_account_type
      FROM users u
@@ -227,4 +234,26 @@ export async function setClientEmail(db: Queryable, orgId: string, email: string
     [email, orgId]
   )
   return result.rowCount ?? 0
+}
+
+export async function findById(db: Queryable, userId: string): Promise<OtpUserRow[]> {
+  const { rows } = await db.query<OtpUserRow>(
+    `SELECT id, otp_code_hash, otp_expires_at FROM users WHERE id = $1`,
+    [userId]
+  )
+  return rows
+}
+
+export async function setOtp(db: Queryable, userId: string, codeHash: string, expiresAt: Date): Promise<void> {
+  await db.query(
+    `UPDATE users SET otp_code_hash = $1, otp_expires_at = $2 WHERE id = $3`,
+    [codeHash, expiresAt, userId]
+  )
+}
+
+export async function clearOtp(db: Queryable, userId: string): Promise<void> {
+  await db.query(
+    `UPDATE users SET otp_code_hash = NULL, otp_expires_at = NULL WHERE id = $1`,
+    [userId]
+  )
 }

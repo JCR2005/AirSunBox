@@ -19,6 +19,7 @@ interface MailTransport {
 export interface Mailer {
   sendPasswordReset(email: string, token: string): Promise<void>
   sendAlert(to: string, subject: string, text: string): Promise<void>
+  sendOtp(email: string, code: string): Promise<void>
 }
 
 export function createMailer(log?: FastifyBaseLogger): Mailer {
@@ -72,6 +73,22 @@ export function createMailer(log?: FastifyBaseLogger): Mailer {
         text.replace(/\n/g, '<br/>') +
         `</p>`
       await transport.sendMail({ from, to, subject, text, html })
+    },
+
+    async sendOtp(email, code) {
+      const text =
+        `Hola,\n\n` +
+        `Tu código de verificación Sanik es: ${code}\n\n` +
+        `Este código expira en 10 minutos.\n\n` +
+        `Si no solicitaste este código, ignorá este correo.\n\n— Sanik`
+      const html =
+        `<p style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">Hola,</p>` +
+        `<p>Tu código de verificación <b>Sanik</b> es: <b style="font-size:24px;letter-spacing:4px;">${code}</b></p>` +
+        `<p>Este código expira en <b>10 minutos</b>.</p>` +
+        `<p>Si no solicitaste este código, ignorá este correo.</p>` +
+        `<p>— Sanik</p>`
+
+      await transport.sendMail({ from, to: email, subject: 'Tu código de verificación Sanik', text, html })
     }
   }
 }
