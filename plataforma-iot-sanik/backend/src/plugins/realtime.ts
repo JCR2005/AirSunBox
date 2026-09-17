@@ -1,10 +1,26 @@
 import fp from 'fastify-plugin'
+import { randomUUID } from 'node:crypto'
+import { createClient } from 'redis'
 import type { FastifyInstance } from 'fastify'
 import type { RealtimeService, RealtimeSocket } from '../types/index.js'
 
+const REALTIME_CHANNEL = 'realtime:data'
+
 async function realtimePlugin(app: FastifyInstance) {
+  const instanceId = randomUUID()
   const devicesToSockets = new Map<string, Set<RealtimeSocket>>()
   const socketsToDevices = new Map<RealtimeSocket, Set<string>>()
+
+  const pubSub = createClient({
+    socket: {
+      host: process.env.REDIS_HOST || 'localhost',
+      port: Number(process.env.REDIS_PORT || 6379)
+    }
+  })
+
+  pubSub.on('error', (err) => {
+    app.log.error(`Redis pub/sub error: ${(err as Error).message}`)
+  })
 
   function subscribe(deviceId: string, socket: RealtimeSocket) {
     if (!deviceId || !socket) return
@@ -44,11 +60,11 @@ async function realtimePlugin(app: FastifyInstance) {
     socketsToDevices.delete(socket)
   }
 
-  function broadcast(deviceId: string, variable: string, value: number, time: Date) {
+  function sendToSockets(deviceId: string, payload: unknown) {
     const sockets = devicesToSockets.get(deviceId)
     if (!sockets || sockets.size === 0) return
 
-    const message = JSON.stringify({ deviceId, variable, value, time })
+    const message = JSON.stringify(payload)
     for (const socket of sockets) {
       try {
         if (socket.readyState === 1) socket.send(message)
@@ -57,6 +73,46 @@ async function realtimePlugin(app: FastifyInstance) {
       }
     }
   }
+
+  async function broadcast(deviceId: string, variable: string, value: number, time: Date) {
+    const payload = { deviceId, variable, value, time }
+    sendToSockets(deviceId, payload)
+
+    try {
+      await pubSub.publish(REALTIME_CHANNEL, JSON.stringify({ ...payload, origin: instanceId }))
+    } catch (err) {
+      app.log.error(`Error publicando en Redis pub/sub: ${(err as Error).message}`)
+    }
+  }
+
+  await pubSub.connect()
+  await pubSub.subscribe(REALTIME_CHANNEL, (rawMessage: string) => {
+    try {
+      const data = JSON.parse(rawMessage) as {
+        deviceId?: string
+        variable?: string
+        value?: number
+        time?: Date
+        origin?: string
+      }
+
+      if (data.origin === instanceId) return
+      if (!data.deviceId) return
+
+      sendToSockets(data.deviceId, {
+        deviceId: data.deviceId,
+        variable: data.variable,
+        value: data.value,
+        time: data.time
+      })
+    } catch (err) {
+      app.log.error(`Mensaje Redis inválido: ${(err as Error).message}`)
+    }
+  })
+
+  app.addHook('onClose', async () => {
+    await pubSub.quit()
+  })
 
   const realtime: RealtimeService = { subscribe, unsubscribe, unsubscribeAll, broadcast }
   app.decorate('realtime', realtime)
