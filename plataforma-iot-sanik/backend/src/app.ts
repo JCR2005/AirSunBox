@@ -3,6 +3,9 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import websocket from '@fastify/websocket'
+import swagger from '@fastify/swagger'
+import swaggerUi from '@fastify/swagger-ui'
+import { registry, registerDefaultMetrics, getMetrics } from './services/metrics.js'
 import 'dotenv/config'
 
 import dbPlugin from './plugins/db.js'
@@ -72,6 +75,23 @@ await app.register(mqttPlugin)
 await app.register(realtimePlugin)
 await app.register(alertQueuePlugin)
 
+await app.register(swagger, {
+  openapi: {
+    info: { title: 'Sanik API', version: '2.0', description: 'API REST de la plataforma Sanik' },
+    components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' } } },
+    security: [{ bearerAuth: [] }]
+  },
+  transform: (schema) => schema
+})
+
+await app.register(swaggerUi, {
+  routePrefix: '/docs',
+  uiConfig: { docExpansion: 'list', deepLinking: true },
+  staticCSP: true
+})
+
+registerDefaultMetrics()
+
 // ── Rutas ──────────────────────────────────────
 await app.register(authRoutes, { prefix: '/api/auth' })
 await app.register(devicesRoutes, { prefix: '/api/devices' })
@@ -115,6 +135,12 @@ app.get('/ws', { websocket: true }, (socket) => {
 
 // ── Healthcheck ────────────────────────────────
 app.get('/health', () => ({ status: 'ok', service: 'sanik-backend', version: '2.0' }))
+
+// ── Metrics (Prometheus) ───────────────────────
+app.get('/metrics', async () => {
+  const metrics = await getMetrics()
+  return metrics
+})
 
 // ── Arrancar ───────────────────────────────────
 try {
