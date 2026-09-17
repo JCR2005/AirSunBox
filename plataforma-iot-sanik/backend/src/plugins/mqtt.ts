@@ -5,11 +5,19 @@ import type { MqttClient } from 'mqtt'
 import { processDevicePayload } from '../services/datalinkService.js'
 
 async function mqttPlugin(app: FastifyInstance) {
-  const client: MqttClient = mqtt.connect(`mqtt://${process.env.MQTT_HOST || 'localhost'}:${process.env.MQTT_PORT || 1883}`)
+  const clientId = `sanik-backend-${process.env.HOSTNAME || 'local'}-${Date.now()}`
+  const client: MqttClient = mqtt.connect(`mqtt://${process.env.MQTT_HOST || 'localhost'}:${process.env.MQTT_PORT || 1883}`, {
+    clientId,
+    clean: true
+  })
 
   client.on('connect', () => {
-    app.log.info('✅ Conectado al broker MQTT (EMQX)')
-    client.subscribe('/v1/devices/+/data', { qos: 1 })
+    app.log.info(`✅ Conectado al broker MQTT (EMQX) — clientId: ${clientId}`)
+    const topic = '$share/sanik-ingest/v1/devices/+/data'
+    client.subscribe(topic, { qos: 1 }, (err) => {
+      if (err) app.log.error(`❌ Error suscribiendo a ${topic}: ${err.message}`)
+      else app.log.info(`📥 Suscrito a shared subscription: ${topic}`)
+    })
   })
 
   client.on('error', (err: Error) => {
@@ -34,16 +42,17 @@ async function mqttPlugin(app: FastifyInstance) {
 
       const deviceId = rows[0].id as string
 
-      await processDevicePayload(app, deviceId, payload, {
-        strictNumbers: true,
-        lowercaseVariables: false
+      await app.ingestQueue.enqueue({
+        deviceId,
+        payload,
+        options: { strictNumbers: true, lowercaseVariables: false }
       })
 
-      app.log.info(`📡 Datos guardados — device: ${deviceId}`)
+      app.log.debug(`📥 Encolado ingesta — device: ${deviceId}`)
 
     } catch (err) {
       app.log.error(err)
-      app.log.error(`Error procesando mensaje MQTT: ${(err as Error)?.message}`)
+      app.log.error(`Error encolando mensaje MQTT: ${(err as Error)?.message}`)
     }
   })
 

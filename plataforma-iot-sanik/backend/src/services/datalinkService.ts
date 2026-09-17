@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { getDeviceVariableScope, isLabelAllowed } from './deviceScopeService.js'
-import { ensureDeviceVariable, insert as insertDot } from '../repositories/dots.js'
+import { ensureDeviceVariable, insert as insertDot, insertBatch } from '../repositories/dots.js'
 import { updateLastSeen } from '../repositories/devices.js'
 import { evaluateDeviceAlerts } from './alertingService.js'
 
@@ -25,6 +25,8 @@ export async function processDevicePayload(
   let saved = 0
   let ignored = 0
 
+  const batchRows: Array<{ time: Date; deviceId: string; variable: string; value: number }> = []
+
   for (const [rawVariable, rawValue] of Object.entries(payload)) {
     if (opts.strictNumbers && typeof rawValue !== 'number') {
       ignored++
@@ -47,16 +49,21 @@ export async function processDevicePayload(
     }
 
     await ensureDeviceVariable(app.db, deviceId, variable)
-    await insertDot(app.db, now, deviceId, variable, value)
-
-    await app.redis.set(
-      `last:${deviceId}:${variable}`,
-      JSON.stringify({ value, time: now }),
-      { EX: 86400 }
-    )
-
-    app.realtime.broadcast(deviceId, variable, value, now)
+    batchRows.push({ time: now, deviceId, variable, value })
     saved++
+  }
+
+  if (batchRows.length > 0) {
+    await insertBatch(app.db, batchRows)
+
+    for (const row of batchRows) {
+      await app.redis.set(
+        `last:${row.deviceId}:${row.variable}`,
+        JSON.stringify({ value: row.value, time: now }),
+        { EX: 86400 }
+      )
+      app.realtime.broadcast(row.deviceId, row.variable, row.value, now)
+    }
   }
 
   await updateLastSeen(app.db, deviceId, now)

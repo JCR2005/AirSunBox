@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import type { MqttClient } from 'mqtt'
 import type { JwtPayload, RealtimeService, RedisLike } from './index.js'
 import type { AlertQueue } from '../services/alertQueue.js'
+import type { IngestQueue } from '../services/ingestQueue.js'
 
 declare module '@fastify/jwt' {
   interface FastifyJWT {
@@ -18,6 +19,7 @@ declare module 'fastify' {
     realtime: RealtimeService
     mqtt: MqttClient
     alertQueue: AlertQueue
+    ingestQueue: IngestQueue
     authenticate(request: FastifyRequest, reply: FastifyReply): Promise<void>
   }
 }

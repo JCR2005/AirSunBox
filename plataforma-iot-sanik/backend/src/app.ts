@@ -3,6 +3,8 @@ import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import websocket from '@fastify/websocket'
+import rateLimit from '@fastify/rate-limit'
+import { Redis } from 'ioredis'
 import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { registry, registerDefaultMetrics, getMetrics } from './services/metrics.js'
@@ -13,6 +15,7 @@ import redisPlugin from './plugins/redis.js'
 import mqttPlugin from './plugins/mqtt.js'
 import realtimePlugin from './plugins/realtime.js'
 import alertQueuePlugin from './plugins/queue.js'
+import ingestQueuePlugin from './plugins/ingestQueue.js'
 
 import authRoutes from './routes/auth.js'
 import devicesRoutes from './routes/devices.js'
@@ -71,6 +74,50 @@ await app.register(websocket)
 // ── Servicios ──────────────────────────────────
 await app.register(dbPlugin)
 await app.register(redisPlugin)
+await app.register(ingestQueuePlugin)
+
+const rateLimitRedis = new Redis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: Number(process.env.REDIS_PORT || 6379),
+  maxRetriesPerRequest: null,
+  enableReadyCheck: true,
+  lazyConnect: true
+})
+
+await rateLimitRedis.connect()
+
+await app.register(rateLimit, {
+  global: true,
+  max: (req) => {
+    const path = req.routeOptions?.url || req.url
+    if (path.startsWith('/api/auth/')) return 10
+    if (path.startsWith('/api/dots/')) return 200
+    if (path.startsWith('/ws')) return 5
+    return 200
+  },
+  timeWindow: '1 minute',
+  keyGenerator: (req) => {
+    const path = req.routeOptions?.url || req.url
+    const prefix = path.startsWith('/api/auth/') ? 'auth' :
+                   path.startsWith('/api/dots/') ? 'dots' :
+                   path.startsWith('/ws') ? 'ws' : 'api'
+    return `${prefix}:${req.ip}`
+  },
+  redis: rateLimitRedis,
+  addHeaders: {
+    'x-ratelimit-limit': true,
+    'x-ratelimit-remaining': true,
+    'x-ratelimit-reset': true
+  },
+  errorResponseBuilder: (_req, context: any) => {
+    const err = new Error(`Rate limit exceeded, retry in ${context.after}`)
+    ;(err as Error & { statusCode: number }).statusCode = context.statusCode
+    return err
+  },
+  ban: 300,
+  skipOnError: true
+})
+
 await app.register(mqttPlugin)
 await app.register(realtimePlugin)
 await app.register(alertQueuePlugin)
@@ -140,6 +187,10 @@ app.get('/health', () => ({ status: 'ok', service: 'sanik-backend', version: '2.
 app.get('/metrics', async () => {
   const metrics = await getMetrics()
   return metrics
+})
+
+app.addHook('onClose', async () => {
+  await rateLimitRedis.quit()
 })
 
 // ── Arrancar ───────────────────────────────────

@@ -128,6 +128,23 @@ export async function insert(db: Queryable, time: Date, deviceId: string, variab
   )
 }
 
+export async function insertBatch(
+  db: Queryable,
+  rows: Array<{ time: Date; deviceId: string; variable: string; value: number }>
+): Promise<void> {
+  if (rows.length === 0) return
+  const values: (Date | string | number)[] = []
+  const placeholders = rows.map((_, i) => {
+    const base = i * 4
+    values.push(rows[i].time, rows[i].deviceId, rows[i].variable, rows[i].value)
+    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4})`
+  }).join(', ')
+  await db.query(
+    `INSERT INTO dots (time, device_id, variable, value) VALUES ${placeholders}`,
+    values
+  )
+}
+
 export async function ensureDeviceVariable(db: Queryable, deviceId: string, variableLabel: string): Promise<void> {
   await db.query(
     `INSERT INTO device_variables (device_id, variable_label)
