@@ -92,7 +92,7 @@ await app.register(rateLimit, {
     const path = req.routeOptions?.url || req.url
     if (path.startsWith('/api/auth/')) return 10
     if (path.startsWith('/api/dots/')) return 200
-    if (path.startsWith('/ws')) return 5
+    if (path.startsWith('/ws')) return 60
     return 200
   },
   timeWindow: '1 minute',

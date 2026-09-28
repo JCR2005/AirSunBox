@@ -171,7 +171,6 @@ export async function listVariablesCatalog(db: Queryable) {
   const { rows } = await db.query(
     `SELECT label, name, unit, icon, description, data_type
      FROM variable_catalog
-     WHERE space_id IS NULL
      ORDER BY name ASC`
   )
   return rows

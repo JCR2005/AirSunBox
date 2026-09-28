@@ -239,6 +239,10 @@ export async function getDeviceAqi(db: Queryable, deviceId: string): Promise<Aqi
     const latestValues: Record<string, number> = {}
     for (const dot of latestDots) latestValues[dot.variable] = Number(dot.value)
 
+    if (!Object.keys(latestValues).length) {
+      return { aqi: null, category: 'Sin datos', dominant: null, variables: {}, categories: [], metadata: null, source: 'space', spaceId: device.space_id }
+    }
+
     const res = computeAqi(latestValues, config)
     return {
       aqi: res.aqi,
