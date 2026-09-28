@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import ClienteLayout from '../components/sanik/ClienteLayout'
 import AdminLayout from '../components/admin/AdminLayout'
 import useAuthStore from '../store/auth'
@@ -6,8 +6,14 @@ import { reports as reportsApi, organizations as orgsApi } from '../services/api
 import { 
   BarChart3, Thermometer, Wind, Filter, Calendar, 
   Map as MapIcon, Download, AlertCircle, Info, RefreshCw,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet
 } from 'lucide-react'
+import { 
+  exportHeatmapPDF, 
+  exportHeatmapExcel, 
+  exportRespiratoryRiskPDF, 
+  exportRespiratoryRiskExcel 
+} from '../utils/exportUtils'
 
 // Leaflet
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
@@ -165,6 +171,49 @@ export default function Reports() {
   // Quetzaltenango coords por defecto
   const XELA_COORDS = [14.8347, -91.5181]
 
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const mapRef = useRef(null)
+
+  const getOrgName = () => {
+    if (isClient) return user?.orgName || 'Mi Organización'
+    if (!filters.orgId) return 'Todas las organizaciones'
+    const found = orgs.find(o => String(o.id) === String(filters.orgId))
+    return found ? found.name : 'Todas las organizaciones'
+  }
+
+  const handleExportPDF = async () => {
+    setExportingPdf(true)
+    try {
+      const orgName = getOrgName()
+      if (activeTab === 'heatmaps') {
+        await exportHeatmapPDF({ data: heatmapData, filters, orgName, mapElement: mapRef.current })
+      } else {
+        await exportRespiratoryRiskPDF({ data: riskData, filters, orgName })
+      }
+    } catch (err) {
+      console.error('Error exportando PDF:', err)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  const handleExportExcel = () => {
+    setExportingExcel(true)
+    try {
+      const orgName = getOrgName()
+      if (activeTab === 'heatmaps') {
+        exportHeatmapExcel({ data: heatmapData, filters, orgName })
+      } else {
+        exportRespiratoryRiskExcel({ data: riskData, filters, orgName })
+      }
+    } catch (err) {
+      console.error('Error exportando Excel:', err)
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
   // Detectar estaciones extremas
   const getExtremes = () => {
     if (heatmapData.length === 0) return { max: null, min: null };
@@ -202,13 +251,27 @@ export default function Reports() {
           <div className="flex items-center gap-3">
             <button 
               onClick={fetchData}
+              title="Actualizar datos"
               className="p-2.5 rounded-xl border hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}
             >
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button className="flex items-center gap-2 bg-[#67B7E8] hover:bg-[#52A8E0] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-[#67B7E8]/20">
-              <Download size={18} /> Exportar PDF
+            <button 
+              onClick={handleExportPDF}
+              disabled={exportingPdf || loading}
+              className="flex items-center gap-2 bg-[#67B7E8] hover:bg-[#52A8E0] text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-[#67B7E8]/20 disabled:opacity-50"
+            >
+              <Download size={18} className={exportingPdf ? 'animate-pulse' : ''} /> 
+              {exportingPdf ? 'Exportando...' : 'Exportar PDF'}
+            </button>
+            <button 
+              onClick={handleExportExcel}
+              disabled={exportingExcel || loading}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+            >
+              <FileSpreadsheet size={18} className={exportingExcel ? 'animate-pulse' : ''} /> 
+              {exportingExcel ? 'Exportando...' : 'Exportar Excel'}
             </button>
           </div>
         </div>
@@ -292,7 +355,7 @@ export default function Reports() {
         {/* Contenido Reporte 1: Islas de Calor */}
         {activeTab === 'heatmaps' && (
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 rounded-3xl overflow-hidden border shadow-sm relative min-h-[500px]" style={{ borderColor: 'var(--border)' }}>
+            <div ref={mapRef} className="lg:col-span-2 rounded-3xl overflow-hidden border shadow-sm relative min-h-[500px]" style={{ borderColor: 'var(--border)' }}>
               <MapContainer center={XELA_COORDS} zoom={13} style={{ height: '100%', width: '100%' }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <ChangeView center={XELA_COORDS} zoom={13} />

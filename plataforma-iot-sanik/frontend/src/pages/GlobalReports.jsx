@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import PublicLayout from '../components/sanik/PublicLayout'
 import { reports as reportsApi } from '../services/api'
 import { 
   BarChart3, Thermometer, Wind, Calendar, 
   Download, AlertCircle, Info, RefreshCw, Activity,
   ArrowUp, ArrowDown, Map as MapIcon, ShieldAlert,
-  Factory, AlertTriangle, Droplets, Zap
+  Factory, AlertTriangle, Droplets, Zap, FileSpreadsheet
 } from 'lucide-react'
+import { 
+  exportHeatmapPDF, 
+  exportHeatmapExcel, 
+  exportRespiratoryRiskPDF, 
+  exportRespiratoryRiskExcel 
+} from '../utils/exportUtils'
 
 // Leaflet
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
@@ -157,6 +163,40 @@ export default function GlobalReports() {
     return { max: maxStation, min: minStation };
   }
 
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const mapRef = useRef(null)
+
+  const handleExportPDF = async () => {
+    setExportingPdf(true)
+    try {
+      if (activeTab === 'heatmaps') {
+        await exportHeatmapPDF({ data: heatmapData, filters, orgName: 'Red Sanik Global', mapElement: mapRef.current })
+      } else if (activeTab === 'respiratory') {
+        await exportRespiratoryRiskPDF({ data: riskData, filters, orgName: 'Red Sanik Global' })
+      }
+    } catch (err) {
+      console.error('Error exportando PDF:', err)
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  const handleExportExcel = () => {
+    setExportingExcel(true)
+    try {
+      if (activeTab === 'heatmaps') {
+        exportHeatmapExcel({ data: heatmapData, filters, orgName: 'Red Sanik Global' })
+      } else if (activeTab === 'respiratory') {
+        exportRespiratoryRiskExcel({ data: riskData, filters, orgName: 'Red Sanik Global' })
+      }
+    } catch (err) {
+      console.error('Error exportando Excel:', err)
+    } finally {
+      setExportingExcel(false)
+    }
+  }
+
   const extremes = getExtremes();
 
   return (
@@ -173,16 +213,30 @@ export default function GlobalReports() {
             </p>
           </div>
           
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
             <button 
               onClick={fetchData}
+              title="Actualizar datos"
               className="p-2 md:p-3 rounded-2xl border hover:bg-black/5 dark:hover:bg-white/5 transition-all"
               style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}
             >
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#67B7E8] hover:bg-[#52A8E0] text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-xl shadow-[#67B7E8]/30">
-              <Download size={18} /> <span className="whitespace-nowrap">Descargar Reporte</span>
+            <button 
+              onClick={handleExportPDF}
+              disabled={exportingPdf || loading}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-[#67B7E8] hover:bg-[#52A8E0] text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-xl shadow-[#67B7E8]/30 disabled:opacity-50"
+            >
+              <Download size={18} className={exportingPdf ? 'animate-pulse' : ''} /> 
+              <span className="whitespace-nowrap">{exportingPdf ? 'Exportando...' : 'Exportar PDF'}</span>
+            </button>
+            <button 
+              onClick={handleExportExcel}
+              disabled={exportingExcel || loading}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 md:px-6 py-2.5 md:py-3 rounded-2xl text-xs md:text-sm font-bold transition-all shadow-xl shadow-emerald-600/30 disabled:opacity-50"
+            >
+              <FileSpreadsheet size={18} className={exportingExcel ? 'animate-pulse' : ''} /> 
+              <span className="whitespace-nowrap">{exportingExcel ? 'Exportando...' : 'Exportar Excel'}</span>
             </button>
           </div>
         </div>
@@ -252,7 +306,7 @@ export default function GlobalReports() {
         {/* Contenido Reporte 1: Islas de Calor */}
         {activeTab === 'heatmaps' && (
           <div className="grid lg:grid-cols-3 gap-6 md:gap-8">
-            <div className="lg:col-span-2 rounded-3xl md:rounded-[2.5rem] overflow-hidden border shadow-xl relative h-[400px] md:h-[500px] lg:h-auto lg:min-h-[600px]" style={{ borderColor: 'var(--border)' }}>
+            <div ref={mapRef} className="lg:col-span-2 rounded-3xl md:rounded-[2.5rem] overflow-hidden border shadow-xl relative h-[400px] md:h-[500px] lg:h-auto lg:min-h-[600px]" style={{ borderColor: 'var(--border)' }}>
               <MapContainer center={XELA_COORDS} zoom={13} style={{ height: '100%', width: '100%' }}>
                 <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                 <ChangeView center={XELA_COORDS} zoom={13} />
