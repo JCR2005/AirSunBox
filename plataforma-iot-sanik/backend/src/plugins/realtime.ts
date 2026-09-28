@@ -34,6 +34,18 @@ async function realtimePlugin(app: FastifyInstance) {
   await pubSub.connect()
   app.log.info(`🔌 Realtime pub/sub conectado — instanceId: ${instanceId}`)
 
+  // Redis pone una conexión en modo "subscriber" al usar subscribe(), y en ese
+  // estado solo admite (P|S)SUBSCRIBE / (P|S)UNSUBSCRIBE / PING / QUIT / RESET.
+  // Los hashes de presencia (hGet/hSet/keys/expire) necesitan su propia
+  // conexión, o Redis responde "ERR Can't execute 'hget'" y el proceso muere.
+  const presence = pubSub.duplicate()
+
+  presence.on('error', (err) => {
+    app.log.error(`Redis presence error: ${(err as Error).message}`)
+  })
+
+  await presence.connect()
+
   function genSocketId(): string {
     return `${instanceId}:${++socketIdCounter.current}`
   }
@@ -45,53 +57,53 @@ async function realtimePlugin(app: FastifyInstance) {
   async function addPresence(deviceId: string, socketId: string): Promise<void> {
     const key = `${PRESENCE_KEY_PREFIX}${deviceId}`
     const entry: PresenceEntry = { instanceId, socketIds: [socketId], updatedAt: Date.now() }
-    const existing = await pubSub.hGet(key, instanceId)
+    const existing = await presence.hGet(key, instanceId)
     if (existing) {
       const parsed = JSON.parse(existing) as PresenceEntry
       if (!parsed.socketIds.includes(socketId)) {
         parsed.socketIds.push(socketId)
         parsed.updatedAt = Date.now()
-        await pubSub.hSet(key, instanceId, JSON.stringify(parsed))
+        await presence.hSet(key, instanceId, JSON.stringify(parsed))
       }
     } else {
-      await pubSub.hSet(key, instanceId, JSON.stringify(entry))
+      await presence.hSet(key, instanceId, JSON.stringify(entry))
     }
-    await pubSub.expire(key, 3600)
+    await presence.expire(key, 3600)
   }
 
   async function removePresence(deviceId: string, socketId: string): Promise<void> {
     const key = `${PRESENCE_KEY_PREFIX}${deviceId}`
-    const existing = await pubSub.hGet(key, instanceId)
+    const existing = await presence.hGet(key, instanceId)
     if (existing) {
       const parsed = JSON.parse(existing) as PresenceEntry
       parsed.socketIds = parsed.socketIds.filter(id => id !== socketId)
       parsed.updatedAt = Date.now()
       if (parsed.socketIds.length === 0) {
-        await pubSub.hDel(key, instanceId)
+        await presence.hDel(key, instanceId)
       } else {
-        await pubSub.hSet(key, instanceId, JSON.stringify(parsed))
+        await presence.hSet(key, instanceId, JSON.stringify(parsed))
       }
     }
-    const count = await pubSub.hLen(key)
+    const count = await presence.hLen(key)
     if (count === 0) {
-      await pubSub.del(key)
+      await presence.del(key)
     }
   }
 
   async function removeAllPresence(socketId: string): Promise<void> {
     const pattern = `${PRESENCE_KEY_PREFIX}*`
-    const keys = await pubSub.keys(pattern)
+    const keys = await presence.keys(pattern)
     for (const key of keys) {
-      const existing = await pubSub.hGet(key, instanceId)
+      const existing = await presence.hGet(key, instanceId)
       if (existing) {
         const parsed = JSON.parse(existing) as PresenceEntry
         const filtered = parsed.socketIds.filter(id => id !== socketId)
         if (filtered.length === 0) {
-          await pubSub.hDel(key, instanceId)
+          await presence.hDel(key, instanceId)
         } else {
           parsed.socketIds = filtered
           parsed.updatedAt = Date.now()
-          await pubSub.hSet(key, instanceId, JSON.stringify(parsed))
+          await presence.hSet(key, instanceId, JSON.stringify(parsed))
         }
       }
     }
@@ -108,7 +120,9 @@ async function realtimePlugin(app: FastifyInstance) {
     socketToDevices.get(socket)!.add(deviceId)
 
     ;(socket as any).__sanik_socket_id = socketId
-    addPresence(deviceId, socketId)
+    addPresence(deviceId, socketId).catch((err) => {
+      app.log.error(`Error registrando presencia: ${(err as Error).message}`)
+    })
   }
 
   function unsubscribe(deviceId: string, socket: RealtimeSocket) {
@@ -222,7 +236,7 @@ async function realtimePlugin(app: FastifyInstance) {
   }
 
   app.addHook('onClose', async () => {
-    await pubSub.quit()
+    await Promise.allSettled([pubSub.quit(), presence.quit()])
   })
 
   const realtime: RealtimeService = {
