@@ -664,3 +664,368 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
 
   XLSX.writeFile(wb, `reporte_riesgo_respiratorio_${new Date().toISOString().slice(0, 10)}.xlsx`)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGISTROS POR ESTACIÓN — PDF
+// ─────────────────────────────────────────────────────────────────────────────
+
+const UNIT_BY_VARIABLE = {
+  temperatura: '°C',
+  humedad: '% HR',
+  co: 'ppm',
+  co2: 'ppm',
+  nh3: 'ppm',
+  no2: 'ppb',
+  nox: 'ppb',
+  o3: 'ppb',
+  pm1: 'µg/m³',
+  pm10: 'µg/m³',
+  pm25: 'µg/m³',
+  so2: 'ppb'
+}
+
+const LABEL_BY_VARIABLE = {
+  temperatura: 'Temperatura',
+  humedad: 'Humedad relativa',
+  co: 'Monóxido de carbono',
+  co2: 'Dióxido de carbono',
+  nh3: 'Amoníaco',
+  no2: 'Dióxido de nitrógeno',
+  nox: 'Óxidos de nitrógeno',
+  o3: 'Ozono',
+  pm1: 'Partículas < 1 µm',
+  pm10: 'Partículas < 10 µm',
+  pm25: 'Partículas < 2.5 µm',
+  so2: 'Dióxido de azufre'
+}
+
+const CATEGORY_COLORS = {
+  Excelente: [22, 101, 52],
+  Buena: [5, 150, 105],
+  'Precaución': [202, 138, 4],
+  Moderada: [202, 138, 4],
+  Mala: [220, 38, 38],
+  'Muy Mala': [190, 18, 60],
+  Peligrosa: [190, 18, 60],
+  Severa: [136, 19, 55]
+}
+
+function formatTimestamp(iso) {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return String(iso)
+  const p = n => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+function humanDuration(hours) {
+  if (hours === null || hours === undefined) return '—'
+  if (hours < 1) return `${Math.round(hours * 60)} minutos`
+  if (hours < 48) return `${Number(hours.toFixed(2))} horas`
+  return `${Number((hours / 24).toFixed(2))} días`
+}
+
+function slugify(text) {
+  return String(text || 'estacion')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+export function exportStationRecordsPDF(payload = {}) {
+  const { device = {}, period = {}, coverage = {}, variables = [] } = payload
+  const doc = new jsPDF('p', 'mm', 'a4')
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const left = 14
+  const usable = pageWidth - left * 2
+
+  // ── Portada de identificación ──
+  doc.setFillColor(103, 183, 232)
+  doc.rect(0, 0, pageWidth, 34, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(20)
+  doc.text('Registros de Medición', left, 14)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.text(device.name || 'Estación sin nombre', left, 21)
+  doc.setFontSize(8)
+  doc.text('AirSunBox — Plataforma IoT Sanik', left, 27)
+
+  // ── Datos de la estación (lugar) ──
+  doc.setTextColor(30, 41, 59)
+  doc.setFillColor(248, 250, 252)
+  doc.setDrawColor(226, 232, 240)
+  doc.roundedRect(left, 40, usable, 42, 2, 2, 'FD')
+  doc.setFontSize(9)
+
+  const coords =
+    device.lat !== null && device.lat !== undefined && device.lng !== null && device.lng !== undefined
+      ? `${Number(device.lat).toFixed(6)}, ${Number(device.lng).toFixed(6)}`
+      : 'Sin coordenadas'
+
+  const identidad = [
+    ['Estación', device.name || '—'],
+    ['Serial', device.serial || '—'],
+    ['Espacio / Zona', device.space_name || '—'],
+    ['Coordenadas', coords]
+  ]
+  identidad.forEach(([k, v], i) => {
+    const y = 47 + i * 5
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(71, 85, 105)
+    doc.text(`${k}:`, left + 3, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(17, 24, 39)
+    doc.text(String(v), left + 42, y)
+  })
+
+  // ── Datos del período (fecha y duración) ──
+  const periodo = [
+    ['Desde', formatTimestamp(period.start)],
+    ['Hasta', formatTimestamp(period.end)],
+    ['Duración', humanDuration(period.durationHours)],
+    ['Lecturas', `${coverage.totalReadings ?? 0} en total · ${variables.length} variables`]
+  ]
+  periodo.forEach(([k, v], i) => {
+    const y = 47 + i * 5
+    const x = left + usable / 2 + 4
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(71, 85, 105)
+    doc.text(`${k}:`, x, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(17, 24, 39)
+    doc.text(String(v), x + 30, y)
+  })
+
+  let y = 88
+
+  // ── Aviso de truncamiento ──
+  if (coverage.truncated) {
+    doc.setFillColor(254, 243, 199)
+    doc.setDrawColor(252, 211, 77)
+    doc.roundedRect(left, y, usable, 12, 2, 2, 'FD')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(120, 53, 15)
+    doc.text(
+      `Documento recortado: se incluyen hasta ${coverage.limitPerVariable} lecturas por variable.`,
+      left + 3, y + 4.5
+    )
+    doc.setFont('helvetica', 'normal')
+    doc.text(
+      `Para el volcado completo (${coverage.totalReadings} lecturas) exporte a Excel.`,
+      left + 3, y + 9
+    )
+    y += 18
+  }
+
+  // ── Índice de variables ──
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(12)
+  doc.setTextColor(30, 41, 59)
+  doc.text('Resumen por variable', left, y)
+  y += 6
+
+  const idxHeaders = ['Variable', 'Unidad', 'Lecturas', 'Mínimo', 'Promedio', 'Máximo', 'No incl.']
+  const idxWidths = [44, 18, 20, 22, 24, 22, 20]
+  const idxTotal = idxWidths.reduce((a, b) => a + b, 0)
+  const scale = usable / idxTotal
+  const idxCols = idxWidths.map(w => w * scale)
+
+  doc.setFillColor(226, 232, 240)
+  doc.rect(left, y, usable, 7, 'F')
+  doc.setFontSize(8)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30, 41, 59)
+  let ix = left + 2
+  idxHeaders.forEach((h, i) => {
+    doc.text(h, ix, y + 4.8)
+    ix += idxCols[i]
+  })
+  y += 7
+
+  doc.setFont('helvetica', 'normal')
+  variables.forEach((v, i) => {
+    if (i % 2 === 1) {
+      doc.setFillColor(248, 250, 252)
+      doc.rect(left, y, usable, 6, 'F')
+    }
+    const unit = UNIT_BY_VARIABLE[v.variable] || ''
+    const omitted = v.total - v.readings.length
+    const row = [
+      LABEL_BY_VARIABLE[v.variable] || v.variable,
+      unit,
+      String(v.total),
+      v.min === null ? '—' : Number(v.min).toFixed(2),
+      v.avg === null ? '—' : Number(v.avg).toFixed(2),
+      v.max === null ? '—' : Number(v.max).toFixed(2),
+      omitted > 0 ? `+${omitted}` : '—'
+    ]
+    let cx = left + 2
+    row.forEach((cell, i) => {
+      if (i === 6 && omitted > 0) {
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(180, 83, 9)
+      } else {
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(55, 65, 81)
+      }
+      doc.text(cell, cx, y + 4.2)
+      cx += idxCols[i]
+    })
+    y += 6
+  })
+
+  // ── Detalle por variable ──
+  for (const v of variables) {
+    if (!v.readings.length) continue
+    y += 8
+    if (y > pageHeight - 30) {
+      // el encabezado y pie definitivos los aplica el loop final sobre todas las páginas
+      doc.addPage()
+      y = 20
+    }
+
+    const unit = UNIT_BY_VARIABLE[v.variable] || ''
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.setTextColor(30, 41, 59)
+    doc.text(LABEL_BY_VARIABLE[v.variable] || v.variable, left, y)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 116, 139)
+    const sufijo = v.truncated ? ` — ${v.readings.length} de ${v.total} lecturas` : ` — ${v.readings.length} lecturas`
+    doc.text(`${unit} ${sufijo}`, pageWidth - left, y, { align: 'right' })
+    y += 5
+
+    const headers = ['Fecha y hora', 'Valor', 'Unidad', 'Categoría', 'Puntaje']
+    const widths = [46, 30, 22, 48, 24]
+    const tScale = usable / widths.reduce((a, b) => a + b, 0)
+    const cols = widths.map(w => w * tScale)
+
+    const drawHead = () => {
+      doc.setFillColor(51, 65, 85)
+      doc.rect(left, y, usable, 6.5, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(255, 255, 255)
+      let hx = left + 2
+      headers.forEach((h, i) => {
+        doc.text(h, hx, y + 4.4)
+        hx += cols[i]
+      })
+      y += 6.5
+      doc.setFont('helvetica', 'normal')
+    }
+    drawHead()
+
+    v.readings.forEach((r, i) => {
+      if (y > pageHeight - 16) {
+        doc.addPage()
+        y = 20
+        drawHead()
+      }
+      if (i % 2 === 1) {
+        doc.setFillColor(249, 250, 251)
+        doc.rect(left, y, usable, 5.6, 'F')
+      }
+      const cells = [formatTimestamp(r.time), Number(r.value).toFixed(2), unit, r.category || '—', r.score ?? '—']
+      let cx = left + 2
+      cells.forEach((cell, ci) => {
+        if (ci === 3 && r.category && CATEGORY_COLORS[r.category]) {
+          const [rr, gg, bb] = CATEGORY_COLORS[r.category]
+          doc.setTextColor(rr, gg, bb)
+          doc.setFont('helvetica', 'bold')
+        } else {
+          doc.setTextColor(55, 65, 81)
+          doc.setFont('helvetica', 'normal')
+        }
+        doc.text(String(cell), cx, y + 3.9)
+        cx += cols[ci]
+      })
+      doc.setFont('helvetica', 'normal')
+      y += 5.6
+    })
+  }
+
+  const total = doc.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p)
+    addPdfHeaderFooter(doc, 'Registros de Medición', p, total)
+  }
+
+  doc.save(`registros_${slugify(device.name)}_${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGISTROS POR ESTACIÓN — EXCEL (volcado completo)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function exportStationRecordsExcel(payload = {}) {
+  const { device = {}, period = {}, coverage = {}, variables = [] } = payload
+  const wb = XLSX.utils.book_new()
+
+  const resumen = [
+    ['REGISTRO DE MEDICIONES POR ESTACIÓN'],
+    [],
+    ['Estación', device.name || '—'],
+    ['Serial', device.serial || '—'],
+    ['Espacio / Zona', device.space_name || '—'],
+    [
+      'Coordenadas',
+      device.lat !== null && device.lat !== undefined && device.lng !== null && device.lng !== undefined
+        ? `${Number(device.lat).toFixed(6)}, ${Number(device.lng).toFixed(6)}`
+        : 'Sin coordenadas'
+    ],
+    [],
+    ['Desde', formatTimestamp(period.start)],
+    ['Hasta', formatTimestamp(period.end)],
+    ['Duración', humanDuration(period.durationHours)],
+    ['Lecturas totales', coverage.totalReadings ?? 0],
+    ['Variables', variables.length],
+    [],
+    ['Nota', 'Volcado completo: incluye todas las lecturas del rango, sin recorte.']
+  ]
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumen)
+  wsResumen['!cols'] = [{ wch: 22 }, { wch: 62 }]
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Estación')
+
+  const estadisticas = [['Variable', 'Unidad', 'Lecturas', 'Mínimo', 'Promedio', 'Máximo']]
+  variables.forEach(v => {
+    estadisticas.push([
+      LABEL_BY_VARIABLE[v.variable] || v.variable,
+      UNIT_BY_VARIABLE[v.variable] || '',
+      v.total,
+      v.min === null ? '—' : Number(v.min).toFixed(2),
+      v.avg === null ? '—' : Number(v.avg).toFixed(2),
+      v.max === null ? '—' : Number(v.max).toFixed(2)
+    ])
+  })
+  const wsStats = XLSX.utils.aoa_to_sheet(estadisticas)
+  wsStats['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }]
+  XLSX.utils.book_append_sheet(wb, wsStats, 'Resumen')
+
+  // Una hoja por variable: el volcado íntegro, sin el tope del PDF
+  variables.forEach(v => {
+    if (!v.readings.length) return
+    const rows = [['Fecha y hora', 'Valor', 'Unidad', 'Categoría', 'Puntaje']]
+    v.readings.forEach(r => {
+      rows.push([
+        formatTimestamp(r.time),
+        Number(r.value).toFixed(2),
+        UNIT_BY_VARIABLE[v.variable] || '',
+        r.category || '',
+        r.score ?? ''
+      ])
+    })
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    ws['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 10 }]
+    const sheetName = (LABEL_BY_VARIABLE[v.variable] || v.variable).slice(0, 31)
+    XLSX.utils.book_append_sheet(wb, ws, sheetName)
+  })
+
+  XLSX.writeFile(wb, `registros_${slugify(device.name)}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+}

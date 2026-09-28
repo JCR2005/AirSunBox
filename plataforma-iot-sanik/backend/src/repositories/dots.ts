@@ -121,6 +121,171 @@ export async function pageRaw(db: Queryable, deviceId: string, variable: string,
   return rows.map(r => ({ time: new Date(r.time).toISOString(), value: Number(r.value) }))
 }
 
+export interface QualityBand {
+  category: string
+  score: number
+  min_value: number
+  max_value: number | null
+}
+
+export interface StationReading {
+  time: string
+  value: number
+  category: string | null
+  score: number | null
+}
+
+export interface StationVariableRecords {
+  variable: string
+  total: number
+  min: number | null
+  avg: number | null
+  max: number | null
+  firstTime: string | null
+  lastTime: string | null
+  truncated: boolean
+  readings: StationReading[]
+}
+
+export interface StationCoverage {
+  firstReading: string | null
+  lastReading: string | null
+  totalReadings: number
+  includedReadings: number
+  truncated: boolean
+  limitPerVariable: number
+}
+
+export interface StationIdentity {
+  id: string
+  name: string
+  serial: string | null
+  lat: number | null
+  lng: number | null
+  space_name: string | null
+}
+
+export async function stationIdentity(db: Queryable, deviceId: string): Promise<StationIdentity | null> {
+  const { rows } = await db.query<StationIdentity>(
+    `SELECT d.id, d.name, d.serial, d.lat, d.lng, s.name AS space_name
+     FROM devices d
+     LEFT JOIN spaces s ON s.id = d.space_id
+     WHERE d.id = $1`,
+    [deviceId]
+  )
+  return rows[0] || null
+}
+
+export async function qualityBands(db: Queryable, variables: string[]): Promise<Record<string, QualityBand[]>> {
+  if (!variables.length) return {}
+  const { rows } = await db.query<QualityBand & { variable_label: string }>(
+    `SELECT variable_label, category, score, min_value, max_value
+     FROM air_quality_ranges
+     WHERE variable_label = ANY($1)
+     ORDER BY variable_label, min_value`,
+    [variables]
+  )
+  const grouped: Record<string, QualityBand[]> = {}
+  for (const row of rows) {
+    if (!grouped[row.variable_label]) grouped[row.variable_label] = []
+    grouped[row.variable_label].push(row)
+  }
+  return grouped
+}
+
+function classify(bands: QualityBand[] | undefined, value: number): Pick<StationReading, 'category' | 'score'> {
+  if (!bands) return { category: null, score: null }
+  const band = bands.find(b => b.min_value <= value && (b.max_value === null || b.max_value > value))
+  return band ? { category: band.category, score: band.score } : { category: null, score: null }
+}
+
+export async function stationRecords(
+  db: Queryable,
+  deviceId: string,
+  start: Date,
+  end: Date,
+  limitPerVariable: number
+): Promise<StationVariableRecords[]> {
+  // Estadísticas sobre todo el rango: el recorte del PDF no debe alterarlas
+  const { rows: stats } = await db.query<{
+    variable: string
+    total: number
+    min: string | null
+    avg: string | null
+    max: string | null
+    first_time: Date
+    last_time: Date
+  }>(
+    `SELECT variable,
+            COUNT(*)::int AS total,
+            MIN(value) AS min,
+            AVG(value) AS avg,
+            MAX(value) AS max,
+            MIN(time) AS first_time,
+            MAX(time) AS last_time
+     FROM dots
+     WHERE device_id = $1 AND time >= $2 AND time <= $3
+     GROUP BY variable
+     ORDER BY variable`,
+    [deviceId, start, end]
+  )
+
+  if (!stats.length) return []
+
+  // row_number() permite tope por variable en una sola pasada
+  const { rows: capped } = await db.query<{ variable: string; time: Date; value: string | number; rn: number }>(
+    `SELECT variable, time, value,
+            ROW_NUMBER() OVER (PARTITION BY variable ORDER BY time DESC) AS rn
+     FROM dots
+     WHERE device_id = $1 AND time >= $2 AND time <= $3`,
+    [deviceId, start, end]
+  )
+
+  const bands = await qualityBands(db, stats.map(s => s.variable))
+  const kept = capped.filter(r => r.rn <= limitPerVariable)
+
+  return stats.map(s => {
+    const readings = kept
+      .filter(r => r.variable === s.variable)
+      .sort((a, b) => b.rn - a.rn)
+      .map(r => {
+        const value = Number(r.value)
+        return { time: new Date(r.time).toISOString(), value, ...classify(bands[s.variable], value) }
+      })
+
+    return {
+      variable: s.variable,
+      total: s.total,
+      min: s.min === null ? null : Number(s.min),
+      avg: s.avg === null ? null : Number(s.avg),
+      max: s.max === null ? null : Number(s.max),
+      firstTime: new Date(s.first_time).toISOString(),
+      lastTime: new Date(s.last_time).toISOString(),
+      truncated: s.total > limitPerVariable,
+      readings
+    }
+  })
+}
+
+export function stationCoverage(
+  variables: StationVariableRecords[],
+  limitPerVariable: number
+): StationCoverage {
+  const times = variables.map(v => v.firstTime).filter(Boolean) as string[]
+  const lastTimes = variables.map(v => v.lastTime).filter(Boolean) as string[]
+  const totalReadings = variables.reduce((acc, v) => acc + v.total, 0)
+  const includedReadings = variables.reduce((acc, v) => acc + v.readings.length, 0)
+
+  return {
+    firstReading: times.length ? times.reduce((a, b) => (a < b ? a : b)) : null,
+    lastReading: lastTimes.length ? lastTimes.reduce((a, b) => (a > b ? a : b)) : null,
+    totalReadings,
+    includedReadings,
+    truncated: includedReadings < totalReadings,
+    limitPerVariable
+  }
+}
+
 export async function insert(db: Queryable, time: Date, deviceId: string, variable: string, value: number): Promise<void> {
   await db.query(
     'INSERT INTO dots (time, device_id, variable, value) VALUES ($1, $2, $3, $4)',

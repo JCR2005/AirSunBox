@@ -133,6 +133,51 @@ export default async function dotsRoutes(app: FastifyInstance) {
     return result
   })
 
+  // ── 5. REGISTROS POR ESTACIÓN (PDF / Excel) ──
+  api.get('/:deviceId/records', {
+    schema: {
+      params: Type.Object({ deviceId: Type.String() }),
+      querystring: Type.Object({
+        start: Type.Optional(Type.String()),
+        end: Type.Optional(Type.String()),
+        limit: Type.Optional(Type.String())
+      })
+    }
+  }, async (req, reply) => {
+    const { deviceId } = req.params
+
+    const allowed = await canAccessDevice(deviceId, req.user.role, req.user.orgId)
+    if (allowed === null) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+    if (allowed === false) return reply.code(403).send({ error: 'Sin acceso' })
+
+    const end = req.query.end ? new Date(req.query.end) : new Date()
+    const start = req.query.start ? new Date(req.query.start) : new Date(end.getTime() - 7 * 24 * 3600 * 1000)
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return reply.code(400).send({ error: 'Rango de fechas inválido' })
+    }
+    if (start > end) return reply.code(400).send({ error: 'La fecha inicial es posterior a la final' })
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit ?? '2000', 10) || 2000, 1), 20000)
+
+    const device = await dotsRepo.stationIdentity(app.db, deviceId)
+    if (!device) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+
+    const variables = await dotsRepo.stationRecords(app.db, deviceId, start, end, limit)
+    const coverage = dotsRepo.stationCoverage(variables, limit)
+
+    return {
+      device,
+      period: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        durationHours: Number(((end.getTime() - start.getTime()) / 3600000).toFixed(2))
+      },
+      coverage,
+      variables
+    }
+  })
+
   // ── 4. RECIBIR DATOS DEL HARDWARE (POST) ──
   api.post('/:deviceToken', {
     schema: {

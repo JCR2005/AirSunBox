@@ -160,10 +160,12 @@ export default async function variablesRoutes(app: FastifyInstance) {
     }
   }, async (req) => {
     const cleanLabel = req.params.label.toLowerCase().trim()
+    // Las bandas viven en air_quality_ranges; variable_catalog no tiene esas columnas
     const { rows } = await app.db.query(
-      `SELECT min_value, max_value, category
-       FROM variable_catalog
-       WHERE label = $1`,
+      `SELECT min_value, max_value, category, score
+       FROM air_quality_ranges
+       WHERE variable_label = $1
+       ORDER BY min_value`,
       [cleanLabel]
     )
     return rows

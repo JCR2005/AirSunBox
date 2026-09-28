@@ -6,8 +6,10 @@ import ClienteLayout from '../components/sanik/ClienteLayout'
 import { devices as devicesApi, dots as dotsApi, variables as variablesApi } from '../services/api' 
 
 import { 
-  ArrowLeft, Download, Trash2, Clock, Calendar, AlertCircle, ChevronLeft, ChevronRight, BarChart2, Check
+  ArrowLeft, Download, Trash2, Clock, Calendar, AlertCircle, ChevronLeft, ChevronRight, BarChart2, Check,
+  FileText, FileSpreadsheet, ClipboardList
 } from 'lucide-react'
+import { exportStationRecordsPDF, exportStationRecordsExcel } from '../utils/exportUtils'
 
 // Modificadores estructurales de funciones matemáticas de Ubidots
 const AGGREGATIONS = [
@@ -86,6 +88,10 @@ export default function VariableDetail() {
   const [rowsPerPage, setRowsPerPage] = useState(10)
   const [totalRecords, setTotalRecords] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
+
+  // Exportación de registros por estación (todas las variables del dispositivo)
+  const [exportingRecords, setExportingRecords] = useState(null)
+  const [recordsNotice, setRecordsNotice] = useState(null)
   
   const cleanVariable = String(variableLabel || '').toLowerCase()
   const isRawMode = aggregation === 'raw'
@@ -223,6 +229,74 @@ export default function VariableDetail() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+  }
+
+  // Convierte el rango activo del filtro en fechas explícitas para el backend
+  const resolveRange = () => {
+    const { range, start, end } = activeTimeFilter
+
+    // handleApplyTimeFilter guarda range: null cuando es custom, con fechas datetime-local
+    if (start && end) {
+      const from = new Date(start)
+      const to = new Date(end)
+      if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime())) {
+        return { start: from.toISOString(), end: to.toISOString() }
+      }
+    }
+
+    const now = new Date()
+    const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    let from
+    switch (range) {
+      case 'last_1_hour':   from = new Date(now.getTime() - 3600e3); break
+      case 'today':         from = startOfDay(now); break
+      case 'yesterday': {
+        const y = new Date(now); y.setDate(y.getDate() - 1)
+        from = startOfDay(y); break
+      }
+      case 'this_week': {
+        const d = startOfDay(now)
+        const weekday = (d.getDay() + 6) % 7
+        from = new Date(d.getTime() - weekday * 86400e3); break
+      }
+      case 'last_7_days':   from = new Date(now.getTime() - 7 * 86400e3); break
+      case 'this_month':    from = new Date(now.getFullYear(), now.getMonth(), 1); break
+      case 'last_30_days':  from = new Date(now.getTime() - 30 * 86400e3); break
+      case 'last_3_months': from = new Date(now.getTime() - 90 * 86400e3); break
+      case 'last_6_months': from = new Date(now.getTime() - 180 * 86400e3); break
+      case 'this_year':     from = new Date(now.getFullYear(), 0, 1); break
+      default:              from = new Date(now.getTime() - 86400e3)
+    }
+    return { start: from.toISOString(), end: now.toISOString() }
+  }
+
+  // Registros de TODAS las variables de la estación, no solo la variable abierta
+  const exportStationRecords = async (format) => {
+    setRecordsNotice(null)
+    setExportingRecords(format)
+    try {
+      const { start, end } = resolveRange()
+      const payload = await dotsApi.stationRecords(deviceId, { start, end, limit: 2000 })
+
+      if (!payload.variables?.length) {
+        setRecordsNotice({ type: 'warn', text: 'No hay lecturas en el rango seleccionado.' })
+        return
+      }
+
+      if (format === 'pdf') exportStationRecordsPDF(payload)
+      else exportStationRecordsExcel(payload)
+
+      setRecordsNotice({
+        type: 'info',
+        text: payload.coverage.truncated
+          ? `PDF con ${payload.coverage.includedReadings.toLocaleString()} de ${payload.coverage.totalReadings.toLocaleString()} lecturas (tope de ${payload.coverage.limitPerVariable.toLocaleString()} por variable). Usá Excel para el volcado completo.`
+          : `${payload.coverage.totalReadings.toLocaleString()} lecturas exportadas.`
+      })
+    } catch (err) {
+      setRecordsNotice({ type: 'error', text: `No se pudo exportar: ${err.message}` })
+    } finally {
+      setExportingRecords(null)
+    }
   }
 
   return (
@@ -379,11 +453,58 @@ export default function VariableDetail() {
 
             <button
               onClick={exportToCSV}
-              className="w-full md:w-auto md:ml-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-[#1D9E75] text-white shadow-sm hover:bg-[#157858] transition-all"
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-[#1D9E75] text-white shadow-sm hover:bg-[#157858] transition-all"
             >
               <Download size={14} /> Exportar (.CSV)
             </button>
+
+            {/* REGISTROS DE LA ESTACIÓN: todas las variables, con fecha, duración y lugar */}
+            <div className="w-full md:w-auto flex items-center gap-2">
+              <button
+                onClick={() => exportStationRecords('pdf')}
+                disabled={exportingRecords !== null}
+                title="Registros de todas las variables de la estación (tope 2,000 por variable)"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-[#67B7E8] text-white shadow-sm hover:bg-[#52A8E0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exportingRecords === 'pdf'
+                  ? <><span className="animate-pulse">Generando…</span></>
+                  : <><ClipboardList size={14} /> Registros (.PDF)</>}
+              </button>
+              <button
+                onClick={() => exportStationRecords('xlsx')}
+                disabled={exportingRecords !== null}
+                title="Volcado completo de todas las variables de la estación, sin recorte"
+                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-black bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {exportingRecords === 'xlsx'
+                  ? <><span className="animate-pulse">Generando…</span></>
+                  : <><FileSpreadsheet size={14} /> Registros (.XLSX)</>}
+              </button>
+            </div>
           </div>
+
+          {recordsNotice && (
+            <div
+              className="flex items-start gap-2 rounded-2xl px-4 py-3 text-xs font-bold border"
+              style={
+                recordsNotice.type === 'error'
+                  ? { background: 'rgba(239,68,68,0.10)', borderColor: 'rgba(239,68,68,0.35)', color: '#b91c1c' }
+                  : recordsNotice.type === 'warn'
+                    ? { background: 'rgba(234,179,8,0.10)', borderColor: 'rgba(234,179,8,0.35)', color: '#a16207' }
+                    : { background: 'rgba(103,183,232,0.10)', borderColor: 'rgba(103,183,232,0.35)', color: 'var(--text)' }
+              }
+            >
+              {recordsNotice.type === 'error' ? <AlertCircle size={14} className="shrink-0 mt-px" /> : <FileText size={14} className="shrink-0 mt-px" />}
+              <span>{recordsNotice.text}</span>
+              <button
+                onClick={() => setRecordsNotice(null)}
+                className="ml-auto shrink-0 opacity-60 hover:opacity-100"
+                aria-label="Cerrar aviso"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {/* AREA GRÁFICA RESPONSIVA CON FONDOS DE COLORES */}
           <div className="border rounded-[2.5rem] p-6 shadow-sm relative min-h-[400px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>

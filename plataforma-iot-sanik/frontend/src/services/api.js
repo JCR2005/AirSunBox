@@ -75,7 +75,15 @@ export const dots = {
     request(`/dots/${deviceId}/${variable}/raw?page=${page}&limit=${limit}${orgId ? `&orgId=${orgId}` : ''}`),
 
   getMultiple: (deviceId, variables, range = '24h', orgId) =>
-    request(`/dots/${deviceId}?variables=${variables.join(',')}&range=${range}${orgId ? `&orgId=${orgId}` : ''}`)
+    request(`/dots/${deviceId}?variables=${variables.join(',')}&range=${range}${orgId ? `&orgId=${orgId}` : ''}`),
+
+  stationRecords: (deviceId, { start, end, limit = 2000 } = {}) => {
+    const q = new URLSearchParams()
+    if (start) q.set('start', start)
+    if (end) q.set('end', end)
+    q.set('limit', String(limit))
+    return request(`/dots/${deviceId}/records?${q.toString()}`)
+  }
 }
 
 export const alerts = {
