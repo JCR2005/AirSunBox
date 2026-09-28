@@ -101,8 +101,6 @@ export default function Alerts() {
         threshold: Number(form.threshold),
         cooldownMinutes: Number(form.cooldownMinutes) || 0,
         message: form.message?.trim() || DEFAULT_MESSAGE,
-        emailTo: form.useEmail ? (form.emailTo?.trim() || null) : null,
-        webhookUrl: form.useWebhook ? (form.webhookUrl?.trim() || null) : null,
         channel: form.useEmail && form.useWebhook
           ? 'both'
           : (form.useEmail ? 'email' : (form.useWebhook ? 'webhook' : (form.useTelegram ? 'telegram' : ''))),

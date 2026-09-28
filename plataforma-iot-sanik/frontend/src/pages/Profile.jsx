@@ -1,6 +1,7 @@
 import ClienteLayout from '../components/sanik/ClienteLayout'
 import useAuthStore from '../store/auth'
 import { User, Building2, Mail, Shield, Calendar } from 'lucide-react'
+import TwoFactorSection from '../components/security/TwoFactorSection'
 
 export default function Profile() {
   const { user, org } = useAuthStore()
@@ -88,17 +89,9 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Seguridad (Placeholder) */}
+            {/* Seguridad */}
             <div className="rounded-3xl p-8 border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-              <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: 'var(--text2)' }}>
-                <Mail size={16} /> Contacto & Soporte
-              </h3>
-              <p className="text-sm" style={{ color: 'var(--text2)' }}>
-                Si necesitas cambiar tu correo o actualizar los datos de tu organización, por favor contacta al equipo de Sanik.
-              </p>
-              <button className="mt-6 px-6 py-3 rounded-xl text-sm font-bold border transition-colors hover:bg-black/5 dark:hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-                Contactar Soporte
-              </button>
+              <TwoFactorSection />
             </div>
 
           </div>

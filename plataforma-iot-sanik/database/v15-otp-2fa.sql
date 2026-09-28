@@ -5,7 +5,10 @@
 -- USERS: campos OTP
 ALTER TABLE users 
   ADD COLUMN IF NOT EXISTS otp_code_hash TEXT,
-  ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS backup_codes TEXT[],
+  ADD COLUMN IF NOT EXISTS otp_failed_attempts INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS otp_locked_until TIMESTAMPTZ;
 
 -- ORGANIZATIONS: política 2FA
 ALTER TABLE organizations 

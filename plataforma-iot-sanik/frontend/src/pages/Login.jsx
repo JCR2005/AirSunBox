@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { auth } from '../services/api'
 import useAuthStore from '../store/auth'
 import MapPicker from '../components/MapPicker'
-import { Mail, Lock, Eye, EyeOff, Activity, Bell, ArrowLeft, Building2, User, Phone, MapPin, ChevronDown } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Activity, Bell, ArrowLeft, Building2, User, Phone, MapPin, ChevronDown, Shield, Loader2, ArrowRight } from 'lucide-react'
 
 import logoImg from "../assets/logo2.svg";
 
@@ -44,6 +44,8 @@ export default function Login() {
   const [regType, setRegType] = useState('organizacion')
   const [scrollHint, setScrollHint] = useState(false)
   const scrollRef = useRef(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [tempToken, setTempToken] = useState('')
 
   const updateScrollHint = () => {
     const el = scrollRef.current
@@ -63,10 +65,47 @@ export default function Login() {
     setError('')
     try {
       const res = await auth.login(form.email, form.password)
+      if (res.requiresOtp) {
+        setTempToken(res.tempToken)
+        setMode('otp')
+        setOtpCode('')
+        setError('')
+        setLoading(false)
+        return
+      }
       login(res.token, res.user, res.org)
       navigate(res.redirect || '/dispositivos')
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Credenciales incorrectas')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault()
+    if (!otpCode || otpCode.length !== 6) return
+    setLoading(true)
+    setError('')
+    try {
+      const res = await auth.verifyOtp(otpCode, tempToken)
+      login(res.token, res.user, res.org)
+      navigate(res.redirect || '/dispositivos')
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Código inválido o expirado')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      await auth.login(form.email, form.password)
+      setError('Se ha enviado un nuevo código a tu email')
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Error al reenviar código')
     } finally {
       setLoading(false)
     }
@@ -229,11 +268,13 @@ export default function Login() {
             </div>
 
             <h2 className="text-xl md:text-2xl font-bold mb-2 font-syne" style={{ color: COLORS.text }}>
-              {mode === 'register' ? 'Crea tu cuenta' : 'Inicia sesión'}
+              {mode === 'register' ? 'Crea tu cuenta' : mode === 'otp' ? 'Verificación 2FA' : 'Inicia sesión'}
             </h2>
             <p className="text-sm" style={{ color: COLORS.textMuted }}>
               {mode === 'register'
                 ? 'Regístrate gratis y gestiona tu monitoreo de calidad del aire'
+                : mode === 'otp'
+                ? 'Ingresa el código enviado a tu email'
                 : 'Usa tus credenciales para acceder al panel'}
             </p>
           </div>
@@ -255,269 +296,343 @@ export default function Login() {
               onScroll={updateScrollHint}
               className="h-full overflow-y-auto pr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
-          <form onSubmit={mode === 'register' ? handleRegister : handleSubmit} className="space-y-5">
-            {mode === 'register' && (
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                  Tipo de cuenta*
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRegType('individual')}
-                    className="flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all border"
-                    style={regType === 'individual'
-                      ? { background: COLORS.primary, color: '#fff', borderColor: COLORS.primary, boxShadow: `0 4px 12px ${COLORS.primary}40` }
-                      : { background: '#F8FAFC', color: COLORS.textMuted, borderColor: COLORS.border }}
-                  >
-                    <User size={16} /> Individual
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRegType('organizacion')}
-                    className="flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all border"
-                    style={regType === 'organizacion'
-                      ? { background: COLORS.primary, color: '#fff', borderColor: COLORS.primary, boxShadow: `0 4px 12px ${COLORS.primary}40` }
-                      : { background: '#F8FAFC', color: COLORS.textMuted, borderColor: COLORS.border }}
-                  >
-                    <Building2 size={16} /> Organización
-                  </button>
-                </div>
-                <p className="text-[11px] mt-2" style={{ color: COLORS.textMuted }}>
-                  {regType === 'individual'
-                    ? 'Para personas que quieren medir en casa o un proyecto personal.'
-                    : 'Para empresas, municipios, universidades u otras instituciones.'}
-                </p>
-              </div>
-            )}
-
-            {mode === 'register' && regType === 'organizacion' && (
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                  Nombre de la organización*
-                </label>
-                <div className="relative group">
-                  <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
-                  <input
-                    type="text"
-                    placeholder="Ej: Municipalidad de Sanik"
-                    value={reg.orgName}
-                    onChange={e => setReg({...reg, orgName: e.target.value})}
-                    onFocus={(e) => e.target.style.borderColor = COLORS.primary}
-                    onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                    className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                    style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            {mode === 'register' && (
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                  {regType === 'individual' ? 'Tu nombre completo' : 'Nombre del representante'}
-                </label>
-                <div className="relative group">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
-                  <input
-                    type="text"
-                    placeholder={regType === 'individual' ? 'Ej: Ana Pérez' : 'Ej: Ana Pérez (contacto)'}
-                    value={reg.name}
-                    onChange={e => setReg({...reg, name: e.target.value})}
-                    onFocus={(e) => e.target.style.borderColor = COLORS.primary}
-                    onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                    className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                    style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                Correo electrónico*
-              </label>
-              <div className="relative group">
-                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
-                <input
-                  type="email"
-                  placeholder="admin@AirSunBox.com"
-                  value={mode === 'register' ? reg.email : form.email}
-                  onChange={e => mode === 'register' ? setReg({...reg, email: e.target.value}) : setForm({...form, email: e.target.value})}
-                  className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                  style={{ 
-                    borderColor: COLORS.border,
-                    color: COLORS.text,
-                    '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = COLORS.primary}
-                  onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                Contraseña* 
-              </label>
-              <div className="relative group">
-                <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  value={mode === 'register' ? reg.password : form.password}
-                  onChange={e => mode === 'register' ? setReg({...reg, password: e.target.value}) : setForm({...form, password: e.target.value})}
-                  className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-12 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                  style={{ 
-                    borderColor: COLORS.border,
-                    color: COLORS.text,
-                    '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
-                  }}
-                  onFocus={(e) => e.target.style.borderColor = COLORS.primary}
-                  onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                  required
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShowPass(!showPass)} 
-                  className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors hover:scale-110"
-                  style={{ color: COLORS.textMuted }}
-                >
-                  {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {mode === 'register' && (
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                  Confirmar contraseña*
-                </label>
-                <div className="relative group">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
-                  <input
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={reg.confirmPassword}
-                    onChange={e => setReg({...reg, confirmPassword: e.target.value})}
-                    className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-12 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                    style={{ 
-                      borderColor: reg.confirmPassword && reg.confirmPassword !== reg.password ? '#F87171' : COLORS.border,
-                      color: COLORS.text,
-                      '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
-                    }}
-                    onFocus={(e) => e.target.style.borderColor = COLORS.primary}
-                    onBlur={(e) => e.target.style.borderColor = reg.confirmPassword && reg.confirmPassword !== reg.password ? '#F87171' : COLORS.border}
-                    required
-                  />
-                </div>
-                {reg.confirmPassword && reg.confirmPassword !== reg.password && (
-                  <p className="text-[11px] mt-1.5 font-semibold" style={{ color: '#F87171' }}>
-                    Las contraseñas no coinciden
+            {mode === 'otp' ? (
+              <div className="space-y-5 animate-in slide-in-from-top-2">
+                <div className="text-center mb-4">
+                  <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: 'rgba(103,183,232,0.12)', color: COLORS.primary }}>
+                    <Shield size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2" style={{ color: COLORS.text }}>Verificación 2FA</h3>
+                  <p className="text-sm" style={{ color: COLORS.textMuted }}>
+                    Hemos enviado un código de 6 dígitos a <strong>{form.email}</strong>
                   </p>
-                )}
+                </div>
+                
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2" style={{ color: COLORS.text }}>Código de 6 dígitos</label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="123456"
+                      className="w-full px-4 py-3.5 rounded-xl border text-center text-2xl tracking-widest font-mono transition-colors"
+                      style={{ background: '#F8FAFC', borderColor: COLORS.border, color: COLORS.text }}
+                      autoComplete="one-time-code"
+                      required
+                      disabled={loading}
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={loading || otpCode.length !== 6}
+                    className="w-full text-white font-bold py-3.5 rounded-xl transition-all duration-300 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ 
+                      background: `linear-gradient(to right, #3bb4ffff , #80ceffff)`,
+                      boxShadow: '0 4px 14px rgba(103, 183, 232, 0.3)' 
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span>Verificando...</span>
+                      </>
+                    ) : (
+                      <>
+                        Verificar código
+                        <ArrowRight size={18} />
+                      </>
+                    )}
+                  </button>
+                </form>
+                
+                <div className="flex items-center justify-center gap-4 text-sm">
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    disabled={loading}
+                    className="font-semibold hover:underline transition-colors"
+                    style={{ color: COLORS.primary }}
+                  >
+                    Reenviar código
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setError(''); setOtpCode(''); setTempToken(''); }}
+                    className="font-medium hover:underline"
+                    style={{ color: COLORS.textMuted }}
+                  >
+                    Volver al login
+                  </button>
+                </div>
               </div>
-            )}
+            ) : (
+              <form onSubmit={mode === 'register' ? handleRegister : handleSubmit} className="space-y-5">
+                {mode === 'register' && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                      Tipo de cuenta*
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRegType('individual')}
+                        className="flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all border"
+                        style={regType === 'individual'
+                          ? { background: COLORS.primary, color: '#fff', borderColor: COLORS.primary, boxShadow: `0 4px 12px ${COLORS.primary}40` }
+                          : { background: '#F8FAFC', color: COLORS.textMuted, borderColor: COLORS.border }}
+                      >
+                        <User size={16} /> Individual
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRegType('organizacion')}
+                        className="flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition-all border"
+                        style={regType === 'organizacion'
+                          ? { background: COLORS.primary, color: '#fff', borderColor: COLORS.primary, boxShadow: `0 4px 12px ${COLORS.primary}40` }
+                          : { background: '#F8FAFC', color: COLORS.textMuted, borderColor: COLORS.border }}
+                      >
+                        <Building2 size={16} /> Organización
+                      </button>
+                    </div>
+                    <p className="text-[11px] mt-2" style={{ color: COLORS.textMuted }}>
+                      {regType === 'individual'
+                        ? 'Para personas que quieren medir en casa o un proyecto personal.'
+                        : 'Para empresas, municipios, universidades u otras instituciones.'}
+                    </p>
+                  </div>
+                )}
 
-            {mode === 'register' && (
-              <>
+                {mode === 'register' && regType === 'organizacion' && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                      Nombre de la organización*
+                    </label>
+                    <div className="relative group">
+                      <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                      <input
+                        type="text"
+                        placeholder="Ej: Municipalidad de Sanik"
+                        value={reg.orgName}
+                        onChange={e => setReg({...reg, orgName: e.target.value})}
+                        onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+                        onBlur={(e) => e.target.style.borderColor = COLORS.border}
+                        className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                        style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {mode === 'register' && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                      {regType === 'individual' ? 'Tu nombre completo' : 'Nombre del representante'}
+                    </label>
+                    <div className="relative group">
+                      <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                      <input
+                        type="text"
+                        placeholder={regType === 'individual' ? 'Ej: Ana Pérez' : 'Ej: Ana Pérez (contacto)'}
+                        value={reg.name}
+                        onChange={e => setReg({...reg, name: e.target.value})}
+                        onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+                        onBlur={(e) => e.target.style.borderColor = COLORS.border}
+                        className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                        style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                    Teléfono <span className="normal-case font-normal">(opcional)</span>
+                    Correo electrónico*
                   </label>
                   <div className="relative group">
-                    <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                    <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
                     <input
-                      type="text"
-                      placeholder="+51 999 999 999"
-                      value={reg.phone}
-                      onChange={e => setReg({...reg, phone: e.target.value})}
+                      type="email"
+                      placeholder="admin@AirSunBox.com"
+                      value={mode === 'register' ? reg.email : form.email}
+                      onChange={e => mode === 'register' ? setReg({...reg, email: e.target.value}) : setForm({...form, email: e.target.value})}
+                      className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                      style={{ 
+                        borderColor: COLORS.border,
+                        color: COLORS.text,
+                        '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
+                      }}
                       onFocus={(e) => e.target.style.borderColor = COLORS.primary}
                       onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                      className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                      style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                      required
                     />
                   </div>
                 </div>
 
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
-                    Ubicación <span className="normal-case font-normal">(opcional)</span>
+                    Contraseña* 
                   </label>
-                  <div className="relative group mb-2">
-                    <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                  <div className="relative group">
+                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
                     <input
-                      type="text"
-                      placeholder="Ej: Iquitos, Perú"
-                      value={reg.location}
-                      onChange={e => setReg({...reg, location: e.target.value})}
+                      type={showPass ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={mode === 'register' ? reg.password : form.password}
+                      onChange={e => mode === 'register' ? setReg({...reg, password: e.target.value}) : setForm({...form, password: e.target.value})}
+                      className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-12 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                      style={{ 
+                        borderColor: COLORS.border,
+                        color: COLORS.text,
+                        '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
+                      }}
                       onFocus={(e) => e.target.style.borderColor = COLORS.primary}
                       onBlur={(e) => e.target.style.borderColor = COLORS.border}
-                      className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
-                      style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                      required
                     />
+                    <button 
+                      type="button" 
+                      onClick={() => setShowPass(!showPass)} 
+                      className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors hover:scale-110"
+                      style={{ color: COLORS.textMuted }}
+                    >
+                      {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
-                  <p className="text-[11px] mb-2" style={{ color: COLORS.textMuted }}>
-                    O marcá la ubicación en el mapa (se autocompleta)
-                  </p>
-                  <MapPicker
-                    lat={regCoords?.lat ?? null}
-                    lng={regCoords?.lng ?? null}
-                    onChange={handleLocationPick}
-                    height={180}
-                  />
                 </div>
-              </>
-            )}
 
-            {mode === 'login' && (
-            <div className="flex items-center justify-between mt-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="w-4 h-4 rounded border-gray-300 text-[#67B7E8] focus:ring-[#67B7E8]"
-                />
-                <span className="text-xs font-medium" style={{ color: COLORS.textMuted }}>Recordarme</span>
-              </label>
-              <a href="/forgot-password" className="text-xs font-semibold hover:underline" style={{ color: COLORS.primary }}>
-                ¿Olvidaste tu contraseña?
-              </a>
-            </div>
-            )}
+                {mode === 'register' && (
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                      Confirmar contraseña*
+                    </label>
+                    <div className="relative group">
+                      <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                      <input
+                        type={showPass ? 'text' : 'password'}
+                        placeholder="••••••••"
+                        value={reg.confirmPassword}
+                        onChange={e => setReg({...reg, confirmPassword: e.target.value})}
+                        className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-12 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                        style={{ 
+                          borderColor: reg.confirmPassword && reg.confirmPassword !== reg.password ? '#F87171' : COLORS.border,
+                          color: COLORS.text,
+                          '--tw-ring-color': 'rgba(103, 183, 232, 0.2)'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+                        onBlur={(e) => e.target.style.borderColor = reg.confirmPassword && reg.confirmPassword !== reg.password ? '#F87171' : COLORS.border}
+                        required
+                      />
+                    </div>
+                    {reg.confirmPassword && reg.confirmPassword !== reg.password && (
+                      <p className="text-[11px] mt-1.5 font-semibold" style={{ color: '#F87171' }}>
+                        Las contraseñas no coinciden
+                      </p>
+                    )}
+                  </div>
+                )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full text-white font-bold py-3.5 rounded-xl transition-all duration-300 mt-6 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{ 
-                background: `linear-gradient(to right, #3bb4ffff , #80ceffff)`,
-                boxShadow: '0 4px 14px rgba(103, 183, 232, 0.3)' 
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#52A8E0';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(103, 183, 232, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = COLORS.primary;
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(103, 183, 232, 0.3)';
-              }}
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>{mode === 'register' ? 'Creando cuenta...' : 'Ingresando...'}</span>
-                </>
-              ) : mode === 'register' ? 'Crear cuenta' : 'Ingresar'}
-            </button>
-          </form>
+                {mode === 'register' && (
+                  <>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                        Teléfono <span className="normal-case font-normal">(opcional)</span>
+                      </label>
+                      <div className="relative group">
+                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                        <input
+                          type="text"
+                          placeholder="+51 999 999 999"
+                          value={reg.phone}
+                          onChange={e => setReg({...reg, phone: e.target.value})}
+                          onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+                          onBlur={(e) => e.target.style.borderColor = COLORS.border}
+                          className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                          style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: COLORS.textMuted }}>
+                        Ubicación <span className="normal-case font-normal">(opcional)</span>
+                      </label>
+                      <div className="relative group mb-2">
+                        <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors group-focus-within:text-[#67B7E8]" style={{ color: COLORS.textMuted }} />
+                        <input
+                          type="text"
+                          placeholder="Ej: Iquitos, Perú"
+                          value={reg.location}
+                          onChange={e => setReg({...reg, location: e.target.value})}
+                          onFocus={(e) => e.target.style.borderColor = COLORS.primary}
+                          onBlur={(e) => e.target.style.borderColor = COLORS.border}
+                          className="w-full bg-[#F8FAFC] border rounded-xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all duration-300 focus:bg-white focus:ring-4"
+                          style={{ borderColor: COLORS.border, color: COLORS.text, '--tw-ring-color': 'rgba(103, 183, 232, 0.2)' }}
+                        />
+                      </div>
+                      <p className="text-[11px] mb-2" style={{ color: COLORS.textMuted }}>
+                        O marcá la ubicación en el mapa (se autocompleta)
+                      </p>
+                      <MapPicker
+                        lat={regCoords?.lat ?? null}
+                        lng={regCoords?.lng ?? null}
+                        onChange={handleLocationPick}
+                        height={180}
+                      />
+                    </div>
+                  </>
+                )}
+
+                {mode === 'login' && (
+                <div className="flex items-center justify-between mt-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 rounded border-gray-300 text-[#67B7E8] focus:ring-[#67B7E8]"
+                    />
+                    <span className="text-xs font-medium" style={{ color: COLORS.textMuted }}>Recordarme</span>
+                  </label>
+                  <a href="/forgot-password" className="text-xs font-semibold hover:underline" style={{ color: COLORS.primary }}>
+                    ¿Olvidaste tu contraseña?
+                  </a>
+                </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full text-white font-bold py-3.5 rounded-xl transition-all duration-300 mt-6 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{ 
+                    background: `linear-gradient(to right, #3bb4ffff , #80ceffff)`,
+                    boxShadow: '0 4px 14px rgba(103, 183, 232, 0.3)' 
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#52A8E0';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(103, 183, 232, 0.4)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = COLORS.primary;
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 4px 14px rgba(103, 183, 232, 0.3)';
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span>{mode === 'register' ? 'Creando cuenta...' : 'Ingresando...'}</span>
+                    </>
+                  ) : mode === 'register' ? 'Crear cuenta' : 'Ingresar'}
+                </button>
+              </form>
+            )}
             </div>
             {scrollHint && (
               <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 flex items-end justify-center" style={{ background: 'linear-gradient(to top, rgba(255,255,255,0.98) 30%, rgba(255,255,255,0))' }}>
@@ -527,7 +642,7 @@ export default function Login() {
           </div>
 
           <p className="text-center text-sm mt-6 flex-shrink-0" style={{ color: COLORS.textMuted }}>
-            {mode === 'register' ? (
+            {mode !== 'otp' && mode === 'register' ? (
               <>¿Ya tienes cuenta?{' '}
                 <button
                   type="button"
@@ -538,7 +653,7 @@ export default function Login() {
                   Inicia sesión
                 </button>
               </>
-            ) : (
+            ) : mode !== 'otp' ? (
               <>¿No tienes cuenta?{' '}
                 <button
                   type="button"
@@ -549,7 +664,7 @@ export default function Login() {
                   Crear cuenta
                 </button>
               </>
-            )}
+            ) : null}
           </p>
 
           <div className="flex-shrink-0 text-center text-xs font-medium pt-4" style={{ color: COLORS.textMuted }}>
