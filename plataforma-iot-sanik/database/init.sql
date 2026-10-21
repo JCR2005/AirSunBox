@@ -224,34 +224,43 @@ INSERT INTO organizations (name, slug, plan)
 VALUES ('Mi Organización', 'mi-organizacion', 'pro');
 
 -- ─────────────────────────────────────────
--- SUPERADMIN POR DEFECTO
--- Email: superadmin@sanik.io
--- Pass: Sanik2026!
+-- ORGANIZACIÓN INTERNA DE SANIK
+-- No se siembra ningún usuario con contraseña conocida. El primer
+-- superadmin se crea con:
+--   docker exec -it -e SUPERADMIN_PASSWORD='...' iot_backend \
+--     node dist/scripts/createSuperadmin.js admin@tu-dominio.com
 -- ─────────────────────────────────────────
 INSERT INTO organizations (id, name, slug, plan, phone, location, status, contact_name, nit, account_type)
 VALUES ('f51dec7f-fb2c-460a-9a9d-b4edc510fe38', 'Sanik', 'sanik-internal', 'enterprise', NULL, NULL, 'active', NULL, NULL, NULL)
 ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO users (org_id, email, password_hash, role, name, status, temp_password)
-SELECT 
-  o.id,
-  'superadmin@sanik.io',
-  '$2b$10$9KSrWSrJpq2Mz6gw5fAOJOq.0uFeJYWT7adPq5c9Xp3XKUUwZzcQC', -- Sanik2026!
-  'superadmin',
-  'Super Admin',
-  'active',
-  NULL
-FROM organizations o
-WHERE o.slug = 'sanik-internal'
-ON CONFLICT (email) DO NOTHING;
 
 -- ─────────────────────────────────────────
--- USUARIO: charlyrodrilop@gmail.com (password: 123456)
+-- ORGANIZACIÓN DE EJEMPLO: CUNOC (sin usuario sembrado)
 -- ─────────────────────────────────────────
 INSERT INTO organizations (id, name, slug, plan, phone, location, status, contact_name, nit, account_type, type, category, created_at)
-VALUES ('2c0202a4-6cba-476f-b984-2656e48cc4d0', 'Centro Universitario de Occidente (CUNOC)', 'centro-universitario-de-occidente-cunoc', 'pro', '7827-1827', 'Quetzaltenango, Quetzaltenango.', 'active', 'Carlos Rodriguez', '1234567-8', 'Convenio', NULL, NULL, '2026-05-30 16:18:20.104852+00')
+VALUES ('2c0202a4-6cba-476f-b984-2656e48cc4d0', 'Centro Universitario de Occidente (CUNOC)', 'centro-universitario-de-occidente-cunoc', 'pro', '7827-1827', 'Quetzaltenango, Quetzaltenango.', 'active', 'Carlos Rodriguez', '1234567-8', 'organizacion', NULL, NULL, '2026-05-30 16:18:20.104852+00')
 ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO users (id, org_id, email, password_hash, role, name, status, temp_password, created_at)
-VALUES ('5c354ca3-c0ba-40da-9aee-cf6b2b23b54b', '2c0202a4-6cba-476f-b984-2656e48cc4d0', 'charlyrodrilop@gmail.com', '$2b$10$K2wa8wr0xPEJ1tkm8H1IkOvz7o54kN8X0QUP5PMAIrZ5ESQzIVQ2m', 'client', NULL, 'active', NULL, '2026-05-30 16:18:20.104852+00')
-ON CONFLICT (email) DO NOTHING;
+-- ─────────────────────────────────────────
+-- 2FA (v15 + v18): columnas que el login necesita en una BD nueva
+-- ─────────────────────────────────────────
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS otp_code_hash TEXT,
+  ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS backup_codes TEXT[],
+  ADD COLUMN IF NOT EXISTS otp_failed_attempts INT DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS otp_locked_until TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS two_fa_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE organizations
+  ADD COLUMN IF NOT EXISTS two_fa_policy TEXT DEFAULT 'optional'
+    CHECK (two_fa_policy IN ('optional', 'required_admins', 'required_all'));
+
+-- ─────────────────────────────────────────
+-- Columnas heredadas presentes en producción (agregadas a mano en su día).
+-- variable_label se usa en v16; la ingesta actual escribe en "variable".
+-- ─────────────────────────────────────────
+ALTER TABLE dots
+  ADD COLUMN IF NOT EXISTS context JSONB,
+  ADD COLUMN IF NOT EXISTS variable_label VARCHAR(50);

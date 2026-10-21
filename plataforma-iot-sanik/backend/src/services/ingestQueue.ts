@@ -1,7 +1,6 @@
 import { Queue, Worker, Job } from 'bullmq'
 import type { FastifyInstance } from 'fastify'
 import { processDevicePayload } from './datalinkService.js'
-import { evaluateDeviceAlerts } from './alertingService.js'
 
 const INGEST_QUEUE_NAME = 'ingest-dots'
 
@@ -40,8 +39,8 @@ export async function createIngestQueue(app: FastifyInstance): Promise<IngestQue
 
   const worker = new Worker(INGEST_QUEUE_NAME, async (job: Job<IngestJobData>) => {
     const { deviceId, payload, options } = job.data
+    // processDevicePayload ya evalúa las alertas del dispositivo
     await processDevicePayload(app, deviceId, payload, options)
-    await evaluateDeviceAlerts(app, deviceId)
   }, {
     connection: redisConnection(),
     concurrency: Number(process.env.INGEST_WORKER_CONCURRENCY || 4),

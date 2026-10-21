@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify'
+import { assertPublicUrl } from '../lib/safeUrl.js'
 import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as alertsRepo from '../repositories/alerts.js'
@@ -65,6 +66,18 @@ export default async function alertsRoutes(app: FastifyInstance) {
 
     if (!(await devicesRepo.deviceBelongsToOrg(app.db, deviceId, orgId))) {
       return reply.code(403).send({ error: 'Sin acceso' })
+    }
+
+    // El webhook puede venir en webhookUrl o, con channel webhook/both, en destination
+    const webhookCandidates = [webhookUrl,
+      (channel === 'webhook' || channel === 'both') && destination && !destination.includes('@') ? destination : undefined]
+    for (const candidate of webhookCandidates) {
+      if (!candidate) continue
+      try {
+        await assertPublicUrl(candidate)
+      } catch (err) {
+        return reply.code(400).send({ error: (err as Error).message })
+      }
     }
 
     const resolvedDestination =

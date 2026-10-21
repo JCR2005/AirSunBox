@@ -6,12 +6,20 @@ import * as orgsRepo from '../repositories/organizations.js'
 import type { Role } from '../types/index.js'
 import type { Mailer } from '../lib/mailer.js'
 import { createMailer } from '../lib/mailer.js'
-import { generateOtp, createOtp, sendOtp, verifyOtp } from './otpService.js'
+import { generateOtp, createOtp, sendOtp, verifyOtp, generateBackupCodes, hashBackupCodes } from './otpService.js'
 
 export const SANIK_ROLES = ['superadmin', 'admin', 'worker'] as const
 
 export function isSanikRole(role: string): boolean {
   return (SANIK_ROLES as readonly string[]).includes(role)
+}
+
+export function isAdminRole(role: string): boolean {
+  return role === 'admin' || role === 'superadmin'
+}
+
+export function isValidRole(role: string): role is Role {
+  return isSanikRole(role) || role === 'client'
 }
 
 export interface LoginOrg {
@@ -60,7 +68,7 @@ export async function login(app: FastifyInstance, email: string, password: strin
   // Check if OTP is required
   const orgRows = await orgsRepo.findById(app.db, user.org_id || '')
   const org = orgRows[0]
-  const requiresOtp = (user as any).otp_code_hash !== null && (user as any).otp_code_hash !== undefined
+  const requiresOtp = user.two_fa_enabled
     || (org?.two_fa_policy === 'required_all')
     || (org?.two_fa_policy === 'required_admins' && isSanikRole(user.role))
 
@@ -233,6 +241,12 @@ export async function register(
   }
 }
 
+// El token tiene 256 bits aleatorios: un SHA-256 basta (no hace falta bcrypt)
+// y permite buscarlo directo en vez de comparar contra todos los vigentes.
+function hashResetToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
 export async function requestPasswordReset(app: FastifyInstance, rawEmail: string, mailer: Mailer): Promise<{ ok: boolean; status?: number; error?: string; message?: string }> {
   const email = (rawEmail || '').trim().toLowerCase()
   if (!email)
@@ -252,9 +266,7 @@ export async function requestPasswordReset(app: FastifyInstance, rawEmail: strin
     return { ok: true, message: generic }
 
   const token = crypto.randomBytes(32).toString('hex')
-  const hash = await bcrypt.hash(token, 10)
-
-  await usersRepo.setResetToken(app.db, user.id, hash)
+  await usersRepo.setResetToken(app.db, user.id, hashResetToken(token))
 
   try {
     await mailer.sendPasswordReset(email, token)
@@ -276,12 +288,7 @@ export async function resetPassword(
   if (password.length < 6)
     return { ok: false, status: 400, error: 'La contraseña debe tener al menos 6 caracteres' }
 
-  const rows = await usersRepo.listValidResetTokens(app.db)
-
-  let match: (typeof rows)[number] | null = null
-  for (const row of rows) {
-    if (await bcrypt.compare(token, row.reset_token_hash!)) { match = row; break }
-  }
+  const [match] = await usersRepo.findValidResetToken(app.db, hashResetToken(token))
 
   if (!match)
     return { ok: false, status: 400, error: 'El enlace es inválido o ya expiró. Volvé a pedir la recuperación.' }
@@ -312,6 +319,12 @@ export async function verifyOtpLogin(
     const result = await verifyOtp(app, decoded.userId, code)
     if (!result.valid) {
       return { ok: false, status: 401, error: 'Código inválido o expirado' }
+    }
+
+    // La cuenta pudo suspenderse entre la contraseña y el código
+    const [current] = await usersRepo.findById(app.db, decoded.userId)
+    if (!current || current.status === 'suspended') {
+      return { ok: false, status: 403, error: 'Tu cuenta está suspendida. Contactá a Sanik.' }
     }
 
     const token = app.jwt.sign({
@@ -349,33 +362,47 @@ export async function verifyOtpLogin(
   }
 }
 
+// Manda un código al email del usuario para confirmar que activa o
+// desactiva el 2FA. El código de login se genera aparte, en login().
+export async function sendTwoFactorCode(
+  app: FastifyInstance,
+  userId: string
+): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const [user] = await usersRepo.findById(app.db, userId)
+  if (!user) return { ok: false, status: 404, error: 'Usuario no encontrado' }
+  if (user.otp_locked_until && new Date() < user.otp_locked_until) {
+    return { ok: false, status: 429, error: 'Demasiados intentos fallidos. Probá de nuevo más tarde.' }
+  }
+
+  const code = generateOtp()
+  await createOtp(app, userId, code)
+  try {
+    await sendOtp(app, user.email, code)
+  } catch (err) {
+    app.log.error(`No se pudo enviar el código 2FA a ${user.email}: ${(err as Error)?.message}`)
+    return { ok: false, status: 502, error: 'No se pudo enviar el código por email' }
+  }
+  return { ok: true }
+}
+
 export async function enableTwoFactor(
   app: FastifyInstance,
   userId: string,
   code: string
 ): Promise<{ ok: boolean; status?: number; error?: string; backupCodes?: string[] }> {
-  const userRows = await usersRepo.findById(app.db, userId)
-  const user = userRows[0]
-  if (!user?.otp_code_hash || !user?.otp_expires_at) {
-    return { ok: false, status: 400, error: 'No hay configuración 2FA pendiente' }
-  }
-  if (new Date() > user.otp_expires_at) {
-    return { ok: false, status: 400, error: 'Código expirado' }
+  const [user] = await usersRepo.findById(app.db, userId)
+  if (!user) return { ok: false, status: 404, error: 'Usuario no encontrado' }
+  if (user.two_fa_enabled) return { ok: false, status: 400, error: 'El 2FA ya está activado' }
+
+  // verifyOtp cuenta los intentos fallidos y bloquea tras varios
+  const result = await verifyOtp(app, userId, code)
+  if (!result.valid || result.usedBackup) {
+    return { ok: false, status: 401, error: 'Código inválido o expirado' }
   }
 
-  const valid = await bcrypt.compare(code, user.otp_code_hash)
-  if (!valid) {
-    return { ok: false, status: 401, error: 'Código inválido' }
-  }
-
-  // Generate backup codes
-  const { generateBackupCodes, hashBackupCodes } = await import('./otpService.js')
   const plainCodes = generateBackupCodes()
-  const hashedCodes = await hashBackupCodes(plainCodes)
-
-  // Enable 2FA: clear OTP, set backup codes
-  await usersRepo.clearOtp(app.db, userId)
-  await usersRepo.setBackupCodes(app.db, userId, await Promise.all(plainCodes.map(c => bcrypt.hash(c.toUpperCase(), 10))))
+  await usersRepo.setBackupCodes(app.db, userId, await hashBackupCodes(plainCodes))
+  await usersRepo.setTwoFactorEnabled(app.db, userId, true)
 
   return { ok: true, backupCodes: plainCodes }
 }
@@ -385,18 +412,19 @@ export async function disableTwoFactor(
   userId: string,
   code: string
 ): Promise<{ ok: boolean; status?: number; error?: string }> {
-  const userRows = await usersRepo.findById(app.db, userId)
-  const user = userRows[0]
+  const [user] = await usersRepo.findById(app.db, userId)
+  if (!user) return { ok: false, status: 404, error: 'Usuario no encontrado' }
+  if (!user.two_fa_enabled) return { ok: false, status: 400, error: 'El 2FA no está activado' }
 
-  // Verify using OTP or backup code
+  // Vale el código enviado por email o un código de respaldo
   const result = await verifyOtp(app, userId, code)
   if (!result.valid) {
     return { ok: false, status: 401, error: 'Código inválido o expirado' }
   }
 
-  // Disable 2FA: clear everything
   await usersRepo.clearOtp(app.db, userId)
   await usersRepo.clearBackupCodes(app.db, userId)
+  await usersRepo.setTwoFactorEnabled(app.db, userId, false)
 
   return { ok: true }
 }

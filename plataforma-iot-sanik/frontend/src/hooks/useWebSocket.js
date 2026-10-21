@@ -46,6 +46,10 @@ export function useWebSocket(deviceIds = []) {
           if (cancelled || !wsRef.current) return
           readyRef.current = true
           setConnected(true)
+          // Con sesión, autenticar antes de suscribir para poder ver las
+          // estaciones privadas de la organización (el servidor procesa en orden)
+          const token = localStorage.getItem('sanik_token')
+          if (token) ws.send(JSON.stringify({ type: 'auth', token }))
           subscribeAll()
         }
 

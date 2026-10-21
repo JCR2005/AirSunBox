@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { createMailer } from '../lib/mailer.js'
+import { assertPublicUrl } from '../lib/safeUrl.js'
 import type { Mailer } from '../lib/mailer.js'
 
 export interface AlertRow {
@@ -84,8 +85,6 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
   if (emailTo) channels.push('email')
   if (webhookUrl) channels.push('webhook')
   if (alert.telegram_bot_token && alert.telegram_chat_id) channels.push('telegram')
-  if (alert.telegram_bot_token && alert.telegram_chat_id) channels.push('telegram')
-  if (alert.telegram_bot_token && alert.telegram_chat_id) channels.push('telegram')
 
   if (emailTo) {
     try {
@@ -118,8 +117,13 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
 
   if (webhookUrl) {
     try {
-      await fetch(webhookUrl, {
+      // Revalida al enviar (el DNS pudo cambiar) y no sigue redirecciones,
+      // que podrían llevar a la red interna
+      const target = await assertPublicUrl(webhookUrl)
+      await fetch(target, {
         method: 'POST',
+        redirect: 'manual',
+        signal: AbortSignal.timeout(10_000),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           event: 'alert-triggered',

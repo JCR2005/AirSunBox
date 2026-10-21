@@ -209,11 +209,8 @@ export async function deviceBelongsToOrg(db: Queryable, deviceId: string, orgId:
   return rows.length > 0
 }
 
-export async function publicMapDevices(db: Queryable) {
-  const { rows } = await db.query<DeviceRow>(
-    `SELECT d.id, d.name, d.lat, d.lng, d.description,
-            CASE WHEN d.last_seen > NOW() - INTERVAL '10 minutes'
-                 THEN 'online' ELSE 'offline' END as status
+// Criterio único de "estación visible en el mapa público" (REST y WebSocket)
+const PUBLIC_MAP_FROM_WHERE = `
      FROM devices d
      LEFT JOIN spaces s ON s.id = d.space_id
      LEFT JOIN organizations o ON o.id = d.org_id
@@ -223,8 +220,23 @@ export async function publicMapDevices(db: Queryable) {
          OR
          (COALESCE(o.type, 'A') = 'B' AND d.public_map = TRUE
           AND d.space_id IS NOT NULL AND s.type = 'aire' AND s.hidden = FALSE)
-       )
+       )`
+
+export async function publicMapDevices(db: Queryable) {
+  const { rows } = await db.query<DeviceRow>(
+    `SELECT d.id, d.name, d.lat, d.lng, d.description,
+            CASE WHEN d.last_seen > NOW() - INTERVAL '10 minutes'
+                 THEN 'online' ELSE 'offline' END as status
+     ${PUBLIC_MAP_FROM_WHERE}
      ORDER BY d.name ASC`
   )
   return rows
+}
+
+export async function isPublicMapDevice(db: Queryable, deviceId: string): Promise<boolean> {
+  const { rows } = await db.query(
+    `SELECT 1 ${PUBLIC_MAP_FROM_WHERE} AND d.id = $1 LIMIT 1`,
+    [deviceId]
+  )
+  return rows.length > 0
 }

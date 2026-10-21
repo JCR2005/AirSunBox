@@ -76,6 +76,7 @@ function CredentialsCard({ clientId }) {
         <div>
           <p className="text-xs mb-4" style={{ color: 'var(--text2)' }}>
             Las credenciales están protegidas. Ingresá tu contraseña de Administrador para visualizarlas.
+            La contraseña del cliente no se guarda: si hace falta entregarla, se genera una nueva.
           </p>
           {!showPrompt ? (
             <button 
@@ -111,15 +112,22 @@ function CredentialsCard({ clientId }) {
             <span className="text-xs font-mono font-bold select-all" style={{ color: 'var(--text)' }}>{revealed.email}</span>
           </div>
           
-          <div className="rounded-xl p-3 border border-emerald-500/30 flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)' }}>
-            <div className="flex-1 min-w-0">
-              <label className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text2)' }}>Contraseña del cliente</label>
-              <span className="text-xs font-mono font-bold text-emerald-500 select-all block break-words">{revealed.password}</span>
+          {revealed.password ? (
+            <div className="rounded-xl p-3 border border-emerald-500/30 flex items-center justify-between" style={{ background: 'rgba(16,185,129,0.05)' }}>
+              <div className="flex-1 min-w-0">
+                <label className="text-[10px] uppercase font-bold tracking-wider block" style={{ color: 'var(--text2)' }}>Nueva contraseña del cliente</label>
+                <span className="text-xs font-mono font-bold text-emerald-500 select-all block break-words">{revealed.password}</span>
+                <span className="text-[10px] block mt-1" style={{ color: 'var(--text2)' }}>Copiala ahora: no se vuelve a mostrar.</span>
+              </div>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 shrink-0">Visible</span>
             </div>
-            <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 shrink-0">Visible</span>
-          </div>
+          ) : (
+            <p className="text-[11px]" style={{ color: 'var(--text2)' }}>
+              La contraseña no se almacena en texto plano. Generá una nueva para entregársela al cliente.
+            </p>
+          )}
 
-          {revealed.password === 'Contraseña ya modificada por el cliente' && (
+          {!revealed.password && (
             <button 
               type="button"
               onClick={() => setShowConfirmReset(true)}

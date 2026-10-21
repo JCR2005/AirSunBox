@@ -4,7 +4,7 @@ import { Type } from '@sinclair/typebox'
 import bcrypt from 'bcrypt'
 import * as usersRepo from '../repositories/users.js'
 import * as orgsRepo from '../repositories/organizations.js'
-import { login, register, requestPasswordReset, resetPassword, isSanikRole, verifyOtpLogin, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
+import { login, register, requestPasswordReset, resetPassword, isSanikRole, isAdminRole, isValidRole, verifyOtpLogin, sendTwoFactorCode, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
 import { createMailer } from '../lib/mailer.js'
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -59,9 +59,17 @@ export default async function authRoutes(app: FastifyInstance) {
     const orgRows = await orgsRepo.findById(app.db, req.user.orgId || '')
     const org = orgRows[0]
     return {
-      enabled: !!user?.otp_code_hash || !!user?.backup_codes?.length,
+      enabled: !!user?.two_fa_enabled,
+      backupCodesLeft: user?.backup_codes?.length ?? 0,
       policy: org?.two_fa_policy || 'optional'
     }
+  })
+
+  // ── Enviar código por email (para activar o desactivar 2FA) ──
+  api.post('/2fa/send-code', { onRequest: [app.authenticate] }, async (req, reply) => {
+    const result = await sendTwoFactorCode(app, req.user.userId)
+    if (!result.ok) return reply.code(result.status || 400).send({ error: result.error })
+    return { message: 'Te enviamos un código a tu email' }
   })
 
   // ── Habilitar 2FA ─────────────────────────────────
@@ -82,7 +90,7 @@ export default async function authRoutes(app: FastifyInstance) {
   api.post('/2fa/disable', {
     schema: {
       body: Type.Object({
-        code: Type.String({ pattern: '^[0-9A-F]{4}-[0-9A-F]{4}|[0-9]{6}' })
+        code: Type.String({ pattern: '^([0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}|[0-9]{6})$' })
       })
     },
     onRequest: [app.authenticate]
@@ -99,11 +107,13 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   // ── Crear usuario (solo admin/superadmin de Sanik) ──
+  // Solo el superadmin crea admin/superadmin. Los roles internos quedan en la
+  // organización de Sanik de quien los crea; un cliente va a la org indicada.
   api.post('/users', {
     schema: {
       body: Type.Object({
         email: Type.String(),
-        password: Type.String(),
+        password: Type.String({ minLength: 6 }),
         name: Type.Optional(Type.String()),
         phone: Type.Optional(Type.String()),
         role: Type.Optional(Type.String()),
@@ -113,26 +123,33 @@ export default async function authRoutes(app: FastifyInstance) {
     onRequest: [app.authenticate]
   }, async (req, reply) => {
     const { role: myRole } = req.user
-    const { email, password, name, phone, role, orgId } = req.body
+    const { email, password, name, phone, orgId } = req.body
+    const role = req.body.role || 'client'
 
-    if (role === 'admin' && myRole !== 'superadmin')
+    if (!isAdminRole(myRole))
+      return reply.code(403).send({ error: 'Sin permisos' })
+
+    if (!isValidRole(role))
+      return reply.code(400).send({ error: 'Rol inválido' })
+
+    if (isAdminRole(role) && myRole !== 'superadmin')
       return reply.code(403).send({ error: 'Solo el superadmin puede crear administradores' })
 
-    if (role && isSanikRole(role) && !isSanikRole(myRole))
-      return reply.code(403).send({ error: 'Sin permisos' })
+    const targetOrgId = isSanikRole(role) ? req.user.orgId : orgId
+    if (!targetOrgId)
+      return reply.code(400).send({ error: 'Indicá la organización del cliente' })
 
     const dup = await usersRepo.existsByEmail(app.db, email)
     if (dup)
       return reply.code(400).send({ error: 'Ese correo ya está registrado' })
 
     const hash = await bcrypt.hash(password, 10)
-    const targetOrgId = orgId || req.user.orgId
 
     const user = await usersRepo.createUser(app.db, {
       orgId: targetOrgId,
       email,
       passwordHash: hash,
-      role: (role as 'superadmin' | 'admin' | 'worker' | 'client') || 'client',
+      role,
       name,
       phone
     })
@@ -158,13 +175,27 @@ export default async function authRoutes(app: FastifyInstance) {
     },
     onRequest: [app.authenticate]
   }, async (req, reply) => {
-    const { role: myRole } = req.user
+    const { role: myRole, userId: myId } = req.user
     const { status, role } = req.body
 
     if (!isSanikRole(myRole))
       return reply.code(403).send({ error: 'Sin permisos' })
 
-    if (role === 'admin' && myRole !== 'superadmin')
+    if (role && !isValidRole(role))
+      return reply.code(400).send({ error: 'Rol inválido' })
+
+    if (status && status !== 'active' && status !== 'suspended')
+      return reply.code(400).send({ error: 'Estado inválido' })
+
+    if (req.params.id === myId)
+      return reply.code(403).send({ error: 'No podés cambiar tu propio rol o estado' })
+
+    const [target] = await usersRepo.findPasswordAndRoleById(app.db, req.params.id)
+    if (!target)
+      return reply.code(404).send({ error: 'Usuario no encontrado' })
+
+    // Tocar a un admin/superadmin, o convertir a alguien en uno, es solo del superadmin
+    if ((isAdminRole(target.role) || (role && isAdminRole(role))) && myRole !== 'superadmin')
       return reply.code(403).send({ error: 'Solo el superadmin puede cambiar este rol' })
 
     const user = await usersRepo.updateUserStatusAndRole(app.db, req.params.id, status ?? null, role ?? null)

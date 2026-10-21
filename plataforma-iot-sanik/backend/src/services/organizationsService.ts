@@ -5,6 +5,16 @@ import * as orgsRepo from '../repositories/organizations.js'
 import * as spacesRepo from '../repositories/spaces.js'
 import { seedAirTemplate } from './aqiService.js'
 import { isSanikRole } from './authService.js'
+import crypto from 'node:crypto'
+
+// Contraseña inicial/restablecida para clientes: se muestra una sola vez
+// al admin y nunca se guarda en claro. 12 caracteres sin ambiguos (0/O, 1/l).
+const PASSWORD_CHARS = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+function generateClientPassword(): string {
+  let out = 'Sanik-'
+  for (let i = 0; i < 12; i++) out += PASSWORD_CHARS[crypto.randomInt(PASSWORD_CHARS.length)]
+  return out
+}
 
 export async function isSanikTeam(app: FastifyInstance, userId: string | undefined): Promise<boolean> {
   if (!userId) return false
@@ -83,16 +93,11 @@ export async function createOrganization(app: FastifyInstance, body: Record<stri
       accountType
     })
 
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-    let autoPassword = 'Sanik-'
-    for (let i = 0; i < 6; i++) {
-      autoPassword += chars.charAt(Math.floor(Math.random() * chars.length))
-    }
-
+    const autoPassword = generateClientPassword()
     const passwordHash = await bcrypt.hash(autoPassword, 10)
 
     const clientEmail = String(email || `${slug}@sanik.local`)
-    await usersRepo.createClientWithTempPassword(client, { email: clientEmail, passwordHash, tempPassword: autoPassword, orgId: org.id })
+    await usersRepo.createClientUser(client, { email: clientEmail, passwordHash, orgId: org.id })
 
     if (tipo === 'B') {
       const space = await spacesRepo.create(client, {
@@ -155,20 +160,23 @@ export async function updateOrganization(
       return { ok: false, status: 404, error: 'Organización no encontrada' }
     }
 
+    let credentials: { username: string; password: string } | undefined
     if (body.email !== undefined) {
       const email = String(body.email)
       let count = await usersRepo.setClientEmail(client, id, email)
       if (count === 0 && email) {
-        const tempPass = 'Sanik-' + Math.random().toString(36).slice(2, 8)
+        const tempPass = generateClientPassword()
         const hash = await bcrypt.hash(tempPass, 10)
-        await usersRepo.createClientWithTempPassword(client, { email, passwordHash: hash, tempPassword: tempPass, orgId: id })
+        await usersRepo.createClientUser(client, { email, passwordHash: hash, orgId: id })
+        // Única vez que se ve: no se guarda en claro
+        credentials = { username: email, password: tempPass }
         count = 1
       }
       if (count > 0) updated.email = email
     }
 
     await client.query('COMMIT')
-    return { ok: true, org: updated }
+    return { ok: true, org: credentials ? { ...updated, credentials } : updated }
   } catch (err) {
     await client.query('ROLLBACK')
     app.log.error(err)
@@ -183,7 +191,7 @@ export async function revealCredentials(
   orgId: string,
   adminUserId: string,
   adminPassword: string
-): Promise<{ ok: boolean; status?: number; error?: string; credentials?: { email: string; password: string } }> {
+): Promise<{ ok: boolean; status?: number; error?: string; credentials?: { email: string; password: string | null } }> {
   if (!adminPassword) return { ok: false, status: 400, error: 'La contraseña de administrador es requerida' }
 
   const rows = await usersRepo.findPasswordAndRoleById(app.db, adminUserId)
@@ -202,10 +210,8 @@ export async function revealCredentials(
 
   return {
     ok: true,
-    credentials: {
-      email: clientUser.email,
-      password: clientUser.temp_password || 'Contraseña ya modificada por el cliente'
-    }
+    // La contraseña no se guarda en claro: para entregar una hay que restablecerla
+    credentials: { email: clientUser.email, password: null }
   }
 }
 
@@ -222,9 +228,9 @@ export async function resetClientPassword(
 
   if (!clientUser) return { ok: false, status: 404, error: 'No se encontró usuario cliente' }
 
-  const newPassword = 'Sanik-' + Math.random().toString(36).slice(2, 8).toUpperCase()
+  const newPassword = generateClientPassword()
   const hash = await bcrypt.hash(newPassword, 10)
-  await usersRepo.resetClientPassword(app.db, clientUser.id, hash, newPassword)
+  await usersRepo.resetClientPassword(app.db, clientUser.id, hash)
 
   return { ok: true, credentials: { email: clientUser.email, password: newPassword } }
 }

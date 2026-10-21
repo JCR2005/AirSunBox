@@ -41,6 +41,25 @@ const useAuthStore = create((set, get) => ({
     }
   },
 
+  send2faCode: async () => {
+    const { token } = get()
+    if (!token) return { ok: false, error: 'No autenticado' }
+    set({ twoFactorLoading: true, twoFactorError: null })
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/2fa/send-code`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'No se pudo enviar el código')
+      set({ twoFactorLoading: false })
+      return { ok: true }
+    } catch (e) {
+      set({ twoFactorError: e.message, twoFactorLoading: false })
+      return { ok: false, error: e.message }
+    }
+  },
+
   enable2fa: async (code) => {
     const { token } = get()
     if (!token) return { ok: false, error: 'No autenticado' }

@@ -14,3 +14,5 @@ hardware/
 # Entornos locales
 *.env.local
 *.env.production
+# Grafo de contexto del agente (contiene hallazgos de seguridad abiertos)
+.contexto/

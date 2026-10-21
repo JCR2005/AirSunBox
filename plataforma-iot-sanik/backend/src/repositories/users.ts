@@ -18,7 +18,7 @@ export interface LoginUserRow {
   org_b_category: string | null
   org_payment_exempt: boolean | null
   org_account_type: string | null
-  otp_code_hash: string | null
+  two_fa_enabled: boolean
 }
 
 export interface MeUserRow {
@@ -53,6 +53,9 @@ export interface ResetTokenRow {
 
 export interface OtpUserRow {
   id: string
+  email: string
+  status: string
+  two_fa_enabled: boolean
   otp_code_hash: string | null
   otp_expires_at: Date | null
   backup_codes: string[] | null
@@ -63,7 +66,6 @@ export interface OtpUserRow {
 export interface ClientUserRow {
   id: string
   email: string
-  temp_password: string | null
   org_id: string | null
 }
 
@@ -74,7 +76,7 @@ export interface IdRow {
 export async function findByEmail(db: Queryable, email: string): Promise<LoginUserRow[]> {
   const { rows } = await db.query<LoginUserRow>(
     `SELECT u.id, u.email, u.password_hash, u.role, u.name, u.status,
-            u.org_id, u.otp_code_hash, o.name as org_name, o.slug as org_slug, o.plan, o.status as org_status,
+            u.org_id, u.two_fa_enabled, o.name as org_name, o.slug as org_slug, o.plan, o.status as org_status,
             o.type as org_type, o.category as org_category, o.b_category as org_b_category,
             o.payment_exempt as org_payment_exempt, o.account_type as org_account_type
      FROM users u
@@ -114,14 +116,14 @@ export async function createUser(
   return user
 }
 
-export async function createClientWithTempPassword(
+export async function createClientUser(
   db: Queryable,
-  params: { email: string; passwordHash: string; tempPassword: string; orgId: string; status?: string }
+  params: { email: string; passwordHash: string; orgId: string; status?: string }
 ): Promise<void> {
   await db.query(
-    `INSERT INTO users (email, password_hash, temp_password, role, org_id, status)
-     VALUES ($1, $2, $3, 'client', $4, $5)`,
-    [params.email, params.passwordHash, params.tempPassword, params.orgId, params.status || 'active']
+    `INSERT INTO users (email, password_hash, role, org_id, status)
+     VALUES ($1, $2, 'client', $3, $4)`,
+    [params.email, params.passwordHash, params.orgId, params.status || 'active']
   )
 }
 
@@ -187,14 +189,15 @@ export async function setResetToken(db: Queryable, userId: string, tokenHash: st
   )
 }
 
-export async function listValidResetTokens(db: Queryable): Promise<ResetTokenRow[]> {
+export async function findValidResetToken(db: Queryable, tokenHash: string): Promise<ResetTokenRow[]> {
   const { rows } = await db.query<ResetTokenRow>(
     `SELECT u.id, u.status, u.reset_token_hash, u.reset_token_expires_at,
             o.status as org_status, o.slug as org_slug
      FROM users u
      LEFT JOIN organizations o ON o.id = u.org_id
-     WHERE u.reset_token_hash IS NOT NULL
-       AND u.reset_token_expires_at > NOW()`
+     WHERE u.reset_token_hash = $1
+       AND u.reset_token_expires_at > NOW()`,
+    [tokenHash]
   )
   return rows
 }
@@ -210,8 +213,8 @@ export async function clearResetTokenAndSetPassword(db: Queryable, userId: strin
 
 export async function findClientUserByOrg(db: Queryable, orgId: string, fields: 'credentials' | 'reset' = 'reset'): Promise<ClientUserRow[]> {
   const select = fields === 'credentials'
-    ? 'email, temp_password'
-    : 'id, email, temp_password, org_id'
+    ? 'email'
+    : 'id, email, org_id'
   const { rows } = await db.query<ClientUserRow>(
     `SELECT ${select} FROM users WHERE org_id = $1 AND role = 'client' LIMIT 1`,
     [orgId]
@@ -222,12 +225,11 @@ export async function findClientUserByOrg(db: Queryable, orgId: string, fields: 
 export async function resetClientPassword(
   db: Queryable,
   userId: string,
-  passwordHash: string,
-  newPassword: string
+  passwordHash: string
 ): Promise<void> {
   await db.query(
-    "UPDATE users SET password_hash = $1, temp_password = $2, status = 'active' WHERE id = $3",
-    [passwordHash, newPassword, userId]
+    "UPDATE users SET password_hash = $1, temp_password = NULL, status = 'active' WHERE id = $2",
+    [passwordHash, userId]
   )
 }
 
@@ -241,7 +243,7 @@ export async function setClientEmail(db: Queryable, orgId: string, email: string
 
 export async function findById(db: Queryable, userId: string): Promise<OtpUserRow[]> {
   const { rows } = await db.query<OtpUserRow>(
-    `SELECT id, otp_code_hash, otp_expires_at, backup_codes, otp_failed_attempts, otp_locked_until FROM users WHERE id = $1`,
+    `SELECT id, email, status, two_fa_enabled, otp_code_hash, otp_expires_at, backup_codes, otp_failed_attempts, otp_locked_until FROM users WHERE id = $1`,
     [userId]
   )
   return rows
@@ -258,6 +260,13 @@ export async function clearOtp(db: Queryable, userId: string): Promise<void> {
   await db.query(
     `UPDATE users SET otp_code_hash = NULL, otp_expires_at = NULL WHERE id = $1`,
     [userId]
+  )
+}
+
+export async function setTwoFactorEnabled(db: Queryable, userId: string, enabled: boolean): Promise<void> {
+  await db.query(
+    `UPDATE users SET two_fa_enabled = $1 WHERE id = $2`,
+    [enabled, userId]
   )
 }
 

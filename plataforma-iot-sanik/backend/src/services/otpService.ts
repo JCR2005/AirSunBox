@@ -17,7 +17,7 @@ const mailer = (app: FastifyInstance): Mailer => {
 }
 
 export function generateOtp(): string {
-  return Math.floor(10 ** (OTP_LENGTH - 1) + Math.random() * 9 * 10 ** (OTP_LENGTH - 1)).toString()
+  return crypto.randomInt(10 ** (OTP_LENGTH - 1), 10 ** OTP_LENGTH).toString()
 }
 
 export function generateBackupCodes(): string[] {
@@ -36,7 +36,7 @@ export async function hashBackupCodes(codes: string[]): Promise<string[]> {
 export async function createOtp(app: FastifyInstance, userId: string, code: string): Promise<void> {
   const hash = await bcrypt.hash(code, 10)
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000)
-  await usersRepo.setOtp(app.db, userId, hash, new Date(Date.now() + 10 * 60 * 1000))
+  await usersRepo.setOtp(app.db, userId, hash, expiresAt)
 }
 
 export async function sendOtp(app: FastifyInstance, email: string, code: string): Promise<void> {
@@ -80,8 +80,8 @@ export async function verifyOtp(app: FastifyInstance, userId: string, inputCode:
   
   // Invalid code - increment failed attempts
   const attempts = await usersRepo.incrementOtpFailedAttempts(app.db, userId)
-  if (attempts >= 3) {
-    const lockedUntil = new Date(Date.now() + 15 * 60 * 1000)
+  if (attempts >= MAX_FAILED_ATTEMPTS) {
+    const lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
     await usersRepo.lockOtpUntil(app.db, userId, lockedUntil)
   }
   

@@ -59,25 +59,24 @@ export async function evaluateDeviceAlerts(app: FastifyInstance, deviceId: strin
       const lastKey = `alert:last:${alert.id}`
 
       if (!matching) {
-        if (app.redis) await app.redis.set(stateKey, 'false', { EX: 60 * 60 })
+        await app.redis.set(stateKey, 'false', { EX: 60 * 60 })
         continue
       }
 
-      const [prevState, lastFiredStr] = await Promise.all([
-        app.redis.get(stateKey),
-        app.redis.get(lastKey)
-      ])
-      const lastFired = lastFiredStr ? Number(lastFiredStr) : 0
+      // Las operaciones son atómicas en Redis: con varios workers ingiriendo
+      // el mismo equipo a la vez, solo uno "gana" el disparo.
+      //  - transición: SET ... GET devuelve el estado anterior y fija el nuevo
+      //  - repetición: mientras exista alert:last (TTL = cooldown) no se repite;
+      //    SET NX lo reclama solo si ya expiró
       const cooldownMs = (Number(alert.cooldown_minutes) || 0) * 60 * 1000
-
-      const transition = prevState !== 'true'
-      const expiredCooldown = cooldownMs > 0 && now - lastFired >= cooldownMs
-      const repeat = prevState === 'true' && expiredCooldown
-
-      if (!transition && !repeat) continue
-
-      await app.redis.set(stateKey, 'true', { EX: 60 * 60 })
-      await app.redis.set(lastKey, String(now), { EX: 60 * 60 })
+      const prevState = await app.redis.set(stateKey, 'true', { EX: 60 * 60, GET: true })
+      let fire = prevState !== 'true'
+      if (fire) {
+        if (cooldownMs > 0) await app.redis.set(lastKey, String(now), { PX: cooldownMs })
+      } else if (cooldownMs > 0) {
+        fire = (await app.redis.set(lastKey, String(now), { PX: cooldownMs, NX: true })) === 'OK'
+      }
+      if (!fire) continue
 
       const displayValue = isAqi ? (value != null ? Math.round(Number(value)) : null) : Number(value)
       const ctx: AlertContext = {

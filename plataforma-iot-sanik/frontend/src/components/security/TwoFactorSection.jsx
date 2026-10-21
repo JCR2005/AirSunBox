@@ -10,6 +10,7 @@ export default function TwoFactorSection() {
     twoFactorLoading, 
     twoFactorError,
     fetch2faStatus, 
+    send2faCode,
     enable2fa, 
     disable2fa 
   } = useAuthStore()
@@ -19,6 +20,12 @@ export default function TwoFactorSection() {
   const [disableCode, setDisableCode] = useState('')
   const [showBackupCodes, setShowBackupCodes] = useState(false)
   const [copiedIndex, setCopiedIndex] = useState(-1)
+  const [codeSent, setCodeSent] = useState(false)
+
+  const handleSendCode = async () => {
+    const result = await send2faCode()
+    if (result.ok) setCodeSent(true)
+  }
 
   useEffect(() => {
     fetch2faStatus()
@@ -31,6 +38,8 @@ export default function TwoFactorSection() {
     if (result.ok) {
       setShowBackupCodes(true)
       setStep('backup')
+      setOtpCode('')
+      setCodeSent(false)
     }
   }
 
@@ -39,8 +48,9 @@ export default function TwoFactorSection() {
     if (!disableCode) return
     const result = await disable2fa(disableCode)
     if (result.ok) {
-      setStep('enabled')
+      setStep('idle')
       setDisableCode('')
+      setCodeSent(false)
     }
   }
 
@@ -152,9 +162,24 @@ export default function TwoFactorSection() {
               </ul>
             </div>
 
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={twoFactorLoading}
+              className="w-full py-3 px-6 rounded-xl font-bold border transition-colors"
+              style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)', opacity: twoFactorLoading ? 0.6 : 1 }}
+            >
+              {codeSent ? 'Reenviar código a mi email' : '1. Enviar código a mi email'}
+            </button>
+            {codeSent && (
+              <p className="text-sm flex items-center gap-2" style={{ color: '#10B981' }}>
+                <Check size={16} /> Código enviado. Revisá tu correo (vence en 10 minutos).
+              </p>
+            )}
+
             <form onSubmit={handleEnable} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>Código de 6 dígitos recibido por email</label>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>2. Código de 6 dígitos recibido por email</label>
                 <input
                   type="text"
                   maxLength={6}
@@ -202,6 +227,7 @@ export default function TwoFactorSection() {
         </div>
       )}
 
+      {isEnabled && (
       <div className="rounded-3xl p-8 border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -225,7 +251,7 @@ export default function TwoFactorSection() {
             </h4>
             <ul className="text-sm space-y-2" style={{ color: 'var(--text2)' }}>
               <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> Código OTP por email al iniciar sesión</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> {backupCodes.length} códigos de respaldo guardados</li>
+              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> {twoFactorStatus?.backupCodesLeft ?? 0} códigos de respaldo disponibles</li>
               <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> Bloqueo tras 3 intentos fallidos (15 min)</li>
             </ul>
           </div>
@@ -262,6 +288,15 @@ export default function TwoFactorSection() {
                 <p className="text-sm mb-4" style={{ color: 'var(--text2)' }}>
                   Ingresa un código OTP de tu email <strong>o</strong> uno de tus códigos de respaldo para confirmar.
                 </p>
+                <button
+                  type="button"
+                  onClick={handleSendCode}
+                  disabled={twoFactorLoading}
+                  className="w-full mb-3 py-2 px-4 rounded-xl text-sm font-bold border transition-colors"
+                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                >
+                  {codeSent ? 'Código enviado · Reenviar' : 'Enviar código a mi email'}
+                </button>
                 <input
                   type="text"
                   maxLength={11}
@@ -276,7 +311,7 @@ export default function TwoFactorSection() {
                 <div className="flex gap-3 mt-4">
                   <button
                     type="button"
-                    onClick={() => setStep('enabled')}
+                    onClick={() => setStep('idle')}
                     className="flex-1 py-3 px-4 rounded-xl font-bold border transition-colors"
                     style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
                   >
@@ -302,6 +337,7 @@ export default function TwoFactorSection() {
           )}
         </div>
       </div>
+      )}
     </div>
   )
 }

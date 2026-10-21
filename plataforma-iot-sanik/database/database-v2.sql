@@ -144,19 +144,9 @@ ON CONFLICT (label) DO NOTHING;
 -- SUPERADMIN POR DEFECTO
 -- Cambiar contraseña después del primer login
 -- Email: superadmin@sanik.io
--- Pass: Sanik2026!
 -- ─────────────────────────────────────────
 INSERT INTO organizations (name, slug, plan)
 VALUES ('Sanik', 'sanik-internal', 'enterprise')
 ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO users (org_id, email, password_hash, role, name)
-SELECT 
-  o.id,
-  'superadmin@sanik.io',
-  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uHwf8x8ou', -- Sanik2026!
-  'superadmin',
-  'Super Admin'
-FROM organizations o
-WHERE o.slug = 'sanik-internal'
-ON CONFLICT (email) DO NOTHING;
+-- (Sin usuario sembrado: el superadmin se crea con backend/src/scripts/createSuperadmin.ts)

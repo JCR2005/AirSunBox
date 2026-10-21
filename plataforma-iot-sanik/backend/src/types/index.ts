@@ -12,11 +12,14 @@ export interface JwtPayload {
   orgId: string
   role: Role
   otp_pending?: boolean
+  iat?: number
+  exp?: number
 }
 
 export interface RedisLike {
   get(key: string): Promise<string | null>
-  set(key: string, value: string, options?: { EX?: number }): Promise<unknown>
+  // GET devuelve el valor anterior; NX devuelve 'OK' solo si la clave no existía
+  set(key: string, value: string, options?: { EX?: number; PX?: number; NX?: boolean; GET?: boolean }): Promise<string | null>
 }
 
 export interface RealtimeSocket {
@@ -25,8 +28,8 @@ export interface RealtimeSocket {
 }
 
 export interface RealtimeService {
-  subscribe(deviceId: string, socket: RealtimeSocket): void
-  unsubscribe(deviceId: string, socket: RealtimeSocket): void
-  unsubscribeAll(socket: RealtimeSocket): void
+  subscribe(deviceId: string, socket: RealtimeSocket): Promise<void>
+  unsubscribe(deviceId: string, socket: RealtimeSocket): Promise<void>
+  unsubscribeAll(socket: RealtimeSocket): Promise<void>
   broadcast(deviceId: string, variable: string, value: number, time: Date): void
 }

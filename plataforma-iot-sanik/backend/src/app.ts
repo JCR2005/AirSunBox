@@ -9,6 +9,9 @@ import swagger from '@fastify/swagger'
 import swaggerUi from '@fastify/swagger-ui'
 import { registry, registerDefaultMetrics, getMetrics } from './services/metrics.js'
 import 'dotenv/config'
+import type { JwtPayload } from './types/index.js'
+import * as devicesRepo from './repositories/devices.js'
+import { isSanikRole } from './services/authService.js'
 
 import dbPlugin from './plugins/db.js'
 import redisPlugin from './plugins/redis.js'
@@ -30,7 +33,12 @@ import incidentsRoutes from './routes/incidents.js'
 import reportsRoutes from './routes/reports.js'
 import publicRoutes from './routes/publicRoutes.js'
 
-const app: FastifyInstance = Fastify({ logger: true })
+// Detrás de nginx, req.ip sería siempre la IP del proxy y el rate limit
+// trataría a todos los usuarios como uno. Solo se confía en X-Forwarded-For
+// cuando la conexión viene de la red interna de Docker o de esta máquina; un
+// cliente externo que pegue directo al :3000 no puede falsear su IP.
+const TRUST_PROXY = process.env.TRUST_PROXY || '127.0.0.1,::1,172.16.0.0/12'
+const app: FastifyInstance = Fastify({ logger: true, trustProxy: TRUST_PROXY })
 
 // ── Plugins globales ──────────────────────────
 await app.register(cors, {
@@ -56,16 +64,42 @@ await app.register(cors, {
   credentials: true
 })
 
+// En producción el secreto es obligatorio: con un valor por defecto conocido
+// cualquiera podría firmar tokens de superadmin.
+const DEV_JWT_SECRET = 'sanik_secret_key'
+const jwtSecret = process.env.JWT_SECRET?.trim()
+if (!jwtSecret || jwtSecret === DEV_JWT_SECRET) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET no está definido (o usa el valor de desarrollo). Configúralo en backend/.env')
+  }
+  app.log.warn('⚠️  JWT_SECRET no definido: usando secreto de desarrollo')
+}
+
+// Vida de la sesión, formato de `ms` ("24h", "7d"). El token temporal de OTP
+// fija su propio expiresIn (10m).
+const JWT_TTL = process.env.JWT_EXPIRES_IN || '24h'
+
 await app.register(jwt, {
-  secret: process.env.JWT_SECRET || 'sanik_secret_key'
+  secret: jwtSecret || DEV_JWT_SECRET,
+  sign: { expiresIn: JWT_TTL }
 })
 
-// Decorador de autenticación
+// Solo vale como sesión un token con caducidad y sin OTP pendiente. Los
+// emitidos antes de introducir expiresIn no traen "exp" y nunca caducarían.
+// Un token otp_pending solo sirve para /api/auth/otp/verify; aceptarlo aquí
+// permitiría saltarse el 2FA.
+function isSessionToken(payload: JwtPayload): boolean {
+  return !payload.otp_pending && typeof payload.exp === 'number'
+}
+
 app.decorate('authenticate', async function (req: FastifyRequest, reply: FastifyReply) {
   try {
     await req.jwtVerify()
   } catch (err) {
-    reply.code(401).send({ error: 'No autorizado' })
+    return reply.code(401).send({ error: 'No autorizado' })
+  }
+  if (!isSessionToken(req.user)) {
+    return reply.code(401).send({ error: 'No autorizado' })
   }
 })
 
@@ -154,30 +188,58 @@ await app.register(reportsRoutes, { prefix: '/api/reports' })
 await app.register(publicRoutes, { prefix: '/api/public' })
 
 // ── WebSocket tiempo real ──────────────────────
+// Sin sesión solo se puede seguir estaciones del mapa público. Con sesión
+// (mensaje {type:'auth', token}, nunca en la URL para que no quede en logs)
+// también las de la propia organización, o todas si es rol Sanik.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function canWatchDevice(deviceId: string, user: JwtPayload | null): Promise<boolean> {
+  if (!UUID_RE.test(deviceId)) return false
+  if (user) {
+    if (isSanikRole(user.role)) return true
+    const scopes = await devicesRepo.findOrgScope(app.db, deviceId)
+    if (scopes.length && scopes[0].org_id === user.orgId) return true
+  }
+  return devicesRepo.isPublicMapDevice(app.db, deviceId)
+}
+
 app.get('/ws', { websocket: true }, (socket) => {
   app.log.info('Cliente WebSocket conectado')
+  let user: JwtPayload | null = null
 
-  socket.on('message', (msg) => {
+  socket.on('message', async (msg) => {
     try {
-      const data = JSON.parse(msg.toString()) as { type?: string; deviceId?: string }
+      const data = JSON.parse(msg.toString()) as { type?: string; deviceId?: string; token?: string }
 
-      if (data.type === 'subscribe' && data.deviceId) {
-        app.realtime.subscribe(data.deviceId, socket)
+      if (data.type === 'auth' && typeof data.token === 'string') {
+        try {
+          const decoded = app.jwt.verify<JwtPayload>(data.token)
+          user = isSessionToken(decoded) ? decoded : null
+        } catch {
+          user = null
+        }
+        socket.send(JSON.stringify({ type: 'auth', ok: !!user }))
+      } else if (data.type === 'subscribe' && data.deviceId) {
+        if (await canWatchDevice(data.deviceId, user)) {
+          await app.realtime.subscribe(data.deviceId, socket)
+        } else {
+          socket.send(JSON.stringify({ type: 'error', deviceId: data.deviceId, error: 'Sin acceso' }))
+        }
       } else if (data.type === 'unsubscribe' && data.deviceId) {
-        app.realtime.unsubscribe(data.deviceId, socket)
+        await app.realtime.unsubscribe(data.deviceId, socket)
       }
     } catch (err) {
       app.log.error(`Mensaje WebSocket inválido: ${(err as Error).message}`)
     }
   })
 
-  socket.on('close', () => {
-    app.realtime.unsubscribeAll(socket)
-  })
-
-  socket.on('error', () => {
-    app.realtime.unsubscribeAll(socket)
-  })
+  const cleanup = () => {
+    app.realtime.unsubscribeAll(socket).catch((err) => {
+      app.log.error(`Error limpiando suscripciones WebSocket: ${(err as Error).message}`)
+    })
+  }
+  socket.on('close', cleanup)
+  socket.on('error', cleanup)
 })
 
 // ── Healthcheck ────────────────────────────────

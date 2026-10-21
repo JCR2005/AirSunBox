@@ -19,6 +19,10 @@ async function realtimePlugin(app: FastifyInstance) {
   const devicesToSockets = new Map<string, Map<string, RealtimeSocket>>()
   const socketToDevices = new Map<RealtimeSocket, Set<string>>()
   const socketIdCounter = { current: 0 }
+  // Un id estable por socket (se asigna en la primera suscripción). Antes se
+  // generaba uno nuevo en cada subscribe y se pisaba el anterior, así que al
+  // cerrar quedaban sockets huérfanos en los otros dispositivos.
+  const socketIds = new WeakMap<RealtimeSocket, string>()
 
   const pubSub = createClient({
     socket: {
@@ -46,8 +50,13 @@ async function realtimePlugin(app: FastifyInstance) {
 
   await presence.connect()
 
-  function genSocketId(): string {
-    return `${instanceId}:${++socketIdCounter.current}`
+  function socketIdOf(socket: RealtimeSocket): string {
+    let id = socketIds.get(socket)
+    if (!id) {
+      id = `${instanceId}:${++socketIdCounter.current}`
+      socketIds.set(socket, id)
+    }
+    return id
   }
 
   function getDeviceChannel(deviceId: string): string {
@@ -90,50 +99,31 @@ async function realtimePlugin(app: FastifyInstance) {
     }
   }
 
-  async function removeAllPresence(socketId: string): Promise<void> {
-    const pattern = `${PRESENCE_KEY_PREFIX}*`
-    const keys = await presence.keys(pattern)
-    for (const key of keys) {
-      const existing = await presence.hGet(key, instanceId)
-      if (existing) {
-        const parsed = JSON.parse(existing) as PresenceEntry
-        const filtered = parsed.socketIds.filter(id => id !== socketId)
-        if (filtered.length === 0) {
-          await presence.hDel(key, instanceId)
-        } else {
-          parsed.socketIds = filtered
-          parsed.updatedAt = Date.now()
-          await presence.hSet(key, instanceId, JSON.stringify(parsed))
-        }
-      }
-    }
+  function logPresenceError(err: unknown) {
+    app.log.error(`Error actualizando presencia: ${(err as Error).message}`)
   }
 
-  function subscribe(deviceId: string, socket: RealtimeSocket) {
+  async function subscribe(deviceId: string, socket: RealtimeSocket): Promise<void> {
     if (!deviceId || !socket) return
+    const socketId = socketIdOf(socket)
 
-    if (!devicesToSockets.has(deviceId)) devicesToSockets.set(deviceId, new Map())
-    const socketId = genSocketId()
-    devicesToSockets.get(deviceId)!.set(socketId, socket)
+    let sockets = devicesToSockets.get(deviceId)
+    if (!sockets) devicesToSockets.set(deviceId, sockets = new Map())
+    if (sockets.has(socketId)) return // ya suscrito: evita mensajes duplicados
+    sockets.set(socketId, socket)
 
-    if (!socketToDevices.has(socket)) socketToDevices.set(socket, new Set())
-    socketToDevices.get(socket)!.add(deviceId)
+    let devices = socketToDevices.get(socket)
+    if (!devices) socketToDevices.set(socket, devices = new Set())
+    devices.add(deviceId)
 
-    ;(socket as any).__sanik_socket_id = socketId
-    addPresence(deviceId, socketId).catch((err) => {
-      app.log.error(`Error registrando presencia: ${(err as Error).message}`)
-    })
+    addPresence(deviceId, socketId).catch(logPresenceError)
+    // Primer interesado en esta instancia: escuchar lo que publiquen las demás
+    if (sockets.size === 1) await subscribeToDeviceChannel(deviceId)
   }
 
-  function unsubscribe(deviceId: string, socket: RealtimeSocket) {
-    const socketId = (socket as any).__sanik_socket_id
+  async function unsubscribe(deviceId: string, socket: RealtimeSocket): Promise<void> {
+    const socketId = socketIds.get(socket)
     if (!socketId) return
-
-    const sockets = devicesToSockets.get(deviceId)
-    if (sockets) {
-      sockets.delete(socketId)
-      if (sockets.size === 0) devicesToSockets.delete(deviceId)
-    }
 
     const devices = socketToDevices.get(socket)
     if (devices) {
@@ -141,23 +131,20 @@ async function realtimePlugin(app: FastifyInstance) {
       if (devices.size === 0) socketToDevices.delete(socket)
     }
 
-    removePresence(deviceId, socketId)
+    const sockets = devicesToSockets.get(deviceId)
+    if (!sockets || !sockets.delete(socketId)) return
+    removePresence(deviceId, socketId).catch(logPresenceError)
+    if (sockets.size === 0) {
+      devicesToSockets.delete(deviceId)
+      await unsubscribeFromDeviceChannel(deviceId)
+    }
   }
 
-  function unsubscribeAll(socket: RealtimeSocket) {
-    const socketId = (socket as any).__sanik_socket_id
+  async function unsubscribeAll(socket: RealtimeSocket): Promise<void> {
     const devices = socketToDevices.get(socket)
-    if (devices) {
-      for (const deviceId of devices) {
-        const sockets = devicesToSockets.get(deviceId)
-        if (sockets) {
-          sockets.delete(socketId)
-          if (sockets.size === 0) devicesToSockets.delete(deviceId)
-        }
-      }
-    }
+    if (!devices) return
+    await Promise.allSettled([...devices].map(deviceId => unsubscribe(deviceId, socket)))
     socketToDevices.delete(socket)
-    if (socketId) removeAllPresence(socketId)
   }
 
   function sendToSockets(deviceId: string, payload: unknown): void {
@@ -216,32 +203,13 @@ async function realtimePlugin(app: FastifyInstance) {
     await pubSub.unsubscribe(channel)
   }
 
-  const originalSubscribe = subscribe
-  const originalUnsubscribe = unsubscribe
-
-  const wrappedSubscribe = async (deviceId: string, socket: RealtimeSocket) => {
-    originalSubscribe(deviceId, socket)
-    const sockets = devicesToSockets.get(deviceId)
-    if (sockets && sockets.size === 1) {
-      await subscribeToDeviceChannel(deviceId)
-    }
-  }
-
-  const wrappedUnsubscribe = async (deviceId: string, socket: RealtimeSocket) => {
-    originalUnsubscribe(deviceId, socket)
-    const sockets = devicesToSockets.get(deviceId)
-    if (!sockets || sockets.size === 0) {
-      await unsubscribeFromDeviceChannel(deviceId)
-    }
-  }
-
   app.addHook('onClose', async () => {
     await Promise.allSettled([pubSub.quit(), presence.quit()])
   })
 
   const realtime: RealtimeService = {
-    subscribe: wrappedSubscribe,
-    unsubscribe: wrappedUnsubscribe,
+    subscribe,
+    unsubscribe,
     unsubscribeAll,
     broadcast
   }

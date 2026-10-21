@@ -12,10 +12,18 @@ services:
       POSTGRES_PASSWORD: iot_password
       POSTGRES_DB: iot_platform
     ports:
-      - "5433:5432"
+      # 5433 lo ocupa el contenedor `hospital-db` de otro proyecto en esta
+      # maquina. El puerto publicado es solo para inspeccion manual con
+      # psql; el backend entra por la red de compose, asi que el valor es
+      # arbitrario mientras no choque.
+      # Solo en 127.0.0.1: no se expone a la red.
+      - "127.0.0.1:5434:5432"
     volumes:
       - timescale_data:/var/lib/postgresql/data
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      # Base nueva: esquema + todas las migraciones en orden (ver el script).
+      # Con el volumen ya creado, Postgres no vuelve a ejecutarlo.
+      - ./database:/sanik-db:ro
+      - ./database/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U iot_user -d iot_platform"]
       interval: 10s
@@ -33,7 +41,8 @@ services:
     container_name: iot_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Redis no tiene contraseña: solo accesible desde esta máquina
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -54,10 +63,11 @@ services:
     restart: unless-stopped
     ports:
       - "1883:1883"    # MQTT
-      - "8083:8083"    # MQTT sobre WebSocket
-      - "8084:8084"    # MQTT sobre WebSocket seguro
       - "8883:8883"    # MQTT seguro (TLS)
-      - "18083:18083"  # Panel de administración EMQX
+      # WebSocket y panel solo en local (el panel trae admin/public por defecto)
+      - "127.0.0.1:8083:8083"    # MQTT sobre WebSocket
+      - "127.0.0.1:8084:8084"    # MQTT sobre WebSocket seguro
+      - "127.0.0.1:18083:18083"  # Panel de administración EMQX
     volumes:
       - emqx_data:/opt/emqx/data
     environment:
@@ -105,8 +115,11 @@ services:
       INGEST_WORKER_CONCURRENCY: 4
       # SMTP (recuperación de contraseña) — se toma del backend/.env (no se inyectan vacías)
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:80}
-
-      JWT_SECRET: 
+    # JWT_SECRET y SMTP_* salen de aquí. Las claves de `environment` tienen
+    # prioridad, así que DB/Redis/MQTT siguen apuntando a la red de compose.
+    # Sin JWT_SECRET el backend se niega a arrancar en producción.
+    env_file:
+      - ./backend/.env
     depends_on:
       timescaledb:
         condition: service_healthy
@@ -115,7 +128,7 @@ services:
       emqx:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -142,9 +155,8 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-    environment:
-      VITE_API_URL: http://localhost:3000
-      VITE_WS_URL: ws://localhost:3000
+    # Las VITE_* se fijan al compilar (vite build), no en runtime. Sin ellas
+    # el frontend usa rutas relativas /api y /ws, que nginx envía al backend.
     depends_on:
       - backend
     networks:
