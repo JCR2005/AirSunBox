@@ -1,3 +1,5 @@
+import useAuthStore from '../store/auth'
+
 const BASE =
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api')
@@ -26,6 +28,14 @@ async function request(path, options = {}) {
   const contentType = res.headers.get('content-type') || ''
   const data = contentType && contentType.includes('application/json') ? await res.json() : null
   
+  // Sesión caducada o inválida: cerrar sesión y volver al login. Se excluyen
+  // las rutas de /auth/ donde 401 significa credenciales o código incorrectos.
+  if (res.status === 401 && getToken() && !path.startsWith('/auth/')) {
+    useAuthStore.getState().logout()
+    localStorage.removeItem('token')
+    if (window.location.pathname !== '/login') window.location.assign('/login')
+  }
+
   if (!res.ok) {
     throw new Error(data?.error || data?.message || 'Error del servidor')
   }
@@ -68,14 +78,25 @@ export const variables = {
 }
 
 export const dots = {
-  get: (deviceId, variable, range = '24h', aggregation = 'avg', bucket = '15 minutes', orgId) =>
-    request(`/dots/${deviceId}/${variable}?range=${range}&aggregation=${aggregation}&bucket=${bucket}${orgId ? `&orgId=${orgId}` : ''}`),
+  get: (deviceId, variable, range = '24h', aggregation = 'avg', bucket = '15 minutes', orgId, start, end) => {
+    const q = new URLSearchParams({ range, aggregation, bucket })
+    if (orgId) q.set('orgId', orgId)
+    // El rango personalizado manda sobre el preajuste
+    if (start) q.set('start', start)
+    if (end) q.set('end', end)
+    return request(`/dots/${deviceId}/${variable}?${q.toString()}`)
+  },
   
   getRaw: (deviceId, variable, page = 1, limit = 10, orgId) =>
     request(`/dots/${deviceId}/${variable}/raw?page=${page}&limit=${limit}${orgId ? `&orgId=${orgId}` : ''}`),
 
-  getMultiple: (deviceId, variables, range = '24h', orgId) =>
-    request(`/dots/${deviceId}?variables=${variables.join(',')}&range=${range}${orgId ? `&orgId=${orgId}` : ''}`),
+  getMultiple: (deviceId, variables, range = '24h', orgId, start, end) => {
+    const q = new URLSearchParams({ variables: variables.join(','), range })
+    if (orgId) q.set('orgId', orgId)
+    if (start) q.set('start', start)
+    if (end) q.set('end', end)
+    return request(`/dots/${deviceId}?${q.toString()}`)
+  },
 
   stationRecords: (deviceId, { start, end, limit = 2000 } = {}) => {
     const q = new URLSearchParams()
@@ -83,6 +104,13 @@ export const dots = {
     if (end) q.set('end', end)
     q.set('limit', String(limit))
     return request(`/dots/${deviceId}/records?${q.toString()}`)
+  },
+
+  stationWeekly: (deviceId, { start, end } = {}) => {
+    const q = new URLSearchParams()
+    if (start) q.set('start', start)
+    if (end) q.set('end', end)
+    return request(`/dots/${deviceId}/weekly?${q.toString()}`)
   }
 }
 

@@ -55,7 +55,7 @@ export function analyzeEnvironmentalImpact(devicesData: Record<string, DeviceRep
     o3: { key: 'o3', name: 'O₃', group: 'gaseous', thresholds: [50, 70, 100], unit: 'ppb', desc: 'Ozono Troposférico formado por reacciones fotoquímicas.' },
     so2: { key: 'so2', name: 'SO₂', group: 'gaseous', thresholds: [35, 75, 185], unit: 'ppb', desc: 'Dióxido de Azufre de quema de combustibles fósiles.' },
     nox: { key: 'nox', name: 'NOX', group: 'gaseous', thresholds: [40, 100, 200], unit: 'ppb', desc: 'Óxidos de Nitrógeno de alta temperatura.' },
-    h2s: { key: 'h2s', name: 'H₂S', group: 'gaseous', thresholds: [1, 5, 10], unit: 'ppb', desc: 'Sulfuro de Hidrógeno (olor a huevo podrido).' }
+    h2s: { key: 'h2s', name: 'H₂S', group: 'gaseous', thresholds: [1.4, 7, 14], unit: 'µg/m³', desc: 'Sulfuro de Hidrógeno (olor a huevo podrido).' }
   }
 
   return Object.values(devicesData).map(dev => {
@@ -134,7 +134,7 @@ export function analyzeEnvironmentalImpact(devicesData: Record<string, DeviceRep
     const sources = new Set<string>()
     const highPM = (vars.pm25?.avg > 35 || vars.pm10?.avg > 154)
     const highCO = (vars.co?.avg > 9)
-    const highH2S = (vars.h2s?.avg > 5)
+    const highH2S = (vars.h2s?.avg > 7)
     const highO3 = (vars.o3?.avg > 70)
 
     if (highPM && highCO) {

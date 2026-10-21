@@ -9,7 +9,7 @@ import {
   ArrowLeft, Download, Trash2, Clock, Calendar, AlertCircle, ChevronLeft, ChevronRight, BarChart2, Check,
   FileText, FileSpreadsheet, ClipboardList
 } from 'lucide-react'
-import { exportStationRecordsPDF, exportStationRecordsExcel } from '../utils/exportUtils'
+import { exportStationRecordsPDF, exportStationRecordsExcel, exportStationWeeklyPDF } from '../utils/exportUtils'
 
 // Modificadores estructurales de funciones matemáticas de Ubidots
 const AGGREGATIONS = [
@@ -55,6 +55,26 @@ const AQI_COLORS = {
   'Peligrosa': '#8B5CF6'   // Morado/Violeta
 }
 
+// Etiquetas y unidades de la matriz semanal (mismo diccionario que el PDF)
+const WEEKLY_LABELS = {
+  temperatura: 'Temp.', humedad: 'Humedad', co: 'CO', co2: 'CO₂', nh3: 'NH₃',
+  h2s: 'H₂S', nox: 'NOx', o3: 'O₃', pm1: 'PM1', pm10: 'PM10', pm25: 'PM2.5', so2: 'SO₂'
+}
+const WEEKLY_UNITS = {
+  temperatura: '°C', humedad: '%', co: 'ppm', co2: 'ppm', nh3: 'ppm',
+  h2s: 'µg/m³', nox: 'ppb', o3: 'ppb', pm1: 'µg/m³', pm10: 'µg/m³', pm25: 'µg/m³', so2: 'ppb'
+}
+const WEEKLY_BAND_COLORS = {
+  Excelente: '#166534', Buena: '#059669', 'Precaución': '#b45309', Moderada: '#b45309',
+  Mala: '#b91c1c', 'Muy Mala': '#9f1239', Peligrosa: '#7f1d1d', Severa: '#581c87'
+}
+
+const weekLabel = iso => {
+  const d = new Date(`${iso}T00:00:00`)
+  if (isNaN(d.getTime())) return iso
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
 export default function VariableDetail() {
   const { deviceId, variableLabel } = useParams()
   const navigate = useNavigate()
@@ -92,6 +112,11 @@ export default function VariableDetail() {
   // Exportación de registros por estación (todas las variables del dispositivo)
   const [exportingRecords, setExportingRecords] = useState(null)
   const [recordsNotice, setRecordsNotice] = useState(null)
+
+  // Vista: gráfica o resumen semanal (comparten el mismo filtro de fechas)
+  const [chartView, setChartView] = useState('chart')
+  const [weekly, setWeekly] = useState(null)
+  const [loadingWeekly, setLoadingWeekly] = useState(false)
   
   const cleanVariable = String(variableLabel || '').toLowerCase()
   const isRawMode = aggregation === 'raw'
@@ -184,6 +209,27 @@ export default function VariableDetail() {
     loadTableData()
     return () => { active = false }
   }, [deviceId, variableLabel, page, rowsPerPage])
+
+  // El resumen semanal sigue el mismo filtro de fechas que la gráfica
+  useEffect(() => {
+    if (chartView !== 'weekly') return
+    let active = true
+    const loadWeekly = async () => {
+      setLoadingWeekly(true)
+      try {
+        const { start, end } = resolveRange()
+        const payload = await dotsApi.stationWeekly(deviceId, { start, end })
+        if (active) setWeekly(payload)
+      } catch (err) {
+        console.error('Error al cargar el resumen semanal:', err)
+        if (active) setWeekly(null)
+      } finally {
+        if (active) setLoadingWeekly(false)
+      }
+    }
+    loadWeekly()
+    return () => { active = false }
+  }, [chartView, deviceId, activeTimeFilter])
 
   // Eliminar un registro de telemetría de forma permanente
   const handleDeletePoint = async (time) => {
@@ -506,7 +552,49 @@ export default function VariableDetail() {
             </div>
           )}
 
-          {/* AREA GRÁFICA RESPONSIVA CON FONDOS DE COLORES */}
+          {/* SELECTOR DE VISTA: la misma serie, en curva o resumida por semana */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex gap-2 p-1 rounded-2xl w-fit" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              <button
+                onClick={() => setChartView('chart')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${chartView === 'chart' ? 'bg-[#67B7E8] text-white shadow-md' : 'text-gray-400 hover:bg-black/5'}`}
+              >
+                <BarChart2 size={15} /> Gráfica
+              </button>
+              <button
+                onClick={() => setChartView('weekly')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${chartView === 'weekly' ? 'bg-[#67B7E8] text-white shadow-md' : 'text-gray-400 hover:bg-black/5'}`}
+              >
+                <ClipboardList size={15} /> Resumen semanal
+              </button>
+            </div>
+
+            {chartView === 'weekly' && (
+              <button
+                onClick={() => {
+                  if (!weekly?.variables?.length) return
+                  setExportingRecords('weekly')
+                  try { exportStationWeeklyPDF(weekly) } finally { setExportingRecords(null) }
+                }}
+                disabled={exportingRecords !== null || !weekly?.variables?.length}
+                title={
+                  weekly?.variables?.length
+                    ? 'Descargar el resumen semanal en PDF horizontal'
+                    : 'No hay lecturas en el rango seleccionado, no se puede generar'
+                }
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#67B7E8] text-white shadow-sm hover:bg-[#52A8E0] transition-all disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
+              >
+                {exportingRecords === 'weekly' ? (
+                  <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando...</>
+                ) : (
+                  <><FileText size={15} /> Generar PDF</>
+                )}
+              </button>
+            )}
+          </div>
+
+          {chartView === 'chart' ? (
+          /* AREA GRÁFICA RESPONSIVA CON FONDOS DE COLORES */
           <div className="border rounded-[2.5rem] p-6 shadow-sm relative min-h-[400px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
             {loadingChart && (
               <div className="absolute inset-0 bg-white/60 dark:bg-black/60 rounded-[2.5rem] z-20 flex items-center justify-center backdrop-blur-sm">
@@ -558,6 +646,96 @@ export default function VariableDetail() {
               </ResponsiveContainer>
             )}
           </div>
+          ) : (
+          /* RESUMEN SEMANAL: la misma serie resumida, semana contra semana */
+          <div className="border rounded-[2.5rem] overflow-hidden shadow-sm" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <div className="p-5 border-b flex flex-wrap items-center justify-between gap-3" style={{ borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-2">
+                <ClipboardList size={15} className="text-[#67B7E8]" />
+                <h3 className="font-black text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                  Promedio semanal por variable
+                </h3>
+              </div>
+              {weekly?.weeks?.length > 0 && (
+                <span className="text-[11px] font-bold" style={{ color: 'var(--text2)' }}>
+                  {weekly.weeks.length} semana{weekly.weeks.length === 1 ? '' : 's'} ·{' '}
+                  {weekly.variables.reduce((a, v) => a + v.count, 0).toLocaleString()} lecturas
+                </span>
+              )}
+            </div>
+
+            {loadingWeekly ? (
+              <div className="p-16 flex items-center justify-center">
+                <div className="text-xs font-bold animate-pulse" style={{ color: 'var(--text2)' }}>
+                  Calculando promedios semanales...
+                </div>
+              </div>
+            ) : !weekly?.variables?.length ? (
+              <div className="p-12 flex flex-col items-center justify-center text-center gap-3">
+                <AlertCircle size={30} className="text-amber-500 opacity-60" />
+                <p className="text-sm font-bold" style={{ color: 'var(--text)' }}>
+                  No hay lecturas en el rango seleccionado
+                </p>
+                <p className="text-xs max-w-md" style={{ color: 'var(--text2)' }}>
+                  Usa el filtro de rango de arriba y selecciona <strong>Rango personalizado</strong>
+                  {' '}para abarcar las fechas donde la estación sí tiene datos registrados.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px]">
+                  <thead>
+                    <tr style={{ background: 'var(--bg)' }}>
+                      <th className="px-4 py-3 text-left font-black uppercase tracking-wider sticky left-0" style={{ color: 'var(--text2)', background: 'var(--bg)' }}>
+                        Semana
+                      </th>
+                      {weekly.variables.map(v => (
+                        <th key={v.variable} className="px-3 py-3 text-center font-black whitespace-nowrap">
+                          <span style={{ color: 'var(--text)' }}>{WEEKLY_LABELS[v.variable] || v.variable}</span>
+                          <span className="block text-[9px] font-bold normal-case" style={{ color: 'var(--text2)' }}>
+                            {WEEKLY_UNITS[v.variable] || ''}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {weekly.weeks.map((week, wi) => (
+                      <tr key={week} style={{ background: wi % 2 === 1 ? 'var(--bg)' : 'transparent' }}>
+                        <td className="px-4 py-2.5 font-black whitespace-nowrap sticky left-0" style={{ color: 'var(--text)', background: wi % 2 === 1 ? 'var(--bg)' : 'var(--card)' }}>
+                          {weekLabel(week)}
+                        </td>
+                        {weekly.variables.map(v => {
+                          const value = v.byWeek[week]
+                          const band = value !== undefined
+                            ? (v.ranges || []).find(r => r.min <= value && (r.max === null || r.max > value))
+                            : null
+                          return (
+                            <td key={v.variable} className="px-3 py-2.5 text-center font-bold" style={{ color: value === undefined ? 'var(--text2)' : (band ? WEEKLY_BAND_COLORS[band.category] : 'var(--text)') }}>
+                              {value === undefined ? '—' : Number(value).toFixed(2)}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: 'var(--bg)', borderTop: '2px solid var(--border)' }}>
+                      <td className="px-4 py-3 font-black uppercase tracking-wider sticky left-0" style={{ color: 'var(--text)', background: 'var(--bg)' }}>
+                        Promedio
+                      </td>
+                      {weekly.variables.map(v => (
+                        <td key={v.variable} className="px-3 py-3 text-center font-black" style={{ color: 'var(--text)' }}>
+                          {v.avg === null ? '—' : Number(v.avg).toFixed(2)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+          )}
 
           {/* TABLA HISTÓRICA CON PAGINACIÓN OFFSET */}
           <div className="border rounded-3xl overflow-hidden shadow-sm" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>

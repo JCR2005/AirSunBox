@@ -205,7 +205,7 @@ export function computeAqi(
   }
 }
 
-const CLASSIC_AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'no2', 'o3', 'so2', 'pm25', 'pm10']
+const CLASSIC_AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'h2s', 'o3', 'so2', 'pm25', 'pm10']
 
 interface ClassicRangeRow {
   score: string | number
@@ -344,7 +344,7 @@ export async function seedAirTemplate(client: Queryable, spaceId: string): Promi
      FROM (
        SELECT DISTINCT variable_label, MAX(weight) AS weight
        FROM air_quality_ranges
-       WHERE variable_label IN ('pm25','pm10','co2','co','no2','nox','nh3','o3','so2')
+       WHERE variable_label IN ('pm25','pm10','co2','co','h2s','nox','nh3','o3','so2')
        GROUP BY variable_label
      ) t
      ON CONFLICT (space_id, variable_label) DO NOTHING`,
@@ -358,7 +358,7 @@ export async function seedAirTemplate(client: Queryable, spaceId: string): Promi
        CASE r.score WHEN 0 THEN 1 WHEN 25 THEN 2 WHEN 50 THEN 3 WHEN 75 THEN 4 ELSE 5 END,
        r.min_value, r.max_value
      FROM air_quality_ranges r
-     WHERE r.variable_label IN ('pm25','pm10','co2','co','no2','nox','nh3','o3','so2')
+     WHERE r.variable_label IN ('pm25','pm10','co2','co','h2s','nox','nh3','o3','so2')
      ON CONFLICT (space_id, variable_label, cat_order) DO NOTHING`,
     [spaceId]
   )

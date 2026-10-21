@@ -6,7 +6,7 @@ import * as reportsRepo from '../repositories/reports.js'
 import { calculateRespiratoryRisk } from '../services/reportCalculationsService.js'
 import { analyzeEnvironmentalImpact } from '../services/environmentalAnalysisService.js'
 
-const AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'no2', 'o3', 'so2', 'pm25', 'pm10']
+const AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'h2s', 'o3', 'so2', 'pm25', 'pm10']
 const CLIMA_VARS = ['temperatura', 'temperature', 'humedad', 'humidity', 'co2', 'co']
 const ALL_VARS = [...new Set([...AQI_VARS, ...CLIMA_VARS])]
 

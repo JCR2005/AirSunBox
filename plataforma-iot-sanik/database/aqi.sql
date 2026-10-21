@@ -46,13 +46,15 @@ INSERT INTO air_quality_ranges (variable_label, min_value, max_value, score, cat
   ('nox', 40, 60,   75,  'Mala',       1.1),
   ('nox', 60, NULL, 100, 'Peligrosa',  1.1);
 
--- ── NO2 ───────────────────────────────────
+-- ── H2S ───────────────────────────────────
+-- En ug/m3. La OMS fija 5 ug/m3 como guia de 24 h; 7 es el umbral de accion.
+-- Equivale a los cortes en ppb 0-1 / 1-5 / 5-10 / 10-50 / 50+ (factor 1.3927).
 INSERT INTO air_quality_ranges (variable_label, min_value, max_value, score, category, weight) VALUES
-  ('no2', 0,  5,    0,   'Excelente',  1.2),
-  ('no2', 5,  15,   25,  'Buena',      1.2),
-  ('no2', 15, 30,   50,  'Precaución', 1.2),
-  ('no2', 30, 50,   75,  'Mala',       1.2),
-  ('no2', 50, NULL, 100, 'Peligrosa',  1.2);
+  ('h2s', 0,    1.4,  0,   'Excelente',  1.2),
+  ('h2s', 1.4,  7,    25,  'Buena',      1.2),
+  ('h2s', 7,    14,   50,  'Precaución', 1.2),
+  ('h2s', 14,   70,   75,  'Mala',       1.2),
+  ('h2s', 70,   NULL, 100, 'Peligrosa',  1.2);
 
 -- ── O3 ────────────────────────────────────
 INSERT INTO air_quality_ranges (variable_label, min_value, max_value, score, category, weight) VALUES

@@ -1,9 +1,10 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import ClienteLayout from '../components/sanik/ClienteLayout'
 import { devices as devicesApi, dots as dotsApi, spaces as spacesApi } from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { exportStationWeeklyPDF } from '../utils/exportUtils'
 import MapPicker from '../components/MapPicker'
 
 import { 
@@ -11,7 +12,7 @@ import {
   Thermometer, Droplets, Wind, Sun, Cloud, Cpu, Gauge, 
   Battery, Zap, Factory, Waves, Flame, Trees, Shield, 
   Activity, CloudLightning, Clock, Leaf, Eye, EyeOff, SlidersHorizontal, ChevronDown,
-  Code, Copy, Check, X, Layers, ArrowUp, ArrowDown, KeyRound, Pencil, Save
+  Code, Copy, Check, X, Layers, ArrowUp, ArrowDown, KeyRound, Pencil, Save, FileText
 } from 'lucide-react'
 
 const RANGES = ['1h', '6h', '24h', '7d', '30d']
@@ -176,6 +177,10 @@ export default function ClientDeviceDetail() {
   const [lastValues, setLastValues] = useState({})
   const [chartData, setChartData] = useState([])
   const [range, setRange] = useState('24h')
+  const [useCustomRange, setUseCustomRange] = useState(false)
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [generatingReport, setGeneratingReport] = useState(false)
   const [activeVars, setActiveVars] = useState([])
   const [loading, setLoading] = useState(true)
   const [chartLoading, setChartLoading] = useState(false)
@@ -373,6 +378,15 @@ export default function ClientDeviceDetail() {
     }, 600)
   }, [wsValues, deviceId])
 
+  // El rango personalizado manda sobre los preajustes (1h..30d)
+  const customWindow = useMemo(() => {
+    if (!useCustomRange || !customStart || !customEnd) return null
+    const s = new Date(customStart)
+    const e = new Date(customEnd)
+    if (isNaN(s.getTime()) || isNaN(e.getTime()) || s >= e) return null
+    return { start: s.toISOString(), end: e.toISOString(), spanMs: e.getTime() - s.getTime() }
+  }, [useCustomRange, customStart, customEnd])
+
   useEffect(() => {
     if (!deviceId || !activeVars.length || activeView !== 'grafica') {
       if (activeView === 'grafica' && !activeVars.length) {
@@ -382,12 +396,19 @@ export default function ClientDeviceDetail() {
     }
     
     setChartLoading(true)
-    dotsApi.getMultiple(deviceId, activeVars, range).then(data => {
+    dotsApi.getMultiple(
+      deviceId, activeVars, customWindow ? '' : range, undefined,
+      customWindow?.start, customWindow?.end
+    ).then(data => {
+      // Si el rango abarca varios días, la hora sola no distingue los puntos
+      const showDate = !!customWindow && customWindow.spanMs > 24 * 3600 * 1000
       const timeMap = {}
       for (const [variable, points] of Object.entries(data || {})) {
         if (!Array.isArray(points)) continue
         points.forEach(p => {
-          const t = new Date(p.time).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })
+          const t = showDate
+            ? new Date(p.time).toLocaleString('es-GT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+            : new Date(p.time).toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit' })
           if (!timeMap[t]) {
             timeMap[t] = { time: t, _rawTime: new Date(p.time).getTime() }
           }
@@ -401,9 +422,39 @@ export default function ClientDeviceDetail() {
     }).finally(() => {
       setChartLoading(false)
     })
-  }, [deviceId, range, activeVars, activeView])
+  }, [deviceId, range, activeVars, activeView, customWindow])
 
   const DynamicIcon = AVAILABLE_ICONS[device?.icon] || Activity
+
+  // Genera el reporte con exactamente las variables visibles en la gráfica,
+  // para el rango de fechas activo
+  const handleGenerateReport = async () => {
+    if (!deviceId || !activeVars.length) return
+    if (!customWindow) return
+    setGeneratingReport(true)
+    try {
+      const payload = await dotsApi.stationWeekly(deviceId, {
+        start: customWindow.start,
+        end: customWindow.end
+      })
+      // Dejar solo las variables que el usuario tiene visibles en el chart
+      const visibles = payload.variables.filter(v => activeVars.includes(v.variable))
+      if (!visibles.length) {
+        alert('No hay lecturas de las variables seleccionadas en ese rango de fechas.')
+        return
+      }
+      exportStationWeeklyPDF({
+        ...payload,
+        variables: visibles,
+        weeks: payload.weeks.filter(w => visibles.some(v => v.byWeek[w] !== undefined))
+      })
+    } catch (err) {
+      console.error('Error al generar el reporte:', err)
+      alert('No se pudo generar el reporte. Revisa el rango de fechas e inténtalo de nuevo.')
+    } finally {
+      setGeneratingReport(false)
+    }
+  }
   const latValue = device?.lat != null ? parseFloat(device.lat) : null
   const lngValue = device?.lng != null ? parseFloat(device.lng) : null
   const hasValidGPS = latValue != null && lngValue != null && !isNaN(latValue) && !isNaN(lngValue)
@@ -1210,16 +1261,85 @@ export default function ClientDeviceDetail() {
                         })}
                       </div>
                       
-                      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                        {RANGES.map(r => (
-                          <button key={r} onClick={() => setRange(r)}
-                            className={`px-5 py-2 rounded-xl text-xs font-black transition-all ${range === r ? 'bg-[#1D9E75] text-white shadow-md scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
-                            style={range !== r ? { color: 'var(--text2)' } : {}}>
-                            {r}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                       <div className="flex items-center gap-1.5 p-1.5 rounded-2xl" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                         {RANGES.map(r => (
+                           <button key={r} onClick={() => { setRange(r); setUseCustomRange(false) }}
+                             className={`px-5 py-2 rounded-xl text-xs font-black transition-all ${range === r && !useCustomRange ? 'bg-[#1D9E75] text-white shadow-md scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                             style={range !== r || useCustomRange ? { color: 'var(--text2)' } : {}}>
+                             {r}
+                           </button>
+                         ))}
+                         <button
+                           onClick={() => {
+                             setUseCustomRange(true)
+                             if (!customStart && !customEnd) {
+                               const toLocal = d => {
+                                 const p = n => String(n).padStart(2, '0')
+                                 return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+                               }
+                               const hasta = new Date()
+                               const desde = new Date(hasta.getTime() - 7 * 24 * 3600 * 1000)
+                               setCustomStart(toLocal(desde))
+                               setCustomEnd(toLocal(hasta))
+                             }
+                           }}
+                           className={`px-5 py-2 rounded-xl text-xs font-black transition-all ${useCustomRange ? 'bg-[#1D9E75] text-white shadow-md scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                           style={!useCustomRange ? { color: 'var(--text2)' } : {}}
+                         >
+                           Fechas
+                         </button>
+                       </div>
+                     </div>
+
+                     {/* Rango personalizado + generación de reporte */}
+                     {useCustomRange && (
+                       <div
+                         className="flex flex-wrap items-end gap-3 mb-6 p-4 rounded-2xl"
+                         style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                       >
+                         <label className="flex flex-col gap-1.5">
+                           <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: 'var(--text2)' }}>
+                             Desde
+                           </span>
+                           <input
+                             type="datetime-local"
+                             value={customStart}
+                             onChange={e => setCustomStart(e.target.value)}
+                             className="px-3 py-2 rounded-xl text-xs font-bold"
+                             style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                           />
+                         </label>
+                         <label className="flex flex-col gap-1.5">
+                           <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: 'var(--text2)' }}>
+                             Hasta
+                           </span>
+                           <input
+                             type="datetime-local"
+                             value={customEnd}
+                             onChange={e => setCustomEnd(e.target.value)}
+                             className="px-3 py-2 rounded-xl text-xs font-bold"
+                             style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                           />
+                         </label>
+
+                         <div className="flex-1" />
+
+                         <button
+                           onClick={handleGenerateReport}
+                           disabled={generatingReport || !customWindow}
+                           title={customWindow
+                             ? `Generar el reporte de ${activeVars.length} variable(s) entre las fechas indicadas`
+                             : 'Selecciona un rango de fechas válido'}
+                           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black bg-[#67B7E8] text-white shadow-sm hover:bg-[#52A8E0] transition-all disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed disabled:shadow-none"
+                         >
+                           {generatingReport ? (
+                             <><span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando...</>
+                           ) : (
+                             <><FileText size={15} /> Generar reporte</>
+                           )}
+                         </button>
+                       </div>
+                     )}
 
                     <ResponsiveContainer width="100%" height={450}>
                       <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>

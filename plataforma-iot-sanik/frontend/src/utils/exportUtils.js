@@ -18,6 +18,13 @@ function formatDate(dateStr) {
 /**
  * Agrega encabezado y pie de página estándar a las páginas del PDF
  */
+// Margenes del pie de pagina. PIE es donde se dibuja la linea separadora y
+// PIE_ALTO es la franja que el contenido de la ultima pagina no puede pisar.
+// Ambos estan centralizados porque un desajuste entre las dos constantes es
+// justo lo que hace que la fecha de generacion termine encima de un texto.
+const PIE = 12
+const PIE_ALTO = PIE + 8
+
 function addPdfHeaderFooter(doc, reportTitle, pageNum, totalPages) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -28,18 +35,18 @@ function addPdfHeaderFooter(doc, reportTitle, pageNum, totalPages) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(255, 255, 255)
-  doc.text('AirSunBox — Plataforma IoT Sanik', 14, 8)
+  doc.text('Plataforma IoT AirSunBox', 14, 8)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.text(reportTitle, pageWidth - 14, 8, { align: 'right' })
 
   // Pie de página
   doc.setDrawColor(220, 220, 220)
-  doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12)
+  doc.line(14, pageHeight - PIE, pageWidth - 14, pageHeight - PIE)
   doc.setFontSize(8)
   doc.setTextColor(120, 120, 120)
-  doc.text(`Generado el ${new Date().toLocaleString('es-GT')}`, 14, pageHeight - 6)
-  doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - 14, pageHeight - 6, { align: 'right' })
+  doc.text(`Generado el ${new Date().toLocaleString('es-GT')}`, 14, pageHeight - PIE + 6)
+  doc.text(`Página ${pageNum} de ${totalPages}`, pageWidth - 14, pageHeight - PIE + 6, { align: 'right' })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -617,7 +624,7 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
     const pm25 = getVal('pm25')
     const pm10 = getVal('pm10')
     const so2 = getVal('so2')
-    const no2 = getVal('no2') || getVal('nox')
+    const h2s = getVal('h2s') || getVal('nox')
     const co = getVal('co')
     const co2 = getVal('co2')
     const hum = getVal('humedad') !== '--' ? getVal('humedad') : getVal('humidity')
@@ -634,7 +641,7 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
       pm25,
       pm10,
       so2,
-      no2,
+      h2s,
       co,
       co2,
       hum,
@@ -654,7 +661,7 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
     { wch: 18 }, // PM2.5
     { wch: 18 }, // PM10
     { wch: 16 }, // SO2
-    { wch: 16 }, // NO2
+    { wch: 16 }, // H2S
     { wch: 16 }, // CO
     { wch: 16 }, // CO2
     { wch: 18 }, // Humedad
@@ -675,7 +682,7 @@ const UNIT_BY_VARIABLE = {
   co: 'ppm',
   co2: 'ppm',
   nh3: 'ppm',
-  no2: 'ppb',
+  h2s: 'µg/m³',
   nox: 'ppb',
   o3: 'ppb',
   pm1: 'µg/m³',
@@ -690,7 +697,7 @@ const LABEL_BY_VARIABLE = {
   co: 'Monóxido de carbono',
   co2: 'Dióxido de carbono',
   nh3: 'Amoníaco',
-  no2: 'Dióxido de nitrógeno',
+  h2s: 'Sulfuro de hidrógeno',
   nox: 'Óxidos de nitrógeno',
   o3: 'Ozono',
   pm1: 'Partículas < 1 µm',
@@ -708,6 +715,100 @@ const CATEGORY_COLORS = {
   'Muy Mala': [190, 18, 60],
   Peligrosa: [190, 18, 60],
   Severa: [136, 19, 55]
+}
+
+// Nota metodologica del resumen semanal.
+//
+// Va como constante y no en linea porque el ancho de la nota depende de la
+// lista de sensores: al medirla para decidir el salto de pagina hay que
+// tener el mismo texto que despues se dibuja, o la medicion miente.
+const NOTA_METODOLOGICA =
+  'Las lecturas de gases multigas (H₂S, NOx, CO, O₃, SO₂, NH₃) provienen de los sensores MQ-135, MQ-136, ' +
+  'MQ-131 y MQ-7, que no son selectivos: responden de forma cruzada a varios gases y su salida no está ' +
+  'calibrada contra un patrón de referencia. Sus valores se presentan como tendencia relativa y como base ' +
+  'para comparar horarios y días entre sí, no como concentración absoluta. Se expresan en ppb, salvo el H₂S ' +
+  'que se reporta en µg/m³, de acuerdo con la unidad registrada en el catálogo de variables. Para valores ' +
+  'regulados se requiere un equipo de referencia. Temperatura, humedad y partículas proceden de sensores ' +
+  'dedicados y pueden compararse con instrumentos de referencia.';
+/**
+ * Dibuja una rejilla de tabla.
+ *
+ * Se separa del codigo en linea porque el PDF repite el mismo patron en el
+ * indice de variables y en el detalle, y las dos tenian las guias verticales
+ * ausentes por separado.
+ *
+ * @param {jsPDF}  doc
+ * @param {object} o
+ * @param {number[]} o.cols     anchos en mm
+ * @param {number}   o.x        borde izquierdo
+ * @param {number}   o.y        borde superior (se devuelve actualizado)
+ * @param {string[]} o.headers  etiquetas; null para no dibujar cabecera
+ * @param {string}   o.headerFill
+ * @param {Array}    o.rows      celdas ya formateadas
+ * @param {string[]} o.align     'l' | 'r' por columna
+ * @param {number}   o.rowH
+ */
+function drawGrid(doc, o) {
+  const { cols, x, headers, headerFill, rows, align, rowH } = o
+  const w = cols.reduce((a, b) => a + b, 0)
+  let y = o.y
+
+  if (headers && headers.length) {
+    doc.setFillColor(headerFill[0], headerFill[1], headerFill[2])
+    doc.rect(x, y, w, 6.5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    let hx = x
+    headers.forEach((h, i) => {
+      const a = align?.[i] === 'r' ? 'right' : 'left'
+      doc.text(String(h), a === 'right' ? hx + cols[i] - 2.5 : hx + 2.5, y + 4.3, { align: a })
+      hx += cols[i]
+    })
+    y += 6.5
+  }
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+
+  rows.forEach((cells, r) => {
+    if (r % 2 === 1) {
+      doc.setFillColor(249, 250, 251)
+      doc.rect(x, y, w, rowH, 'F')
+    }
+    let cx = x
+    cells.forEach((cell, ci) => {
+      const spec = cell && typeof cell === 'object' ? cell : { text: cell }
+      const a = spec.align || align?.[ci] === 'r' ? 'right' : 'left'
+      if (spec.color) {
+        doc.setTextColor(spec.color[0], spec.color[1], spec.color[2])
+        doc.setFont('helvetica', spec.bold === false ? 'normal' : 'bold')
+      } else {
+        doc.setTextColor(55, 65, 81)
+        doc.setFont('helvetica', 'normal')
+      }
+      const tx = a === 'right' ? cx + cols[ci] - 2.5 : cx + 2.5
+      doc.text(String(spec.text ?? '—'), tx, y + rowH * 0.7, { align: a })
+      cx += cols[ci]
+    })
+    y += rowH
+  })
+
+  // Guias verticales: una por separacion de columna, del ancho completo de la
+  // tabla. Son las que separan un dato del siguiente.
+  doc.setDrawColor(203, 213, 225)
+  doc.setLineWidth(0.15)
+  let gx = x
+  for (let i = 0; i < cols.length - 1; i++) {
+    gx += cols[i]
+    doc.line(gx, o.y + (headers && headers.length ? 6.5 : 0), gx, y)
+  }
+  // Marco exterior superior e inferior: cierran el bloque.
+  doc.line(x, o.y, x + w, o.y)
+  doc.line(x, y, x + w, y)
+
+  doc.setFont('helvetica', 'normal')
+  return y
 }
 
 function formatTimestamp(iso) {
@@ -752,7 +853,7 @@ export function exportStationRecordsPDF(payload = {}) {
   doc.setFontSize(10)
   doc.text(device.name || 'Estación sin nombre', left, 21)
   doc.setFontSize(8)
-  doc.text('AirSunBox — Plataforma IoT Sanik', left, 27)
+  doc.text('Plataforma IoT AirSunBox', left, 27)
 
   // ── Datos de la estación (lugar) ──
   doc.setTextColor(30, 41, 59)
@@ -830,53 +931,34 @@ export function exportStationRecordsPDF(payload = {}) {
   y += 6
 
   const idxHeaders = ['Variable', 'Unidad', 'Lecturas', 'Mínimo', 'Promedio', 'Máximo', 'No incl.']
-  const idxWidths = [44, 18, 20, 22, 24, 22, 20]
+  const idxWidths = [42, 18, 19, 23, 24, 23, 20]
   const idxTotal = idxWidths.reduce((a, b) => a + b, 0)
-  const scale = usable / idxTotal
-  const idxCols = idxWidths.map(w => w * scale)
+  const idxScale = usable / idxTotal
+  const idxCols = idxWidths.map(w => w * idxScale)
+  // Variable y Unidad son texto; el resto, numeros. Alineados a la derecha, los
+  // decimales de Minimo/Promedio/Maximo caen en la misma columna vertical y se
+  // comparan de un vistazo.
+  const idxAlign = ['l', 'l', 'r', 'r', 'r', 'r', 'r']
 
-  doc.setFillColor(226, 232, 240)
-  doc.rect(left, y, usable, 7, 'F')
-  doc.setFontSize(8)
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(30, 41, 59)
-  let ix = left + 2
-  idxHeaders.forEach((h, i) => {
-    doc.text(h, ix, y + 4.8)
-    ix += idxCols[i]
-  })
-  y += 7
-
-  doc.setFont('helvetica', 'normal')
-  variables.forEach((v, i) => {
-    if (i % 2 === 1) {
-      doc.setFillColor(248, 250, 252)
-      doc.rect(left, y, usable, 6, 'F')
-    }
-    const unit = UNIT_BY_VARIABLE[v.variable] || ''
-    const omitted = v.total - v.readings.length
-    const row = [
-      LABEL_BY_VARIABLE[v.variable] || v.variable,
-      unit,
-      String(v.total),
-      v.min === null ? '—' : Number(v.min).toFixed(2),
-      v.avg === null ? '—' : Number(v.avg).toFixed(2),
-      v.max === null ? '—' : Number(v.max).toFixed(2),
-      omitted > 0 ? `+${omitted}` : '—'
-    ]
-    let cx = left + 2
-    row.forEach((cell, i) => {
-      if (i === 6 && omitted > 0) {
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(180, 83, 9)
-      } else {
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(55, 65, 81)
-      }
-      doc.text(cell, cx, y + 4.2)
-      cx += idxCols[i]
+  y = drawGrid(doc, {
+    cols: idxCols, x: left, y,
+    headers: idxHeaders, align: idxAlign, rowH: 6,
+    headerFill: [226, 232, 240],
+    rows: variables.map(v => {
+      const omitted = v.total - v.readings.length
+      const num = x => ({ text: x === null ? '—' : Number(x).toFixed(2), align: 'r' })
+      return [
+        LABEL_BY_VARIABLE[v.variable] || v.variable,
+        UNIT_BY_VARIABLE[v.variable] || '',
+        { text: String(v.total), align: 'r' },
+        num(v.min),
+        num(v.avg),
+        num(v.max),
+        omitted > 0
+          ? { text: `+${omitted}`, align: 'r', color: [180, 83, 9] }
+          : { text: '—', align: 'r' }
+      ]
     })
-    y += 6
   })
 
   // ── Detalle por variable ──
@@ -901,53 +983,41 @@ export function exportStationRecordsPDF(payload = {}) {
     doc.text(`${unit} ${sufijo}`, pageWidth - left, y, { align: 'right' })
     y += 5
 
-    const headers = ['Fecha y hora', 'Valor', 'Unidad', 'Categoría', 'Puntaje']
-    const widths = [46, 30, 22, 48, 24]
+    // La unidad se queda en la cabecera de la variable, no repetida en cada
+    // fila: 60 filas con "ppb" al lado del 27.60 es ruido que empuja el dato
+    // fuera del centro de la columna.
+    const headers = ['Fecha y hora', 'Valor', 'Categoría', 'Puntaje']
+    const widths = [52, 26, 56, 22]
     const tScale = usable / widths.reduce((a, b) => a + b, 0)
     const cols = widths.map(w => w * tScale)
+    const align = ['l', 'r', 'l', 'r']
+    const rowH = 5.6
 
     const drawHead = () => {
-      doc.setFillColor(51, 65, 85)
-      doc.rect(left, y, usable, 6.5, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor(255, 255, 255)
-      let hx = left + 2
-      headers.forEach((h, i) => {
-        doc.text(h, hx, y + 4.4)
-        hx += cols[i]
+      y = drawGrid(doc, {
+        cols, x: left, y, headers, align, rowH,
+        headerFill: [51, 65, 85],
+        rows: []
       })
-      y += 6.5
-      doc.setFont('helvetica', 'normal')
     }
     drawHead()
 
-    v.readings.forEach((r, i) => {
-      if (y > pageHeight - 16) {
+    v.readings.forEach(r => {
+      if (y > pageHeight - PIE_ALTO) {
         doc.addPage()
         y = 20
         drawHead()
       }
-      if (i % 2 === 1) {
-        doc.setFillColor(249, 250, 251)
-        doc.rect(left, y, usable, 5.6, 'F')
-      }
-      const cells = [formatTimestamp(r.time), Number(r.value).toFixed(2), unit, r.category || '—', r.score ?? '—']
-      let cx = left + 2
-      cells.forEach((cell, ci) => {
-        if (ci === 3 && r.category && CATEGORY_COLORS[r.category]) {
-          const [rr, gg, bb] = CATEGORY_COLORS[r.category]
-          doc.setTextColor(rr, gg, bb)
-          doc.setFont('helvetica', 'bold')
-        } else {
-          doc.setTextColor(55, 65, 81)
-          doc.setFont('helvetica', 'normal')
-        }
-        doc.text(String(cell), cx, y + 3.9)
-        cx += cols[ci]
+      const cat = r.category && CATEGORY_COLORS[r.category]
+      y = drawGrid(doc, {
+        cols, x: left, y, align, rowH,
+        rows: [[
+          formatTimestamp(r.time),
+          { text: Number(r.value).toFixed(2), align: 'r' },
+          cat ? { text: r.category, color: cat } : (r.category || '—'),
+          { text: r.score ?? '—', align: 'r' }
+        ]]
       })
-      doc.setFont('helvetica', 'normal')
-      y += 5.6
     })
   }
 
@@ -1028,4 +1098,259 @@ export function exportStationRecordsExcel(payload = {}) {
   })
 
   XLSX.writeFile(wb, `registros_${slugify(device.name)}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESUMEN SEMANAL POR ESTACIÓN — PDF (horizontal)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function weekLabel(iso) {
+  const d = new Date(`${iso}T00:00:00`)
+  if (isNaN(d.getTime())) return iso
+  const p = n => String(n).padStart(2, '0')
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}`
+}
+
+export function exportStationWeeklyPDF(payload = {}) {
+  const { device = {}, period = {}, weeks = [], variables = [], coverage } = payload
+  // horizontal: 12 variables necesitan el ancho completo
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const left = 12
+  const usable = pageWidth - left * 2
+
+  // El rango pedido no siempre coincide con lo que hay almacenado: se pide un
+  // mes y solo hay 2 semanas de datos. Se anuncia la cobertura real para que el
+  // encabezado no prometa periodos que el reporte no contiene.
+  const cov = coverage || {}
+  const coverageHours = cov.first && cov.last
+    ? (new Date(cov.last).getTime() - new Date(cov.first).getTime()) / 3600000
+    : 0
+  const coversRequested =
+    !!cov.first && !!cov.last &&
+    new Date(cov.first).getTime() >= new Date(period.start).getTime() - 3600000 &&
+    new Date(cov.last).getTime() <= new Date(period.end).getTime() + 3600000
+
+  const rangeText = cov.first && cov.last
+    ? `${formatTimestamp(cov.first)} a ${formatTimestamp(cov.last)}`
+    : '—'
+  const spanText = coversRequested ? period.durationHours : coverageHours
+
+  doc.setFillColor(103, 183, 232)
+  doc.rect(0, 0, pageWidth, 26, 'F')
+  doc.setTextColor(255, 255, 255)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(17)
+  doc.text('Resumen Semanal de Mediciones', left, 12)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(`${device.name || 'Estación'} — ${rangeText} (${humanDuration(spanText)})`, left, 19)
+
+  const totalReadings = variables.reduce((a, v) => a + v.count, 0)
+  const coords =
+    device.lat !== null && device.lat !== undefined && device.lng !== null && device.lng !== undefined
+      ? `${Number(device.lat).toFixed(6)}, ${Number(device.lng).toFixed(6)}`
+      : 'Sin coordenadas'
+
+  // ── Matriz: filas = semanas, columnas = variables ──
+  const weekCol = 24
+  const varWidth = (usable - weekCol) / Math.max(variables.length, 1)
+
+  let y = 34
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9)
+  doc.setTextColor(71, 85, 105)
+  doc.text(
+    `Promedio semanal de ${variables.length} variables · ${weeks.length} semana(s) · ${totalReadings.toLocaleString()} lecturas`,
+    left, y
+  )
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text(`Espacio: ${device.space_name || '—'}   Coordenadas: ${coords}`, left, y + 5)
+  y += 5
+  if (!coversRequested && period.start && period.end) {
+    doc.setTextColor(180, 83, 9)
+    doc.text(
+      `Rango solicitado: ${formatTimestamp(period.start)} a ${formatTimestamp(period.end)}. ` +
+      `El reporte incluye solo las semanas con lecturas registradas.`,
+      left, y + 5
+    )
+    y += 5
+  }
+  y += 8
+
+  const drawHeader = () => {
+    doc.setFillColor(51, 65, 85)
+    doc.rect(left, y, usable, 12, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Semana', left + 2, y + 8)
+    variables.forEach((v, i) => {
+      const unit = UNIT_BY_VARIABLE[v.variable] || ''
+      doc.text((LABEL_BY_VARIABLE[v.variable] || v.variable), left + weekCol + i * varWidth + 1.5, y + 5.5, {
+        align: 'center',
+        maxWidth: varWidth - 3
+      })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(6)
+      doc.setTextColor(203, 213, 225)
+      doc.text(unit, left + weekCol + i * varWidth + 1.5, y + 10, { align: 'center' })
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(255, 255, 255)
+    })
+    y += 12
+  }
+  drawHeader()
+
+  weeks.forEach((week, wi) => {
+    if (y > pageHeight - 20) {
+      addPdfHeaderFooter(doc, 'Resumen Semanal', doc.getNumberOfPages(), doc.getNumberOfPages())
+      doc.addPage()
+      y = 16
+      drawHeader()
+    }
+    if (wi % 2 === 1) {
+      doc.setFillColor(248, 250, 252)
+      doc.rect(left, y, usable, 7, 'F')
+    }
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(30, 41, 59)
+    doc.text(weekLabel(week), left + 2, y + 4.8)
+    variables.forEach((v, i) => {
+      const value = v.byWeek[week]
+      if (value === undefined || value === null) {
+        doc.setTextColor(203, 213, 225)
+        doc.text('—', left + weekCol + i * varWidth + varWidth / 2, y + 4.8, { align: 'center' })
+        return
+      }
+      // color por banda de calidad del promedio semanal
+      const band = (v.ranges || []).find(r => r.min <= value && (r.max === null || r.max > value))
+      if (band && CATEGORY_COLORS[band.category]) {
+        const [rr, gg, bb] = CATEGORY_COLORS[band.category]
+        doc.setTextColor(rr, gg, bb)
+        doc.setFont('helvetica', 'bold')
+      } else {
+        doc.setTextColor(55, 65, 81)
+        doc.setFont('helvetica', 'normal')
+      }
+      doc.text(Number(value).toFixed(2), left + weekCol + i * varWidth + varWidth / 2, y + 4.8, { align: 'center' })
+    })
+    doc.setFont('helvetica', 'normal')
+    y += 7
+  })
+
+  // ── Fila de promedio general ──
+  if (y > pageHeight - 24) {
+    addPdfHeaderFooter(doc, 'Resumen Semanal', doc.getNumberOfPages(), doc.getNumberOfPages())
+    doc.addPage()
+    y = 16
+  }
+  y += 2
+  doc.setFillColor(226, 232, 240)
+  doc.rect(left, y, usable, 8, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(17, 24, 39)
+  doc.text('Promedio', left + 2, y + 5.4)
+  variables.forEach((v, i) => {
+    doc.setTextColor(55, 65, 81)
+    doc.text(v.avg === null ? '—' : Number(v.avg).toFixed(2), left + weekCol + i * varWidth + varWidth / 2, y + 5.4, { align: 'center' })
+  })
+  y += 10
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(71, 85, 105)
+  doc.text('Lecturas del periodo por variable', left, y)
+  y += 5
+
+  const statsHeaders = ['Variable', 'Unidad', 'Mínimo', 'Promedio', 'Máximo', 'Semanas']
+  const statsWidths = [46, 18, 24, 26, 24, 20]
+  const sScale = usable / statsWidths.reduce((a, b) => a + b, 0)
+  const statsCols = statsWidths.map(w => w * sScale)
+
+  doc.setFillColor(226, 232, 240)
+  doc.rect(left, y, usable, 6.5, 'F')
+  doc.setFontSize(7)
+  doc.setTextColor(30, 41, 59)
+  let sx = left + 2
+  statsHeaders.forEach((h, i) => {
+    doc.text(h, sx, y + 4.4)
+    sx += statsCols[i]
+  })
+  y += 6.5
+
+  variables.forEach((v, i) => {
+    if (y > pageHeight - PIE_ALTO) {
+      doc.addPage()
+      y = 16
+    }
+    if (i % 2 === 1) {
+      doc.setFillColor(248, 250, 252)
+      doc.rect(left, y, usable, 5.6, 'F')
+    }
+    const cells = [
+      LABEL_BY_VARIABLE[v.variable] || v.variable,
+      UNIT_BY_VARIABLE[v.variable] || '',
+      v.min === null ? '—' : Number(v.min).toFixed(2),
+      v.avg === null ? '—' : Number(v.avg).toFixed(2),
+      v.max === null ? '—' : Number(v.max).toFixed(2),
+      String(Object.keys(v.byWeek).length)
+    ]
+    let cx = left + 2
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    cells.forEach((cell, ci) => {
+      doc.setTextColor(55, 65, 81)
+      doc.text(cell, cx, y + 3.9)
+      cx += statsCols[ci]
+    })
+    y += 5.6
+  })
+
+  // Nota metodologica: los sensores multigas no son seletivos. Sin esto el
+  // lector toma las concentraciones como una medicion calibrada.
+  //
+  // La nota se mide ANTES de dibujar para decidir el salto de pagina. El margen
+  // fijo anterior se quedaba corto en cuanto la nota crecio al listar mas
+  // sensores, y entonces invadia la franja del pie, donde vive la fecha de
+  // generacion. Medir el bloque real evita adivinar el alto.
+  const NOTA_FONT = 7
+  const NOTA_LH = NOTA_FONT * 0.352777 * 1.25
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(NOTA_FONT)
+  const notaLineas = doc.splitTextToSize(NOTA_METODOLOGICA, usable - 4)
+  // +3 separador, +4 titulo, +4 primera linea, +2 descendente de la ultima.
+  const notaAlto = 3 + 4 + 4 + (notaLineas.length - 1) * NOTA_LH + 2
+
+  if (y + notaAlto > pageHeight - PIE_ALTO) {
+    // Dibujar el pie en la página actual ANTES de saltar para no perderlo
+    addPdfHeaderFooter(doc, 'Resumen Semanal', doc.getNumberOfPages(), doc.getNumberOfPages()) 
+    doc.addPage()
+    y = 16
+  }
+  y += 3
+  doc.setDrawColor(203, 213, 225)
+  doc.line(left, y, left + usable, y)
+  y += 4
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(NOTA_FONT)
+  doc.setTextColor(71, 85, 105)
+  doc.text('Nota metodológica', left, y)
+  y += 4
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139)
+  doc.text(notaLineas, left, y, { lineHeightFactor: 1.25 })
+
+  const total = doc.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p)
+    addPdfHeaderFooter(doc, 'Resumen Semanal', p, total)
+  }
+
+  doc.save(`resumen_semanal_${slugify(device.name)}_${new Date().toISOString().slice(0, 10)}.pdf`)
 }

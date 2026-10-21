@@ -148,7 +148,7 @@ BEGIN
       FROM (
         SELECT DISTINCT variable_label, MAX(weight) AS weight
         FROM air_quality_ranges
-        WHERE variable_label IN ('pm25','pm10','co2','co','no2','nox','nh3','o3','so2')
+        WHERE variable_label IN ('pm25','pm10','co2','co','h2s','nox','nh3','o3','so2')
         GROUP BY variable_label
       ) t
       ON CONFLICT (space_id, variable_label) DO NOTHING;
@@ -162,7 +162,7 @@ BEGIN
         r.min_value,
         r.max_value
       FROM air_quality_ranges r
-      WHERE r.variable_label IN ('pm25','pm10','co2','co','no2','nox','nh3','o3','so2')
+      WHERE r.variable_label IN ('pm25','pm10','co2','co','h2s','nox','nh3','o3','so2')
       ON CONFLICT (space_id, variable_label, cat_order) DO NOTHING;
     END IF;
   END LOOP;

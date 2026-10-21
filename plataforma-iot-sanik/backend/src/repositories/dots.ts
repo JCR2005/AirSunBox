@@ -58,45 +58,69 @@ export async function latestForDeviceAqi(db: Queryable, deviceId: string, variab
   return rows
 }
 
-export async function seriesRaw(db: Queryable, deviceId: string, variable: string, sqlInterval: string, limit = 1500): Promise<SeriesPoint[]> {
+export async function seriesRaw(db: Queryable, deviceId: string, variable: string, sqlInterval: string, limit = 1500, start?: Date, end?: Date): Promise<SeriesPoint[]> {
+  // Con rango explicito se respeta la ventana elegida; si no, la ventana relativa
+  const window = start && end
+    ? `AND time >= $3::timestamptz AND time <= $4::timestamptz`
+    : `AND time >= NOW() - $3::interval`
+  const params: unknown[] = start && end ? [deviceId, variable, start, end] : [deviceId, variable, sqlInterval]
+
   const { rows } = await db.query<{ time: Date; value: string | number }>(
     `SELECT time, value
      FROM dots
      WHERE device_id = $1 AND variable = $2
-       AND time >= NOW() - $3::interval
+       ${window}
      ORDER BY time ASC
      LIMIT ${limit}`,
-    [deviceId, variable, sqlInterval]
+    params
   )
   return rows.map(r => ({ time: new Date(r.time).toISOString(), value: Number(r.value) }))
 }
 
-export async function seriesAggregated(db: Queryable, deviceId: string, variable: string, sqlFunction: string, bucket: string, sqlInterval: string): Promise<SeriesPoint[]> {
+export async function seriesAggregated(db: Queryable, deviceId: string, variable: string, sqlFunction: string, bucket: string, sqlInterval: string, start?: Date, end?: Date): Promise<SeriesPoint[]> {
+  // Con rango explicito se respeta la ventana elegida y se ensancha el cubo
+  // para no devolver mas de ~500 puntos en un rango amplio.
+  const bucketExpr = start && end
+    ? `GREATEST($3::interval, ($5::timestamptz - $4::timestamptz) / 500)`
+    : '$3::interval'
+  const window = start && end
+    ? `AND time >= $4::timestamptz AND time <= $5::timestamptz`
+    : `AND time >= NOW() - $4::interval`
+  const params: unknown[] = start && end ? [deviceId, variable, bucket, start, end] : [deviceId, variable, bucket, sqlInterval]
+
   const { rows } = await db.query<{ time: Date; value: string | number }>(
-    `SELECT time_bucket($3::interval, time) AS time,
+    `SELECT time_bucket(${bucketExpr}, time) AS time,
             ROUND(${sqlFunction}::numeric, 2) AS value
      FROM dots
      WHERE device_id = $1 AND variable = $2
-       AND time >= NOW() - $4::interval
+       ${window}
      GROUP BY 1
      ORDER BY time ASC`,
-    [deviceId, variable, bucket, sqlInterval]
+    params
   )
   return rows.map(r => ({ time: new Date(r.time).toISOString(), value: Number(r.value) }))
 }
 
-export async function seriesMultiVar(db: Queryable, deviceId: string, variables: string[], bucket: string, sqlInterval: string) {
+export async function seriesMultiVar(db: Queryable, deviceId: string, variables: string[], bucket: string, sqlInterval: string, start?: Date, end?: Date) {
+  const bucketExpr = start && end
+    ? `GREATEST($3::interval, ($5::timestamptz - $4::timestamptz) / 500)`
+    : '$3::interval'
+  const window = start && end
+    ? `AND time >= $4::timestamptz AND time <= $5::timestamptz`
+    : `AND time >= NOW() - $4::interval`
+  const params: unknown[] = start && end ? [deviceId, variables, bucket, start, end] : [deviceId, variables, bucket, sqlInterval]
+
   const { rows } = await db.query<{ time: Date; variable: string; value: string | number }>(
-    `SELECT time_bucket($3::interval, time) AS time,
+    `SELECT time_bucket(${bucketExpr}, time) AS time,
             variable,
             ROUND(AVG(value)::numeric, 2) as value
      FROM dots
      WHERE device_id = $1
        AND variable = ANY($2)
-       AND time >= NOW() - $4::interval
+       ${window}
      GROUP BY 1, 2
      ORDER BY time ASC`,
-    [deviceId, variables, bucket, sqlInterval]
+    params
   )
   return rows
 }
@@ -283,6 +307,123 @@ export function stationCoverage(
     includedReadings,
     truncated: includedReadings < totalReadings,
     limitPerVariable
+  }
+}
+
+export interface WeeklyBucket {
+  week: string
+  values: Record<string, number>
+}
+
+export interface WeeklyVariable {
+  variable: string
+  count: number
+  min: number | null
+  avg: number | null
+  max: number | null
+  byWeek: Record<string, number>
+}
+
+export interface StationWeekly {
+  weeks: string[]
+  variables: WeeklyVariable[]
+  /** Primera y ultima lectura realmente presentes en el rango pedido. */
+  coverage: { first: string | null; last: string | null }
+}
+
+export async function stationWeekly(
+  db: Queryable,
+  deviceId: string,
+  start: Date,
+  end: Date
+): Promise<StationWeekly> {
+  const { rows } = await db.query<{
+    week: Date
+    variable: string
+    avg: string
+    total: number
+    first_ts: Date
+    last_ts: Date
+    vmin: number | null
+    vmax: number | null
+  }>(
+    `WITH cov AS (
+       SELECT MIN(time) AS first_ts, MAX(time) AS last_ts
+       FROM dots
+       WHERE device_id = $1 AND time >= $2 AND time <= $3
+     ),
+     vrange AS (
+       SELECT variable, MIN(value) AS vmin, MAX(value) AS vmax
+       FROM dots
+       WHERE device_id = $1 AND time >= $2 AND time <= $3
+       GROUP BY variable
+     )
+     SELECT date_trunc('week', d.time) AS week,
+            d.variable,
+            AVG(d.value) AS avg,
+            COUNT(*)::int AS total,
+            (SELECT first_ts FROM cov) AS first_ts,
+            (SELECT last_ts FROM cov) AS last_ts,
+            r.vmin, r.vmax
+     FROM dots d
+     JOIN vrange r ON r.variable = d.variable
+     WHERE d.device_id = $1 AND d.time >= $2 AND d.time <= $3
+     GROUP BY 1, d.variable, r.vmin, r.vmax
+     ORDER BY 1, d.variable`,
+    [deviceId, start, end]
+  )
+
+  if (!rows.length) return { weeks: [], variables: [], coverage: { first: null, last: null } }
+
+  const weeks = [...new Set(rows.map(r => new Date(r.week).toISOString().slice(0, 10)))].sort()
+  const byVariable = new Map<string, {
+    count: number
+    values: number[]
+    byWeek: Record<string, number>
+    rawMin: number | null
+    rawMax: number | null
+  }>()
+
+  for (const row of rows) {
+    const week = new Date(row.week).toISOString().slice(0, 10)
+    const value = Number(row.avg)
+    if (!byVariable.has(row.variable)) {
+      byVariable.set(row.variable, {
+      count: 0,
+      values: [],
+      byWeek: {},
+      rawMin: row.vmin === null ? null : Number(row.vmin),
+      rawMax: row.vmax === null ? null : Number(row.vmax)
+    })
+    }
+    const entry = byVariable.get(row.variable)!
+    entry.count += row.total
+    entry.values.push(value)
+    entry.byWeek[week] = value
+  }
+
+  const variables: WeeklyVariable[] = [...byVariable.entries()]
+    .map(([variable, entry]) => {
+      return {
+        variable,
+        count: entry.count,
+        min: entry.rawMin,
+        max: entry.rawMax,
+        avg: entry.values.length
+          ? Number((entry.values.reduce((a, b) => a + b, 0) / entry.values.length).toFixed(2))
+          : null,
+        byWeek: entry.byWeek
+      }
+    })
+    .sort((a, b) => a.variable.localeCompare(b.variable))
+
+  return {
+    weeks,
+    variables,
+    coverage: {
+      first: new Date(rows[0].first_ts).toISOString(),
+      last: new Date(rows[0].last_ts).toISOString()
+    }
   }
 }
 

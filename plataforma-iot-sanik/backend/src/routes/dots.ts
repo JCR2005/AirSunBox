@@ -31,7 +31,9 @@ export default async function dotsRoutes(app: FastifyInstance) {
       }),
       querystring: Type.Object({
         range: Type.Optional(Type.String()),
-        aggregation: Type.Optional(Type.String())
+        aggregation: Type.Optional(Type.String()),
+        start: Type.Optional(Type.String()),
+        end: Type.Optional(Type.String())
       })
     }
   }, async (req, reply) => {
@@ -43,11 +45,25 @@ export default async function dotsRoutes(app: FastifyInstance) {
     if (allowed === null) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
     if (allowed === false) return reply.code(403).send({ error: 'Sin acceso' })
 
+    // Rango explicto (selector personalizado) tiene prioridad sobre el preajuste
+    let windowStart: Date | undefined
+    let windowEnd: Date | undefined
+    if (req.query.start || req.query.end) {
+      windowEnd = req.query.end ? new Date(req.query.end) : new Date()
+      windowStart = req.query.start ? new Date(req.query.start) : new Date(windowEnd.getTime() - 24 * 3600 * 1000)
+      if (Number.isNaN(windowStart.getTime()) || Number.isNaN(windowEnd.getTime())) {
+        return reply.code(400).send({ error: 'Rango de fechas inválido' })
+      }
+      if (windowStart > windowEnd) {
+        return reply.code(400).send({ error: 'La fecha inicial es posterior a la final' })
+      }
+    }
+
     const selected = dotsRepo.resolveInterval(range)
     const aggLower = aggregation.toLowerCase()
 
     if (aggLower === 'raw') {
-      return dotsRepo.seriesRaw(app.db, deviceId, variable, selected.sqlInterval)
+      return dotsRepo.seriesRaw(app.db, deviceId, variable, selected.sqlInterval, 1500, windowStart, windowEnd)
     }
 
     let sqlFunction = 'AVG(value)'
@@ -56,7 +72,7 @@ export default async function dotsRoutes(app: FastifyInstance) {
     if (aggLower === 'max') sqlFunction = 'MAX(value)'
     if (aggLower === 'count') sqlFunction = 'COUNT(value)'
 
-    return dotsRepo.seriesAggregated(app.db, deviceId, variable, sqlFunction, selected.bucket, selected.sqlInterval)
+    return dotsRepo.seriesAggregated(app.db, deviceId, variable, sqlFunction, selected.bucket, selected.sqlInterval, windowStart, windowEnd)
   })
 
   // ── 2. DATOS CRUDOS PAGINADOS ──
@@ -101,7 +117,9 @@ export default async function dotsRoutes(app: FastifyInstance) {
       params: Type.Object({ deviceId: Type.String() }),
       querystring: Type.Object({
         variables: Type.Optional(Type.String()),
-        range: Type.Optional(Type.String())
+        range: Type.Optional(Type.String()),
+        start: Type.Optional(Type.String()),
+        end: Type.Optional(Type.String())
       })
     }
   }, async (req, reply) => {
@@ -115,8 +133,22 @@ export default async function dotsRoutes(app: FastifyInstance) {
     if (allowed === null) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
     if (allowed === false) return reply.code(403).send({ error: 'Sin acceso' })
 
+    // Rango explicto (selector personalizado) tiene prioridad sobre el preajuste
+    let windowStart: Date | undefined
+    let windowEnd: Date | undefined
+    if (req.query.start || req.query.end) {
+      windowEnd = req.query.end ? new Date(req.query.end) : new Date()
+      windowStart = req.query.start ? new Date(req.query.start) : new Date(windowEnd.getTime() - 24 * 3600 * 1000)
+      if (Number.isNaN(windowStart.getTime()) || Number.isNaN(windowEnd.getTime())) {
+        return reply.code(400).send({ error: 'Rango de fechas inválido' })
+      }
+      if (windowStart > windowEnd) {
+        return reply.code(400).send({ error: 'La fecha inicial es posterior a la final' })
+      }
+    }
+
     const selected = dotsRepo.resolveInterval(range)
-    const rows = await dotsRepo.seriesMultiVar(app.db, deviceId, varList, selected.bucket, selected.sqlInterval)
+    const rows = await dotsRepo.seriesMultiVar(app.db, deviceId, varList, selected.bucket, selected.sqlInterval, windowStart, windowEnd)
 
     const result: Record<string, Array<{ time: string; value: number }>> = {}
     for (const v of varList) result[v] = []
@@ -131,6 +163,56 @@ export default async function dotsRoutes(app: FastifyInstance) {
     }
 
     return result
+  })
+
+  // ── 6. RESUMEN SEMANAL POR VARIABLE ──
+  api.get('/:deviceId/weekly', {
+    schema: {
+      params: Type.Object({ deviceId: Type.String() }),
+      querystring: Type.Object({
+        start: Type.Optional(Type.String()),
+        end: Type.Optional(Type.String())
+      })
+    }
+  }, async (req, reply) => {
+    const { deviceId } = req.params
+
+    const allowed = await canAccessDevice(deviceId, req.user.role, req.user.orgId)
+    if (allowed === null) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+    if (allowed === false) return reply.code(403).send({ error: 'Sin acceso' })
+
+    const end = req.query.end ? new Date(req.query.end) : new Date()
+    const start = req.query.start ? new Date(req.query.start) : new Date(end.getTime() - 30 * 24 * 3600 * 1000)
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return reply.code(400).send({ error: 'Rango de fechas inválido' })
+    }
+    if (start > end) return reply.code(400).send({ error: 'La fecha inicial es posterior a la final' })
+
+    const device = await dotsRepo.stationIdentity(app.db, deviceId)
+    if (!device) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+
+    const { weeks, variables, coverage } = await dotsRepo.stationWeekly(app.db, deviceId, start, end)
+    const bands = await dotsRepo.qualityBands(app.db, variables.map(v => v.variable))
+
+    return {
+      device,
+      period: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        durationHours: Number(((end.getTime() - start.getTime()) / 3600000).toFixed(2))
+      },
+      coverage,
+      weeks,
+      variables: variables.map(v => ({
+        ...v,
+        ranges: (bands[v.variable] || []).map(b => ({
+          category: b.category,
+          min: b.min_value,
+          max: b.max_value
+        }))
+      }))
+    }
   })
 
   // ── 5. REGISTROS POR ESTACIÓN (PDF / Excel) ──
