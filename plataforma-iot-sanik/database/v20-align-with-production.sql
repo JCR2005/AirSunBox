@@ -38,6 +38,11 @@ WHERE NOT EXISTS (SELECT 1 FROM variable_catalog c WHERE c.label = v.label);
 
 -- Configuración por espacio ligada al catálogo (borrar una variable del
 -- catálogo borra su configuración en cada espacio)
+-- Limpiar referencias NO2 heredadas antes de instalar las FK. v16 captura y
+-- migra la configuración válida a h2s; estas filas sobrantes ya son obsoletas.
+DELETE FROM space_aqi_variables WHERE variable_label = 'no2';
+DELETE FROM space_variable_ranges WHERE variable_label = 'no2';
+
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'space_aqi_variables_variable_label_fkey') THEN
     ALTER TABLE space_aqi_variables

@@ -475,7 +475,7 @@ const { rowCount: removed } = await client.query(
 )
 if (removed) console.log(`(se reemplazan ${removed} filas previas del rango)`)
 
-const COLS = 6 // time, device_id, variable, value, context, variable_label
+const COLS = 5 // time, device_id, variable, value, context
 const BATCH = 5000
 for (let i = 0; i < rows.length; i += BATCH) {
   const slice = rows.slice(i, i + BATCH)
@@ -484,13 +484,12 @@ for (let i = 0; i < rows.length; i += BATCH) {
     const o = k * COLS
     values.push(
       r.time, deviceId, r.variable, r.value,
-      JSON.stringify({ lluvia: r.rain, perfil: PROFILE }),
-      r.variable
+      JSON.stringify({ lluvia: r.rain, perfil: PROFILE })
     )
-    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5}, $${o + 6})`
+    return `($${o + 1}, $${o + 2}, $${o + 3}, $${o + 4}, $${o + 5})`
   })
   await client.query(
-    `INSERT INTO dots (time, device_id, variable, value, context, variable_label)
+    `INSERT INTO dots (time, device_id, variable, value, context)
      VALUES ${tuples.join(',')}`,
     values
   )

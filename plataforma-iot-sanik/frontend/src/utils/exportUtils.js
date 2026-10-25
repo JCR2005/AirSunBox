@@ -604,7 +604,7 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
     'Prom. PM2.5 (µg/m³)',
     'Prom. PM10 (µg/m³)',
     'Prom. SO2 (ppb)',
-    'Prom. NO2 (ppb)',
+    'Prom. H₂S (µg/m³)',
     'Prom. CO (ppm)',
     'Prom. CO2 (ppm)',
     'Prom. Humedad (%)',
@@ -624,7 +624,7 @@ export function exportRespiratoryRiskExcel({ data = [], filters = {}, orgName = 
     const pm25 = getVal('pm25')
     const pm10 = getVal('pm10')
     const so2 = getVal('so2')
-    const h2s = getVal('h2s') || getVal('nox')
+    const h2s = getVal('h2s')
     const co = getVal('co')
     const co2 = getVal('co2')
     const hum = getVal('humedad') !== '--' ? getVal('humedad') : getVal('humidity')

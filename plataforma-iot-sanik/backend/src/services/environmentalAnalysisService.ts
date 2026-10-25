@@ -1,5 +1,8 @@
 import type { DeviceReportData } from './reportCalculationsService.js'
 
+// Match the project's gas conversion convention in v17 (25 °C, 1 atm).
+const CO_PPM_TO_MG_M3 = 28.0101 / 24.465
+
 interface ImpactFactor {
   key: string
   name: string
@@ -67,7 +70,7 @@ export function analyzeEnvironmentalImpact(devicesData: Record<string, DeviceRep
     Object.keys(pollutantInfo).forEach(pKey => {
       const data = vars[pKey]
       if (data) {
-        const val = data.avg
+        const val = pKey === 'co' ? data.avg * CO_PPM_TO_MG_M3 : data.avg
         const info = pollutantInfo[pKey]
         let score = 1
         let influence = 'Impacto bajo'
@@ -133,7 +136,7 @@ export function analyzeEnvironmentalImpact(devicesData: Record<string, DeviceRep
 
     const sources = new Set<string>()
     const highPM = (vars.pm25?.avg > 35 || vars.pm10?.avg > 154)
-    const highCO = (vars.co?.avg > 9)
+    const highCO = (vars.co?.avg * CO_PPM_TO_MG_M3 > 9)
     const highH2S = (vars.h2s?.avg > 7)
     const highO3 = (vars.o3?.avg > 70)
 

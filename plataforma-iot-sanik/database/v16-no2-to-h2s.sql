@@ -66,6 +66,11 @@ ON CONFLICT (device_id, variable_label) DO NOTHING;
 -- ni se usa para identificar lecturas.
 UPDATE dots SET variable = 'h2s' WHERE variable = 'no2';
 
+-- Quitar las referencias espaciales viejas antes de borrar el catalogo. Esto
+-- tambien funciona en instalaciones donde estas tablas aun no tienen FK.
+DELETE FROM space_aqi_variables WHERE variable_label = 'no2';
+DELETE FROM space_variable_ranges WHERE variable_label = 'no2';
+
 -- Ya sin hijos, el CASCADE se lleva solo las filas por espacio. Se reponen en
 -- el paso 7.
 DELETE FROM variable_catalog WHERE label = 'no2';
