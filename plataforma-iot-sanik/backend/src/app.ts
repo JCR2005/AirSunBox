@@ -44,6 +44,7 @@ const app: FastifyInstance = Fastify({ logger: true, trustProxy: TRUST_PROXY })
 await app.register(cors, {
   origin: (origin, cb) => {
     const allowed = [
+      'http://18.223.121.208',
       'https://voluble-creponne-e6c74f.netlify.app',
       'http://localhost',
       'http://localhost:5173'
