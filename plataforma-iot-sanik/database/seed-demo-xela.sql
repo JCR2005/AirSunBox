@@ -109,9 +109,11 @@ WHERE o.slug = 'mi-organizacion'
   AND d.label = sensor.device_label
 ON CONFLICT (device_id, variable_label) DO NOTHING;
 
--- Cinco filas por estación con cinco horas distintas. Los valores ya están en
--- las unidades del catálogo; mq135_adc es lectura cruda, no CO2. El marcador
--- en context evita duplicados incluso si el script se repite en otro momento.
+-- Cinco filas por estación, espaciadas cinco minutos y dentro de la última hora
+-- que consulta el AQI. dots.variable es la etiqueta que usa el backend;
+-- variable_label es una columna heredada opcional y no se inserta. Los valores
+-- están en unidades del catálogo; mq135_adc es lectura cruda, no CO2. El
+-- marcador en context evita duplicados incluso si el script se repite después.
 WITH samples(station_slot, device_label, sample_no, variable, value, unit, sensor) AS (
   VALUES
     ('centro', 'estacion-centro-xela', 1, 'co',          0.8,  'ppm',    'MQ-7'),
@@ -126,8 +128,8 @@ WITH samples(station_slot, device_label, sample_no, variable, value, unit, senso
     ('zona3',  'estacion-zona3-xela',  5, 'pm1',         9.3,  'µg/m³', 'PMS5003')
 )
 INSERT INTO dots (time, device_id, variable, value, context)
-SELECT date_trunc('hour', transaction_timestamp())
-         + (samples.sample_no - 5) * INTERVAL '1 hour',
+SELECT transaction_timestamp()
+         + (samples.sample_no - 5) * INTERVAL '5 minutes',
        d.id, samples.variable, samples.value,
        jsonb_build_object(
          'simulated', true,
