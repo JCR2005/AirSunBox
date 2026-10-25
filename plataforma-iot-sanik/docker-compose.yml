@@ -91,8 +91,6 @@ services:
       dockerfile: Dockerfile
     container_name: iot_backend
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -155,6 +153,10 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
     # Las VITE_* se fijan al compilar (vite build), no en runtime. Sin ellas
     # el frontend usa rutas relativas /api y /ws, que nginx envía al backend.
     depends_on:
