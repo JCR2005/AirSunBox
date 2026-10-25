@@ -12,19 +12,19 @@ for f in \
   init.sql \
   database-v2.sql \
   aqi.sql \
-  migrate-full.sql \
   v6-spaces-icon.sql \
-  v7-spaces-icon-backfill.sql \
   v8-space-variables.sql \
   v9-password-recovery.sql \
   v10-device-display-variables.sql \
   v11-alerts-engine.sql \
   v12-alerts-telegram.sql \
   v13-space-accent-color.sql \
-  v14-public-map-and-phrases.sql \
   v15-otp-2fa.sql \
   v16-no2-to-h2s.sql \
   v17-h2s-to-ugm3.sql \
+  migrate-full.sql \
+  v7-spaces-icon-backfill.sql \
+  v14-public-map-and-phrases.sql \
   v18-2fa-flag-and-no-plain-passwords.sql \
   v19-dots-compression.sql \
   v20-align-with-production.sql

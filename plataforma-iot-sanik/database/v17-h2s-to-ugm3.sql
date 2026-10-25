@@ -24,11 +24,32 @@
 
 BEGIN;
 
--- ── Datos historicos y de septiembre ──────────────────────────────────────────
--- dots.value es double precision, y round() no acepta double precision con
--- precision: se multiplica en numeric y se vuelve a castear.
-UPDATE dots SET value = round((value * 1.3927)::numeric, 2)::double precision
-WHERE variable = 'h2s';
+-- El marcador se confirma en la misma transaccion que la conversion. Si hay
+-- cualquier error, se revierten ambos; si se ejecuta otra vez tras un commit,
+-- no se multiplican de nuevo las lecturas. Las reparaciones de catalogo/rangos
+-- abajo siguen ejecutandose siempre.
+-- Si esta migracion pudo haberse ejecutado antes de existir este marcador,
+-- verificar manualmente el estado de los datos antes de correrla: no se intenta
+-- detectar ni revertir conversiones previas sin marcar.
+CREATE TABLE IF NOT EXISTS migration_data_flags (
+  migration_key TEXT PRIMARY KEY,
+  applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM migration_data_flags WHERE migration_key = 'v17-h2s-to-ugm3'
+  ) THEN
+    -- dots.value es double precision; redondear via numeric y volver a castear.
+    UPDATE dots
+    SET value = round((value * 1.3927)::numeric, 2)::double precision
+    WHERE variable = 'h2s';
+
+    INSERT INTO migration_data_flags (migration_key)
+    VALUES ('v17-h2s-to-ugm3');
+  END IF;
+END $$;
 
 -- ── Catalogo ──────────────────────────────────────────────────────────────────
 UPDATE variable_catalog SET unit = 'µg/m³' WHERE label = 'h2s';
