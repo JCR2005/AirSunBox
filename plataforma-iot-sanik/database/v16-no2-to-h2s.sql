@@ -16,8 +16,9 @@
 --
 -- ORDEN IMPORTANTE. Estas cuatro tablas cuelgan de variable_catalog.label con
 -- ON DELETE CASCADE:
---   device_variables, dots (via FK compuesta), space_aqi_variables,
---   space_variable_ranges
+--   device_variables, space_aqi_variables, space_variable_ranges. dots usa
+--   `variable` como etiqueta; `variable_label` es una columna heredada y puede
+--   no existir en bases que no la recibieron desde init.sql.
 -- Por eso hay que capturar la configuracion por espacio ANTES de borrar la
 -- entrada del catalogo, y reinsertarla despues. Borrar primero y reinsertar
 -- despues es lo que deja al espacio sin la variable.
@@ -38,7 +39,7 @@ CREATE TEMP TABLE _no2_spaces AS
 -- y se renombra en el paso 4.
 -- ─────────────────────────────────────────────────────────────────────────────
 DELETE FROM dots
-WHERE variable_label = 'no2'
+WHERE variable = 'no2'
   AND time >= '2026-09-01';
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -55,21 +56,15 @@ WHERE NOT EXISTS (SELECT 1 FROM variable_catalog WHERE label = 'h2s');
 -- quede completa antes de borrar la entrada vieja.
 -- ─────────────────────────────────────────────────────────────────────────────
 INSERT INTO device_variables (device_id, variable_label)
-SELECT dv.device_id, 'h2s'
+SELECT DISTINCT dv.device_id, 'h2s'
 FROM device_variables dv
-WHERE dv.variable_label = 'no2'
+WHERE dv.variable_label IN ('no2', 'h2s')
 ON CONFLICT (device_id, variable_label) DO NOTHING;
 
--- dots tiene dos columnas y no son equivalentes:
---   'variable'       -> la que leen TODAS las consultas de telemetria
---   'variable_label' -> la de la FK hacia device_variables
--- Hay que mover la primera en las 46,676 filas. La segunda solo en las que ya la
--- tienen: 42,298 lecturas de mayo/junio estan con variable_label NULL porque
--- son anteriores a la FK, y llenarlas de golpe las meteria bajo la FK por
--- primera vez, cambiando el ON DELETE CASCADE en las otras nueve estaciones.
+-- La columna consultada por la aplicacion es `variable`. Las instalaciones que
+-- tengan la columna heredada variable_label la conservan nullable; no se rellena
+-- ni se usa para identificar lecturas.
 UPDATE dots SET variable = 'h2s' WHERE variable = 'no2';
-
-UPDATE dots SET variable_label = 'h2s' WHERE variable_label = 'no2';
 
 -- Ya sin hijos, el CASCADE se lleva solo las filas por espacio. Se reponen en
 -- el paso 7.
@@ -122,7 +117,8 @@ CROSS JOIN (VALUES
   (3, 5,   10),
   (4, 10,  50),
   (5, 50,  999999)
-) AS t(cat_order, min_value, max_value);
+) AS t(cat_order, min_value, max_value)
+ON CONFLICT (space_id, variable_label, cat_order) DO NOTHING;
 
 DROP TABLE _no2_spaces;
 
