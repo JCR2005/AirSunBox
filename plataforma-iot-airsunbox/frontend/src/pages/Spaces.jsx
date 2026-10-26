@@ -73,75 +73,108 @@ export default function Spaces() {
         />
       )}
       <div className="min-h-full px-4 py-6 md:px-8 md:py-10 page-bg">
-        <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold mb-1 font-syne" style={{ color: 'var(--text)' }}>
-              Espacios
-            </h1>
-            <p className="text-xs md:text-sm" style={{ color: 'var(--text2)' }}>
-              Gestioná tus espacios y el índice de calidad de cada uno
-            </p>
+        <header className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center shrink-0" style={{ background: 'rgba(103,183,232,0.14)', color: COLORS.primary }} aria-hidden="true">
+              <Layers size={22} strokeWidth={2.25} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="font-display text-[1.9rem] md:text-[2.4rem] font-extrabold leading-[1.1]" style={{ color: 'var(--text)' }}>
+                Espacios
+              </h1>
+              <p className="mt-1 text-sm" style={{ color: 'var(--text2)' }}>
+                {list.length
+                  ? `${list.length} ${list.length === 1 ? 'espacio' : 'espacios'} · ${list.reduce((n, sp) => n + Number(sp.device_count || 0), 0)} estaciones en total`
+                  : 'Agrupá tus estaciones y medí la calidad de cada lugar'}
+              </p>
+            </div>
           </div>
-          <button
-            onClick={() => setCreating(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-            style={{ background: '#67B7E8' }}
-          >
-            <Plus size={16} /> Nuevo espacio
-          </button>
-        </div>
+          {list.length > 0 && (
+            <button
+              onClick={() => setCreating(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-colors hover:bg-[#55A6D7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40"
+              style={{ background: COLORS.primary }}
+            >
+              <Plus size={16} /> Nuevo espacio
+            </button>
+          )}
+        </header>
 
         {/* ── Vista de lista ── */}
         {loading ? (
-          <div className="text-center py-12 text-sm" style={{ color: 'var(--text2)' }}>Cargando...</div>
+          <div className="text-center py-12 text-sm" style={{ color: 'var(--text2)' }}>Cargando espacios…</div>
         ) : list.length === 0 ? (
-          <div className="text-center py-16 rounded-2xl border border-dashed" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>
-            <Layers size={32} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-medium">Aún no tenés espacios</p>
-            <button
-              onClick={() => setCreating(true)}
-              className="mt-5 inline-flex items-center gap-2 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-              style={{ background: '#67B7E8' }}
-            >
-              <Plus size={15} /> Crear el primero
-            </button>
-          </div>
+          <section className="rounded-2xl border px-6 py-12 md:py-16 text-center" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <span className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center" style={{ background: 'rgba(103,183,232,0.14)', color: COLORS.primary }} aria-hidden="true">
+              <Layers size={26} strokeWidth={2} />
+            </span>
+            <h2 className="mt-5 font-display text-xl md:text-2xl font-extrabold" style={{ color: 'var(--text)' }}>Creá tu primer espacio</h2>
+            <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text2)' }}>
+              Un espacio agrupa las estaciones de un lugar o de un tipo de medición, con sus propias variables y su índice de calidad.
+            </p>
+            <p className="mt-6 text-xs font-semibold" style={{ color: 'var(--text2)' }}>¿Qué querés monitorear?</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {SPACE_TYPES.map(t => (
+                <button
+                  key={t.v}
+                  type="button"
+                  onClick={() => { setNewType(t.v); if (t.v !== 'otro') setNewCustomIcon(t.v); setNewColor(t.color); setCreating(true) }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40"
+                  style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = t.color; e.currentTarget.style.color = t.color }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text)' }}
+                >
+                  <t.icon size={16} style={{ color: t.color }} /> {t.label}
+                </button>
+              ))}
+            </div>
+          </section>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {list.map(s => (
-              <div
-                key={s.id}
-                onClick={() => navigate(`/espacios/${s.id}`)}
-                className="group rounded-2xl p-5 border cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
-                style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: (s.color || '#67B7E8') + '1F', color: s.color || '#67B7E8' }}>
-                    {spaceIcon(s.icon, s.type, 18)}
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {list.map(s => {
+              const color = s.color || COLORS.primary
+              const typeLabel = SPACE_TYPES.find(t => t.v === s.type)?.label || (s.type ? s.type.charAt(0).toUpperCase() + s.type.slice(1) : 'Otro')
+              const count = Number(s.device_count ?? 0)
+              return (
+                <div
+                  key={s.id}
+                  role="link"
+                  tabIndex={0}
+                  onClick={() => navigate(`/espacios/${s.id}`)}
+                  onKeyDown={e => { if (e.key === 'Enter') navigate(`/espacios/${s.id}`) }}
+                  className="group rounded-2xl p-5 border cursor-pointer transition-colors flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40"
+                  style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = color + '80' }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+                >
+                  <div className="flex items-start justify-between">
+                    <span className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: color + '1F', color }}>
+                      {spaceIcon(s.icon, s.type, 20)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setEditingSpace(s) }}
+                      className="p-1.5 rounded-lg opacity-0 group-hover:opacity-70 focus-visible:opacity-100 transition-opacity hover:bg-black/5 dark:hover:bg-white/5"
+                      style={{ color: 'var(--text2)' }}
+                      aria-label={`Editar ${s.name}`}
+                    >
+                      <Pencil size={15} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setEditingSpace(s) }}
-                    className="p-1.5 rounded-lg opacity-0 group-hover:opacity-60 transition-opacity hover:bg-black/5 dark:hover:bg-white/5"
-                    style={{ color: 'var(--text2)' }}
-                    title="Editar espacio"
-                  >
-                    <Pencil size={15} />
-                  </button>
+                  <h3 className="mt-4 text-base font-bold truncate" style={{ color: 'var(--text)' }}>{s.name}</h3>
+                  <p className="mt-1 text-sm line-clamp-2 min-h-[2.5rem]" style={{ color: 'var(--text2)' }}>
+                    {s.description || `Monitoreo de ${typeLabel.toLowerCase()}`}
+                  </p>
+                  <div className="mt-4 pt-4 border-t flex items-center justify-between text-sm" style={{ borderColor: 'var(--border)' }}>
+                    <span className="inline-flex items-center gap-2" style={{ color: 'var(--text2)' }}>
+                      <span className="px-2 py-0.5 rounded-md text-xs font-semibold" style={{ background: color + '1A', color }}>{typeLabel}</span>
+                      <span className="inline-flex items-center gap-1"><Server size={13} /> {count} {count === 1 ? 'estación' : 'estaciones'}</span>
+                    </span>
+                    <ArrowRight size={16} className="transition-transform group-hover:translate-x-0.5" style={{ color }} />
+                  </div>
                 </div>
-                <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--text)' }}>{s.name}</h3>
-                <span className="text-xs font-mono uppercase" style={{ color: s.color || '#67B7E8' }}>{s.slug}</span>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-[11px]" style={{ color: 'var(--text2)' }}>{s.type}</p>
-                  <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                    <Server size={11} /> {s.device_count ?? 0} {s.device_count === 1 ? 'estación' : 'estaciones'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-xs font-semibold mt-3 group-hover:gap-2 transition-all" style={{ color: s.color || '#67B7E8' }}>
-                  Ver espacio <ArrowRight size={11} />
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
