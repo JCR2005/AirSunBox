@@ -1,11 +1,11 @@
 output "instance_id" {
-  description = "ID de la instancia EC2 consultada."
-  value       = data.aws_instance.existing.id
+  description = "ID de la instancia EC2 administrada por Terraform."
+  value       = aws_instance.sanik_iot_prod.id
 }
 
 output "vpc_id" {
   description = "ID de la VPC consultada."
-  value       = data.aws_vpc.existing.id
+  value       = aws_vpc.main.id
 }
 
 output "subnet_id" {
@@ -15,7 +15,7 @@ output "subnet_id" {
 
 output "security_group_id" {
   description = "ID del security group consultado."
-  value       = data.aws_security_group.existing.id
+  value       = aws_security_group.production.id
 }
 
 output "ebs_volume_id" {

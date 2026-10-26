@@ -187,7 +187,9 @@ export default function Login() {
       <div 
         className="hidden md:flex w-full md:w-1/2 p-10 lg:p-20 flex-col justify-center relative"
         style={{ 
-          background: `radial-gradient(circle at -10% 50%, rgba(103, 183, 232, 0.4) 0%, rgba(103, 183, 232, 0.15) 45%, ${COLORS.bgLight} 85%)` 
+          // Fondo claro sólido debajo del degradado translúcido: sin él, el tema
+          // oscuro de la app se veía a través y el panel quedaba negro
+          background: `radial-gradient(circle at -10% 50%, rgba(103, 183, 232, 0.4) 0%, rgba(103, 183, 232, 0.15) 45%, ${COLORS.bgLight} 85%), ${COLORS.bgLight}` 
         }}
       >
         <div className="max-w-lg z-10">
