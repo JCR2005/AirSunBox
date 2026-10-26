@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg16
+        env:
+          POSTGRES_USER: iot_user
+          POSTGRES_PASSWORD: iot_password
+          POSTGRES_DB: iot_platform
+        ports:
+          - 5432:5432
+        # Sin volúmenes: los servicios arrancan antes del checkout y montar el
+        # workspace deja carpetas de root que hacen fallar actions/checkout.
+        # El esquema se aplica más abajo con database/initdb/00-schema.sh.
+        options: >-
+          --health-cmd "pg_isready -U iot_user -d iot_platform"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply database schema and migrations
+        env:
+          SANIK_DB_DIR: plataforma-iot-sanik/database
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGPASSWORD: iot_password
+          POSTGRES_USER: iot_user
+          POSTGRES_DB: iot_platform
+        run: sh plataforma-iot-sanik/database/initdb/00-schema.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: plataforma-iot-sanik/backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: plataforma-iot-sanik/backend
+        run: npm ci
+
+      - name: Typecheck backend
+        working-directory: plataforma-iot-sanik/backend
+        run: npm run typecheck
+
+      - name: Build backend
+        working-directory: plataforma-iot-sanik/backend
+        run: npm run build
+
+      - name: Start backend for smoke tests
+        working-directory: plataforma-iot-sanik/backend
+        env:
+          NODE_ENV: test
+          PORT: 3000
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: iot_user
+          DB_PASSWORD: iot_password
+          DB_NAME: iot_platform
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          MQTT_HOST: 127.0.0.1
+          MQTT_PORT: 1883
+        run: npm start > /tmp/sanik-backend.log 2>&1 &
+
+      - name: Wait for backend
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/sanik-backend.log
+          exit 1
+
+      - name: Run backend smoke tests
+        working-directory: plataforma-iot-sanik/backend
+        env:
+          SMOKE_BASE_URL: http://127.0.0.1:3000
+        run: npm test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: plataforma-iot-sanik/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: plataforma-iot-sanik/frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: plataforma-iot-sanik/frontend
+        run: npm run build
