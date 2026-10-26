@@ -1,3 +1,4 @@
+import ScrollHint from '../components/ScrollHint'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
@@ -156,6 +157,7 @@ function AddDeviceModal({ spaceId, onClose, onAdd, accent = COLORS.primary }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="rounded-[24px] p-8 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <ScrollHint />
         {success ? (
           <div className="flex flex-col items-center justify-center py-10 text-center animate-in zoom-in-95 duration-300">
             <div className="w-16 h-16 bg-[#2BA8A0]/10 text-[#2BA8A0] rounded-full flex items-center justify-center mb-4 shadow-sm shadow-[#2BA8A0]/10">
@@ -334,6 +336,7 @@ function EditDeviceVariablesModal({ device, spaceId, onClose, onSaved, accent = 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="rounded-[24px] p-8 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <ScrollHint />
         {success ? (
           <div className="flex flex-col items-center justify-center py-10 text-center animate-in zoom-in-95 duration-300">
             <div className="w-16 h-16 bg-[#2BA8A0]/10 text-[#2BA8A0] rounded-full flex items-center justify-center mb-4 shadow-sm shadow-[#2BA8A0]/10">

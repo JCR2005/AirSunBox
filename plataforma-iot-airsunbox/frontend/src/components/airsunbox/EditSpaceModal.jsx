@@ -1,3 +1,4 @@
+import ScrollHint from '../ScrollHint'
 import { useState } from 'react'
 import { X, Check, ChevronDown } from 'lucide-react'
 import { spaces as spacesApi } from '../../services/api'
@@ -45,6 +46,7 @@ export default function EditSpaceModal({ space, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
       <div className="w-full max-w-2xl rounded-2xl p-6 max-h-[90vh] overflow-y-auto" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <ScrollHint />
         <div className="flex items-center justify-between mb-5">
           <h3 className="font-bold text-lg" style={{ color: 'var(--text)' }}>Editar espacio</h3>
           <button onClick={onClose} style={{ color: 'var(--text2)' }}><X size={18} /></button>

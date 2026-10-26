@@ -57,9 +57,10 @@ body {
 .hover\:border-\[\#1D9E75\]\/40:hover { border-color: rgba(77,182,255,0.4) !important; }
 .text-\[\#25C48F\] { color: var(--accent-l) !important; }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Sin barra de scroll visible en toda la app: el scroll funciona igual
+   (rueda, trackpad, táctil) y los modales muestran ScrollHint */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
 
 /* ── Map marker ── */
 .map-marker-icon {

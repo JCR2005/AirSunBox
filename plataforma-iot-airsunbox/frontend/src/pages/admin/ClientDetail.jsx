@@ -1,3 +1,4 @@
+import ScrollHint from '../../components/ScrollHint'
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
@@ -268,6 +269,7 @@ function AddDeviceModal({ clientId, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="rounded-[24px] p-8 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <ScrollHint />
         
         {success ? (
           /* Vista limpia de confirmación exitosa */
