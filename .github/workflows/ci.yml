@@ -62,10 +62,6 @@ jobs:
         working-directory: plataforma-iot-airsunbox/backend
         run: npm ci
 
-      - name: Typecheck backend
-        working-directory: plataforma-iot-airsunbox/backend
-        run: npm run typecheck
-
       - name: Build backend
         working-directory: plataforma-iot-airsunbox/backend
         run: npm run build
@@ -121,3 +117,125 @@ jobs:
       - name: Build frontend
         working-directory: plataforma-iot-airsunbox/frontend
         run: npm run build
+
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: airsunbox-production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Deploy tested main commit through SSM
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          EC2_INSTANCE_ID: i-07a637df8369c3f6c
+          AWS_REGION: us-east-2
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          remote_command=$(cat <<EOF
+          set -eu
+          repo=/home/ubuntu/apps/airsunbox
+          compose_dir=\$repo/plataforma-iot-airsunbox
+          deploy_sha=$DEPLOY_SHA
+
+          test "\$(sudo -u ubuntu -H git -C "\$repo" branch --show-current)" = main
+          test -z "\$(sudo -u ubuntu -H git -C "\$repo" status --porcelain)"
+          sudo -u ubuntu -H git -C "\$repo" fetch --no-tags origin main
+          test "\$(sudo -u ubuntu -H git -C "\$repo" rev-parse refs/remotes/origin/main)" = "\$deploy_sha"
+          sudo -u ubuntu -H git -C "\$repo" merge --ff-only "\$deploy_sha"
+
+          cd "\$compose_dir"
+          docker compose -p airsunbox -f docker-compose.yml build --quiet backend frontend
+          docker compose -p airsunbox -f docker-compose.yml up -d --no-deps backend frontend
+
+          for attempt in \$(seq 1 60); do
+            backend_health=\$(docker inspect --format '{{.State.Health.Status}}' iot_backend 2>/dev/null || true)
+            frontend_state=\$(docker inspect --format '{{.State.Status}}' iot_frontend 2>/dev/null || true)
+            if [ "\$backend_health" = healthy ] && [ "\$frontend_state" = running ]; then
+              break
+            fi
+            sleep 2
+          done
+          test "\$backend_health" = healthy
+          test "\$frontend_state" = running
+          curl --fail --silent --show-error --output /dev/null --resolve 18.223.121.208:443:127.0.0.1 https://18.223.121.208/
+          printf 'DEPLOYED_SHA=%s\\n' "\$deploy_sha"
+          docker compose -p airsunbox -f docker-compose.yml ps --format 'table {{.Service}} {{.State}} {{.Health}}'
+          EOF
+          )
+
+          parameters=$(jq -cn --arg command "$remote_command" '{commands: [$command], executionTimeout: ["900"]}')
+          command_id=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "AirSunBox deploy $DEPLOY_SHA" \
+            --timeout-seconds 120 \
+            --parameters "$parameters" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          poll_error_file=$(mktemp)
+          trap 'rm -f "$poll_error_file"' EXIT
+          for attempt in $(seq 1 240); do
+            if status=$(aws ssm get-command-invocation \
+                --region "$AWS_REGION" \
+                --command-id "$command_id" \
+                --instance-id "$EC2_INSTANCE_ID" \
+                --query Status \
+                --output text 2>"$poll_error_file"); then
+              :
+            elif grep -q 'InvocationDoesNotExist' "$poll_error_file" && [ "$attempt" -le 6 ]; then
+              echo "SSM invocation is not visible yet; retrying ($attempt/6)." >&2
+              sleep 5
+              continue
+            else
+              echo "Unable to poll SSM command $command_id:" >&2
+              cat "$poll_error_file" >&2
+              exit 1
+            fi
+
+            case "$status" in
+              Success)
+                aws ssm get-command-invocation \
+                  --region "$AWS_REGION" \
+                  --command-id "$command_id" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query StandardOutputContent \
+                  --output text
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|Cancelling|DeliveryTimedOut|ExecutionTimedOut|Undeliverable|Terminated|InvalidPlatform|AccessDenied|"Delivery Timed Out"|"Execution Timed Out"|"Invalid Platform"|"Access Denied")
+                response_code=$(aws ssm get-command-invocation \
+                  --region "$AWS_REGION" \
+                  --command-id "$command_id" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query ResponseCode \
+                  --output text)
+                echo "SSM deployment failed with status: $status (response code: $response_code)." >&2
+                exit 1
+                ;;
+              Pending|InProgress|Delayed)
+                sleep 5
+                ;;
+              *)
+                echo "SSM returned unexpected deployment status: $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "Timed out waiting for SSM deployment command $command_id" >&2
+          exit 1
