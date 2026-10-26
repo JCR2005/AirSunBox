@@ -27,7 +27,8 @@ export default function RecoveryShell({ step = 1, children }) {
     <div className="min-h-screen flex flex-col md:flex-row" style={{ fontFamily: '"DM Sans", -apple-system, BlinkMacSystemFont, sans-serif' }}>
       <aside
         className="hidden md:flex md:w-1/2 p-10 lg:p-20 flex-col justify-center"
-        style={{ background: `radial-gradient(circle at -10% 50%, rgba(103,183,232,0.4) 0%, rgba(103,183,232,0.15) 45%, ${RC.bgLight} 85%)` }}
+        // Base sólida clara: el degradado es translúcido y el tema oscuro se veía debajo
+        style={{ background: `radial-gradient(circle at -10% 50%, rgba(103,183,232,0.4) 0%, rgba(103,183,232,0.15) 45%, ${RC.bgLight} 85%), ${RC.bgLight}` }}
       >
         <div className="max-w-md">
           <h1 className="font-display text-4xl lg:text-5xl font-extrabold leading-[1.08]" style={{ color: RC.text }}>
