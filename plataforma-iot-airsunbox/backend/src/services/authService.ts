@@ -278,6 +278,14 @@ export async function requestPasswordReset(app: FastifyInstance, rawEmail: strin
   return { ok: true, message: generic }
 }
 
+// Para que la pantalla de cambio no muestre el formulario con un enlace ya
+// usado o vencido. No revela a qué cuenta pertenece el token.
+export async function checkResetToken(app: FastifyInstance, token: string | undefined): Promise<boolean> {
+  if (!token) return false
+  const [match] = await usersRepo.findValidResetToken(app.db, hashResetToken(token))
+  return !!match
+}
+
 export async function resetPassword(
   app: FastifyInstance,
   token: string | undefined,
