@@ -5,7 +5,7 @@ backup_*.sql
 # Respaldos y archivos comprimidos locales
 *.tgz
 *.tar.gz
-plataforma-iot-sanik.zip
+*.zip
 hardware/
 
 # Dockerfiles de desarrollo (el compose usa los oficiales)
