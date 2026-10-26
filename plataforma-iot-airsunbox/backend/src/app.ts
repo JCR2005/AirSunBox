@@ -12,7 +12,8 @@ import 'dotenv/config'
 import type { JwtPayload } from './types/index.js'
 import * as devicesRepo from './repositories/devices.js'
 import { isInternalRole } from './services/authService.js'
-import { isSessionRevoked, SESSION_REVOKED } from './services/sessionRevocation.js'
+import { isSessionRevoked, isTokenLoggedOut, SESSION_REVOKED } from './services/sessionRevocation.js'
+import { bearerToken } from './lib/bearer.js'
 
 import dbPlugin from './plugins/db.js'
 import redisPlugin from './plugins/redis.js'
@@ -106,6 +107,9 @@ app.decorate('authenticate', async function (req: FastifyRequest, reply: Fastify
   }
   if (await isSessionRevoked(app, req.user)) {
     return reply.code(401).send(SESSION_REVOKED)
+  }
+  if (await isTokenLoggedOut(app, bearerToken(req))) {
+    return reply.code(401).send({ error: 'No autorizado' })
   }
 })
 
@@ -230,7 +234,10 @@ app.get('/ws', { websocket: true }, (socket) => {
       if (data.type === 'auth' && typeof data.token === 'string') {
         try {
           const decoded = app.jwt.verify<JwtPayload>(data.token)
-          user = isSessionToken(decoded) && !(await isSessionRevoked(app, decoded)) ? decoded : null
+          user = isSessionToken(decoded)
+            && !(await isSessionRevoked(app, decoded))
+            && !(await isTokenLoggedOut(app, data.token))
+            ? decoded : null
         } catch {
           user = null
         }

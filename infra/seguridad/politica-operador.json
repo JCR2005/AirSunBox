@@ -1,0 +1,56 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "LeerEstado",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeSnapshots",
+        "ec2:DescribeReplaceRootVolumeTasks",
+        "ec2:GetEbsEncryptionByDefault"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SecretosAirSunBox",
+      "Effect": "Allow",
+      "Action": ["ssm:PutParameter", "ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:us-east-2:009644552142:parameter/airsunbox/prod/*"
+    },
+    {
+      "Sid": "PermisoDeLecturaParaElEC2",
+      "Effect": "Allow",
+      "Action": ["iam:GetInstanceProfile", "iam:PutRolePolicy", "iam:GetRolePolicy"],
+      "Resource": [
+        "arn:aws:iam::009644552142:instance-profile/sanik-iot-ec2-role",
+        "arn:aws:iam::009644552142:role/sanik-iot-ec2-role"
+      ]
+    },
+    {
+      "Sid": "CifrarDiscoRaiz",
+      "Effect": "Allow",
+      "Action": ["ec2:CreateSnapshot", "ec2:CreateReplaceRootVolumeTask"],
+      "Resource": [
+        "arn:aws:ec2:us-east-2:009644552142:instance/i-07a637df8369c3f6c",
+        "arn:aws:ec2:us-east-2:009644552142:volume/*",
+        "arn:aws:ec2:us-east-2::snapshot/*",
+        "arn:aws:ec2:us-east-2:009644552142:replace-root-volume-task/*"
+      ]
+    },
+    {
+      "Sid": "EtiquetarSnapshot",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:us-east-2::snapshot/*",
+      "Condition": { "StringEquals": { "ec2:CreateAction": "CreateSnapshot" } }
+    },
+    {
+      "Sid": "CifradoPorDefecto",
+      "Effect": "Allow",
+      "Action": "ec2:EnableEbsEncryptionByDefault",
+      "Resource": "*"
+    }
+  ]
+}

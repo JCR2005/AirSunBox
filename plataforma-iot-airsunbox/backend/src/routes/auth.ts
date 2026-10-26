@@ -6,6 +6,8 @@ import * as usersRepo from '../repositories/users.js'
 import * as orgsRepo from '../repositories/organizations.js'
 import { login, register, requestPasswordReset, resetPassword, checkResetToken, isInternalRole, isAdminRole, isValidRole, verifyOtpLogin, sendTwoFactorCode, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
 import { createMailer } from '../lib/mailer.js'
+import { revokeToken } from '../services/sessionRevocation.js'
+import { bearerToken } from '../lib/bearer.js'
 
 export default async function authRoutes(app: FastifyInstance) {
   const api = app.withTypeProvider<TypeBoxTypeProvider>()
@@ -101,6 +103,17 @@ export default async function authRoutes(app: FastifyInstance) {
   })
 
   // ── Perfil del usuario actual ──────────────────
+  // ── Cerrar sesión: el token deja de valer también en el servidor ──
+  api.post('/logout', { onRequest: [app.authenticate] }, async (req, reply) => {
+    try {
+      await revokeToken(app, bearerToken(req), req.user.exp ?? 0)
+    } catch (err) {
+      app.log.error(`No se pudo revocar el token al cerrar sesión: ${(err as Error).message}`)
+      return reply.code(503).send({ error: 'No se pudo cerrar la sesión en el servidor' })
+    }
+    return reply.code(204).send()
+  })
+
   api.get('/me', { onRequest: [app.authenticate] }, async (req) => {
     const rows = await usersRepo.findMe(app.db, req.user.userId)
     return rows[0]
