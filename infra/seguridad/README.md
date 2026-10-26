@@ -45,6 +45,20 @@ temporales privados (`mktemp`, permisos 700) que se borran al terminar.
    (no es Elastic IP; detenerla la cambiaría y rompería el certificado y el
    deploy). El disco viejo y el snapshot quedan para volver atrás.
 
+## Sin acceso a AWS todavía: `db-password.sh`
+
+Mientras no se pueda usar SSM, la contraseña de la base igual se cambia
+(la anterior, `iot_password`, estuvo publicada en el repositorio):
+
+1. `./db-password.sh preparar`: copia la contraseña actual al `backend/.env`
+   del servidor (sin corte). Antes de llevar a `main` la versión sin la
+   contraseña en el compose.
+2. Despliegue de esa versión.
+3. `./db-password.sh rotar`: contraseña nueva en Postgres y en `backend/.env`
+   (permisos 600) y recrea el backend; vuelve atrás solo si no queda sano.
+
+Después, `1-secretos-a-ssm.sh` la lleva a SSM igual que el resto.
+
 ## Después del paso 3 (Terraform)
 
 `root_block_device.encrypted` cambia a `true` y el volumen raíz tiene otro ID.
