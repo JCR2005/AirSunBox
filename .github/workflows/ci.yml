@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, main]
   pull_request:
-    branches: [develop]
+    branches: [develop, main]
 
 permissions:
   contents: read
@@ -21,16 +21,36 @@ jobs:
           POSTGRES_DB: iot_platform
         ports:
           - 5432:5432
-        volumes:
-          - ${{ github.workspace }}/plataforma-iot-sanik/database:/sanik-db:ro
-          - ${{ github.workspace }}/plataforma-iot-sanik/database/initdb:/docker-entrypoint-initdb.d:ro
+        # Sin volúmenes: los servicios arrancan antes del checkout y montar el
+        # workspace deja carpetas de root que hacen fallar actions/checkout.
+        # El esquema se aplica más abajo con database/initdb/00-schema.sh.
+        options: >-
+          --health-cmd "pg_isready -U iot_user -d iot_platform"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
       redis:
         image: redis:7-alpine
         ports:
           - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Apply database schema and migrations
+        env:
+          SANIK_DB_DIR: plataforma-iot-sanik/database
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGPASSWORD: iot_password
+          POSTGRES_USER: iot_user
+          POSTGRES_DB: iot_platform
+        run: sh plataforma-iot-sanik/database/initdb/00-schema.sh
 
       - uses: actions/setup-node@v4
         with:

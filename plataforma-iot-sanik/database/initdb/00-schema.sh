@@ -5,8 +5,12 @@
 #
 # Para agregar una migración: crear database/vNN-*.sql (idempotente) y
 # sumarla al final de la lista.
+#
+# También lo usa el pipeline de CI contra un Postgres por TCP:
+#   SANIK_DB_DIR=plataforma-iot-sanik/database PGHOST=127.0.0.1 \
+#   PGPASSWORD=... POSTGRES_USER=... POSTGRES_DB=... sh 00-schema.sh
 set -eu
-DIR=/sanik-db
+DIR=${SANIK_DB_DIR:-/sanik-db}
 
 for f in \
   init.sql \
