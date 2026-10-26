@@ -7,6 +7,7 @@ import type { Role } from '../types/index.js'
 import type { Mailer } from '../lib/mailer.js'
 import { createMailer } from '../lib/mailer.js'
 import { generateOtp, createOtp, sendOtp, verifyOtp, generateBackupCodes, hashBackupCodes } from './otpService.js'
+import { markPasswordChanged } from './sessionRevocation.js'
 
 export const INTERNAL_ROLES = ['superadmin', 'admin', 'worker'] as const
 
@@ -285,8 +286,8 @@ export async function resetPassword(
   if (!token || !password)
     return { ok: false, status: 400, error: 'Faltan el token y la nueva contraseña' }
 
-  if (password.length < 6)
-    return { ok: false, status: 400, error: 'La contraseña debe tener al menos 6 caracteres' }
+  if (password.length < 8)
+    return { ok: false, status: 400, error: 'La contraseña debe tener al menos 8 caracteres' }
 
   const [match] = await usersRepo.findValidResetToken(app.db, hashResetToken(token))
 
@@ -301,6 +302,8 @@ export async function resetPassword(
 
   const hash = await bcrypt.hash(password, 10)
   await usersRepo.clearResetTokenAndSetPassword(app.db, match.id, hash)
+  // Cierra la sesión en todos los dispositivos
+  await markPasswordChanged(app, match.id)
 
   return { ok: true, message: 'Contraseña actualizada. Ya podés iniciar sesión.' }
 }
