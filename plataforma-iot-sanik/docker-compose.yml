@@ -111,8 +111,8 @@ services:
       MQTT_PORT: 1883
       # Ingesta worker
       INGEST_WORKER_CONCURRENCY: 4
-      # SMTP (recuperación de contraseña) — se toma del backend/.env (no se inyectan vacías)
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:80}
+      # FRONTEND_URL, SMTP_* y JWT_SECRET vienen del backend/.env (env_file).
+      # No se repiten aquí: una clave en `environment` pisaría la del .env.
     # JWT_SECRET y SMTP_* salen de aquí. Las claves de `environment` tienen
     # prioridad, así que DB/Redis/MQTT siguen apuntando a la red de compose.
     # Sin JWT_SECRET el backend se niega a arrancar en producción.
