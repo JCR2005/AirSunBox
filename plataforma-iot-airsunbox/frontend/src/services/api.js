@@ -160,3 +160,14 @@ export const reports = {
   getGlobalEnvironmentalReport: (startDate, endDate) => request(`/public/reports/environmental?start=${startDate || ''}&end=${endDate || ''}`),
   getGlobalPublicStats: () => request('/public/reports/stats')
 }
+export const requests = {
+  list: () => request('/requests'),
+  updateStatus: (id, status) => request(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+}
+
+// Equipo interno de AirSunBox (superadmin, admin, worker)
+export const team = {
+  list: () => request('/auth/team'),
+  create: (data) => request('/auth/users', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id, data) => request(`/auth/users/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+}

@@ -1,125 +1,171 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { Users, Cpu, Activity, Clock, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Users, Cpu, Activity, TrendingUp, FileText, CalendarClock } from 'lucide-react'
+import useAuthStore from '../../store/auth'
+import { reports, requests as requestsApi, organizations as orgsApi } from '../../services/api'
+
+const STATUS_LABEL = {
+  pending: { label: 'Pendiente', color: '#F59E0B' },
+  in_review: { label: 'En revisión', color: '#67B7E8' },
+  approved: { label: 'Aprobada', color: '#2CB67D' },
+  rejected: { label: 'Rechazada', color: '#EF4444' },
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function timeAgo(date) {
+  const diff = Date.now() - new Date(date).getTime()
+  const min = Math.round(diff / 60000)
+  if (min < 60) return min <= 1 ? 'Hace un momento' : `Hace ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24) return `Hace ${h} h`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'Ayer' : `Hace ${d} días`
+}
+
+function Panel({ title, Icon, children }) {
+  return (
+    <div className="rounded-3xl p-8" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.02)' }}>
+      <h2 className="font-display text-xl font-bold mb-6 flex items-center gap-2" style={{ color: 'var(--text)' }}>
+        <Icon size={18} style={{ color: '#67B7E8' }} /> {title}
+      </h2>
+      {children}
+    </div>
+  )
+}
+
+function Empty({ children }) {
+  return <p className="text-sm py-6 text-center" style={{ color: 'var(--text2)' }}>{children}</p>
+}
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    totalClients: 0, activeDevices: 0, pendingDevices: 0,
-    offlineDevices: 0, pendingRequests: 0, pendingPayments: 0
-  })
+  const { user } = useAuthStore()
+  const [stats, setStats] = useState(null)
+  const [recentRequests, setRecentRequests] = useState(null)
+  const [dueOrgs, setDueOrgs] = useState(null)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    setStats({
-      totalClients: 3, activeDevices: 5, pendingDevices: 2,
-      offlineDevices: 1, pendingRequests: 1, pendingPayments: 2
-    })
+    let active = true
+    // Cada bloque carga por separado: si uno falla (p. ej. un rol sin acceso a
+    // organizaciones), los demás se muestran igual.
+    reports.getGlobalStats()
+      .then(s => active && setStats(s))
+      .catch(e => active && setError(e.message || 'No se pudieron cargar las estadísticas'))
+    requestsApi.list()
+      .then(r => active && setRecentRequests((r || []).slice(0, 5)))
+      .catch(() => active && setRecentRequests([]))
+    orgsApi.list()
+      .then(orgs => {
+        if (!active) return
+        // Vencimientos reales: organizaciones que pagan, con fecha, ordenadas
+        const due = (orgs || [])
+          .filter(o => o.paid_until && !o.payment_exempt && o.status !== 'suspended')
+          .map(o => ({ id: o.id, name: o.name, plan: o.plan, paidUntil: o.paid_until,
+                       days: Math.ceil((new Date(o.paid_until).getTime() - Date.now()) / DAY_MS) }))
+          .filter(o => o.days <= 30)
+          .sort((a, b) => a.days - b.days)
+          .slice(0, 5)
+        setDueOrgs(due)
+      })
+      .catch(() => active && setDueOrgs([]))
+    return () => { active = false }
   }, [])
 
-  // Obtenemos la fecha actual para darle un toque más personal
-  const today = new Intl.DateTimeFormat('es-GT', { 
-    weekday: 'long', day: 'numeric', month: 'long' 
-  }).format(new Date());
+  const today = new Intl.DateTimeFormat('es-GT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const name = (user?.name || user?.email?.split('@')[0] || '').split(' ')[0]
 
+  const total = Number(stats?.total_devices ?? 0)
+  const activeNow = Number(stats?.active_devices ?? 0)
   const STAT_CARDS = [
-    { label: 'Clientes activos', value: stats.totalClients, icon: Users, color: '#2BA8A0', bg: 'rgba(43, 168, 160, 0.1)' },
-    { label: 'Dispositivos activos', value: stats.activeDevices, icon: Activity, color: '#67B7E8', bg: 'rgba(103, 183, 232, 0.12)' },
-    { label: 'Equipos pendientes', value: stats.pendingDevices, icon: Clock, color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' },
-    { label: 'Sin conexión', value: stats.offlineDevices, icon: Cpu, color: '#8FA899', bg: 'rgba(143, 168, 153, 0.1)' },
-    { label: 'Nuevas solicitudes', value: stats.pendingRequests, icon: TrendingUp, color: '#A78BFA', bg: 'rgba(167, 139, 250, 0.1)' },
-    { label: 'Pagos pendientes', value: stats.pendingPayments, icon: AlertTriangle, color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' },
+    { label: 'Clientes', value: stats?.total_clients, icon: Users, color: '#2BA8A0', bg: 'rgba(43, 168, 160, 0.1)' },
+    { label: `Estaciones activas de ${total}`, value: stats ? activeNow : undefined, icon: Activity, color: '#67B7E8', bg: 'rgba(103, 183, 232, 0.12)' },
+    { label: 'Estaciones sin conexión', value: stats ? total - activeNow : undefined, icon: Cpu, color: '#8FA899', bg: 'rgba(143, 168, 153, 0.1)' },
+    { label: 'Solicitudes pendientes', value: stats?.pending_requests, icon: TrendingUp, color: '#A78BFA', bg: 'rgba(167, 139, 250, 0.1)' },
   ]
 
   return (
     <AdminLayout>
-      {/* Fondo Glow Premium - Más grande y suave */}
-      <div 
-        className="min-h-full py-4 lg:py-6 page-bg"
-      >
+      <div className="min-h-full py-4 lg:py-6 page-bg">
         <div className="mb-10 flex flex-col gap-1">
-          <p className="text-sm font-semibold capitalize tracking-wide" style={{ color: '#67B7E8' }}>
-            {today}
-          </p>
-          <h1 className="text-3xl lg:text-4xl font-bold tracking-tight" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
-            Hola de nuevo, Superadmin
+          <p className="text-sm font-semibold capitalize tracking-wide" style={{ color: '#67B7E8' }}>{today}</p>
+          <h1 className="font-display text-3xl lg:text-4xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
+            {greeting}{name ? `, ${name}` : ''}
           </h1>
           <p className="text-base mt-2" style={{ color: 'var(--text2)' }}>
-            Acá tenés el resumen de lo que está pasando hoy en AirSunBox.
+            El estado de AirSunBox ahora mismo.
           </p>
         </div>
-        {/* Tarjetas de Estadísticas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-10">
+
+        {error && (
+          <div role="alert" className="mb-6 rounded-xl px-5 py-4 text-sm font-medium" style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6 mb-10">
           {STAT_CARDS.map(({ label, value, icon: Icon, color, bg }) => (
-            <div 
-              key={label} 
-              className="group rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1.5" 
-              style={{ 
-                background: 'var(--card)', 
-                border: '1px solid var(--border)',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
-              }}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110" style={{ background: bg }}>
-                  <Icon size={22} strokeWidth={2.5} style={{ color }} />
-                </div>
+            <div key={label} className="rounded-3xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-6" style={{ background: bg }}>
+                <Icon size={22} strokeWidth={2.5} style={{ color }} />
               </div>
-              <div className="flex flex-col gap-1">
-                <div className="text-4xl lg:text-5xl font-bold tracking-tight" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
-                  {value}
-                </div>
-                <span className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
-                  {label}
-                </span>
+              <div className="font-display text-4xl lg:text-5xl font-extrabold tracking-tight" style={{ color: 'var(--text)' }}>
+                {value ?? <span className="inline-block w-12 h-10 rounded-lg animate-pulse" style={{ background: 'var(--border)' }} />}
               </div>
+              <span className="text-sm font-medium" style={{ color: 'var(--text2)' }}>{label}</span>
             </div>
           ))}
         </div>
 
-        {/* Paneles de Información Inferiores */}
         <div className="grid lg:grid-cols-2 gap-8">
-          
-          {/* Actividad Reciente */}
-          <div className="rounded-3xl p-8" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.02)' }}>
-            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Actividad reciente</h2>
-            <div className="space-y-1">
-              {[
-                { msg: 'Municipalidad Xela registró un nuevo dispositivo', time: 'Hace 2 horas', color: '#2BA8A0' },
-                { msg: 'Estación Centro perdió conexión', time: 'Hace 5 horas', color: '#F59E0B' },
-                { msg: 'CUNOC registró un nuevo pago', time: 'Ayer', color: '#67B7E8' },
-                { msg: 'Recibiste una nueva solicitud de dispositivo', time: 'Hace 2 días', color: '#A78BFA' },
-              ].map((a, i) => (
-                <div key={i} className="flex items-center gap-4 py-4 border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] -mx-4 px-4 rounded-xl transition-colors" style={{ borderColor: 'var(--border)' }}>
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: a.color, boxShadow: `0 0 12px ${a.color}80` }} />
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{a.msg}</p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>{a.time}</p>
-                  </div>
+          <Panel title="Solicitudes recientes" Icon={FileText}>
+            {recentRequests === null ? <Empty>Cargando…</Empty>
+              : recentRequests.length === 0 ? <Empty>No hay solicitudes.</Empty>
+              : (
+                <div className="space-y-1">
+                  {recentRequests.map(r => {
+                    const st = STATUS_LABEL[r.status] || { label: r.status, color: '#8FA899' }
+                    return (
+                      <Link key={r.id} to="/admin/solicitudes" className="flex items-center gap-4 py-4 border-b last:border-0 -mx-4 px-4 rounded-xl transition-colors hover:bg-black/[0.02]" style={{ borderColor: 'var(--border)' }}>
+                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: st.color }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                            {r.org_name} · {r.device_name || 'Estación'}{r.quantity > 1 ? ` (×${r.quantity})` : ''}
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>{timeAgo(r.created_at)}</p>
+                        </div>
+                        <span className="text-xs font-bold" style={{ color: st.color }}>{st.label}</span>
+                      </Link>
+                    )
+                  })}
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
+          </Panel>
 
-          {/* Pagos Pendientes */}
-          <div className="rounded-3xl p-8" style={{ background: 'var(--card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.02)' }}>
-            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Próximos cobros</h2>
-            <div className="space-y-1">
-              {[
-                { org: 'Municipalidad Xela', plan: 'Plan Pro', vence: '1 Jun 2026', dias: 3 },
-                { org: 'Empresa Industrial S.A.', plan: 'Plan Pro', vence: '15 Jun 2026', dias: 17 },
-              ].map((p, i) => (
-                <div key={i} className="flex items-center justify-between py-4 border-b last:border-0 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] -mx-4 px-4 rounded-xl transition-colors" style={{ borderColor: 'var(--border)' }}>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>{p.org}</div>
-                    <div className="text-xs mt-1 font-medium" style={{ color: 'var(--text2)' }}>{p.plan} · Vence el {p.vence}</div>
-                  </div>
-                  <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${p.dias <= 5 ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                    Faltan {p.dias} días
-                  </span>
+          <Panel title="Próximos cobros" Icon={CalendarClock}>
+            {dueOrgs === null ? <Empty>Cargando…</Empty>
+              : dueOrgs.length === 0 ? <Empty>Ningún cliente vence en los próximos 30 días.</Empty>
+              : (
+                <div className="space-y-1">
+                  {dueOrgs.map(o => (
+                    <Link key={o.id} to={`/admin/clientes/${o.id}`} className="flex items-center justify-between py-4 border-b last:border-0 -mx-4 px-4 rounded-xl transition-colors hover:bg-black/[0.02]" style={{ borderColor: 'var(--border)' }}>
+                      <div>
+                        <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>{o.name}</div>
+                        <div className="text-xs mt-1 font-medium" style={{ color: 'var(--text2)' }}>
+                          {o.plan ? `Plan ${o.plan} · ` : ''}Vence el {new Date(o.paidUntil).toLocaleDateString('es-GT', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${o.days <= 5 ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        {o.days < 0 ? `Vencido hace ${-o.days} d` : o.days === 0 ? 'Vence hoy' : `Faltan ${o.days} días`}
+                      </span>
+                    </Link>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
-
+              )}
+          </Panel>
         </div>
       </div>
     </AdminLayout>

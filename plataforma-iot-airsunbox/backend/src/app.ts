@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import Fastify from 'fastify'
+import crypto from 'node:crypto'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
 import websocket from '@fastify/websocket'
@@ -68,23 +69,23 @@ await app.register(cors, {
   credentials: true
 })
 
-// En producción el secreto es obligatorio: con un valor por defecto conocido
-// cualquiera podría firmar tokens de superadmin.
-const DEV_JWT_SECRET = 'airsunbox_dev_secret'
-const jwtSecret = process.env.JWT_SECRET?.trim()
-if (!jwtSecret || jwtSecret === DEV_JWT_SECRET) {
+// En producción el secreto es obligatorio (backend/.env o SSM). Fuera de
+// producción, si falta, se genera uno aleatorio al arrancar: no hay ningún
+// secreto escrito en el código y las sesiones de desarrollo vencen al reiniciar.
+const jwtSecret = process.env.JWT_SECRET?.trim() || (() => {
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET no está definido (o usa el valor de desarrollo). Configúralo en backend/.env')
+    throw new Error('JWT_SECRET no está definido (backend/.env o SSM)')
   }
-  app.log.warn('⚠️  JWT_SECRET no definido: usando secreto de desarrollo')
-}
+  app.log.warn('⚠️  JWT_SECRET no definido: se usa uno aleatorio para esta ejecución')
+  return crypto.randomBytes(32).toString('hex')
+})()
 
 // Vida de la sesión, formato de `ms` ("24h", "7d"). El token temporal de OTP
 // fija su propio expiresIn (10m).
 const JWT_TTL = process.env.JWT_EXPIRES_IN || '24h'
 
 await app.register(jwt, {
-  secret: jwtSecret || DEV_JWT_SECRET,
+  secret: jwtSecret,
   sign: { expiresIn: JWT_TTL }
 })
 
