@@ -6,7 +6,11 @@
 
 ## Levantar todo con un comando
 
+Primero los secretos (ningún secreto está en el repositorio):
+
 ```bash
+cp backend/.env.example backend/.env    # completar DB_PASSWORD, JWT_SECRET y SMTP_*
+echo "DB_PASSWORD=<la misma>" > .env    # la usa compose al crear la base
 docker-compose up -d
 ```
 
@@ -25,13 +29,23 @@ Eso levanta los 5 servicios:
 
 **Base de datos**
 - Usuario: `iot_user`
-- Password: `iot_password`
+- Password: la que definas en `DB_PASSWORD` (ver *Secretos* más abajo)
 - Base: `iot_platform`
 
 **EMQX Panel** (administración del broker MQTT)
 - URL: http://localhost:18083
-- Usuario: `admin`
-- Password: `public`
+- Usuario y contraseña: los de fábrica de EMQX; cambiarlos al primer ingreso.
+  El panel solo escucha en 127.0.0.1.
+
+## Secretos
+
+- En el repositorio no hay secretos: el código los lee del entorno y no tiene
+  valores por defecto (sin `DB_PASSWORD` o `JWT_SECRET` el backend no arranca).
+- **Producción:** `JWT_SECRET`, `DB_PASSWORD` y `SMTP_PASS` están cifrados en
+  AWS SSM Parameter Store (`/airsunbox/prod/*`) y el backend los lee al
+  arrancar con el rol del EC2. Procedimiento y scripts en
+  [`infra/seguridad`](../infra/seguridad/README.md).
+- **Desarrollo:** `backend/.env` (en `.gitignore`), a partir de `backend/.env.example`.
 
 ## Estructura del proyecto
 

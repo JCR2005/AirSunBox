@@ -19,6 +19,16 @@ const useAuthStore = create((set, get) => ({
   },
 
   logout: () => {
+    // Invalida el token también en el servidor. No se espera la respuesta:
+    // la sesión local se cierra igual aunque no haya conexión.
+    const { token } = get()
+    if (token) {
+      fetch(`${API_BASE}/api/auth/logout`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        keepalive: true
+      }).catch(() => {})
+    }
     localStorage.removeItem('airsunbox_token')
     localStorage.removeItem('airsunbox_user')
     localStorage.removeItem('airsunbox_org')

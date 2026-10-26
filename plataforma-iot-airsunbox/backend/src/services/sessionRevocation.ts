@@ -1,5 +1,26 @@
+import crypto from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type { JwtPayload } from '../types/index.js'
+
+// Cierre de sesión: el token deja de valer en el servidor, no solo en el
+// navegador. Se guarda el SHA-256 del token en Redis hasta que vence solo.
+// Sin Redis no se puede consultar la lista: el token sigue valiendo hasta su
+// vencimiento (24 h), igual que antes de existir el cierre en el servidor.
+const loggedOutKey = (token: string) => `logout:${crypto.createHash('sha256').update(token).digest('hex')}`
+
+export async function revokeToken(app: FastifyInstance, token: string, exp: number): Promise<void> {
+  const ttl = exp - Math.floor(Date.now() / 1000)
+  if (ttl <= 0) return
+  await app.redis.set(loggedOutKey(token), '1', { EX: ttl })
+}
+
+export async function isTokenLoggedOut(app: FastifyInstance, token: string): Promise<boolean> {
+  try {
+    return (await app.redis.get(loggedOutKey(token))) !== null
+  } catch {
+    return false
+  }
+}
 
 // Cierre de sesión en todos los dispositivos al cambiar la contraseña.
 //

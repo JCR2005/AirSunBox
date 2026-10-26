@@ -9,6 +9,7 @@ import 'dotenv/config'
 import crypto from 'node:crypto'
 import bcrypt from 'bcrypt'
 import pg from 'pg'
+import { loadSecretsFromSsm } from '../lib/secrets.js'
 
 const email = process.argv[2]?.trim().toLowerCase()
 if (!email || !email.includes('@')) {
@@ -23,11 +24,14 @@ if (given !== undefined && given.length < 10) {
 }
 const password = given || crypto.randomBytes(12).toString('base64url')
 
+await loadSecretsFromSsm()
+if (!process.env.DB_PASSWORD) throw new Error('DB_PASSWORD no está definido (backend/.env o SSM)')
+
 const pool = new pg.Pool({
   host: process.env.DB_HOST || 'localhost',
   port: Number(process.env.DB_PORT || 5432),
   user: process.env.DB_USER || 'iot_user',
-  password: process.env.DB_PASSWORD || 'iot_password',
+  password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME || 'iot_platform'
 })
 
