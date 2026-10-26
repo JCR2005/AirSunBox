@@ -5,12 +5,6 @@ import AdminLayout from '../../components/admin/AdminLayout'
 import { Search, Plus, X, ChevronRight, Building2 } from 'lucide-react'
 import { organizations as orgsApi } from '../../services/api'
 
-const MOCK_CLIENTS = [
-  { id: '1', name: 'Municipalidad Xela', slug: 'municipalidad-xela', plan: 'Pro', devices: 3, activeDevices: 2, email: 'admin@xela.gob.gt', phone: '77612345', location: 'Quetzaltenango', status: 'active', paidUntil: '2026-06-01', createdAt: '2026-01-15' },
-  { id: '2', name: 'CUNOC', slug: 'cunoc', plan: 'Empresarial', devices: 2, activeDevices: 2, email: 'investigacion@cunoc.edu.gt', phone: '77612346', location: 'Quetzaltenango', status: 'active', paidUntil: '2026-07-01', createdAt: '2026-02-01' },
-  { id: '3', name: 'Empresa Industrial S.A.', slug: 'empresa-industrial', plan: 'Pro', devices: 1, activeDevices: 1, email: 'admin@industrial.com', phone: '55123456', location: 'Xela, Zona Industrial', status: 'suspended', paidUntil: '2026-04-01', createdAt: '2026-03-10' },
-]
-
 // Estilos consistentes con el nuevo diseño
 const COLORS = { primary: "#67B7E8", primaryHover: "#55A6D7" }
 const INPUT = "w-full border rounded-xl px-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[#67B7E8]/20 focus:border-[#67B7E8]"
@@ -244,7 +238,7 @@ export default function AdminClients() {
       } catch (err) {
         if (active) {
           setLoadError(err.message || 'No se pudieron cargar los clientes')
-          setClients(MOCK_CLIENTS)
+          setClients([])
         }
       } finally {
         if (active) setLoading(false)
@@ -365,7 +359,7 @@ export default function AdminClients() {
         {loadError && (
           <div className="mb-6 rounded-xl px-5 py-4 text-sm font-medium flex items-center gap-3" style={{ background: 'rgba(245,158,11,0.1)', color: '#F59E0B' }}>
             <Building2 size={18} />
-            {loadError} — Mostrando datos de prueba.
+            {loadError}
           </div>
         )}
 

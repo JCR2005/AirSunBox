@@ -1,27 +1,36 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { Plus, Shield, User, Ban, X, Crown } from 'lucide-react'
+import { Plus, Shield, User, Ban, X, Crown, RotateCcw } from 'lucide-react'
 import useAuthStore from '../../store/auth'
-
-const MOCK_TEAM = [
-  { id: '1', email: 'carlos@airsunbox.com', role: 'superadmin', status: 'active', createdAt: '2026-01-01' },
-  { id: '2', email: 'juan@airsunbox.com', role: 'admin', status: 'active', createdAt: '2026-02-15' },
-  { id: '3', email: 'maria@airsunbox.com', role: 'worker', status: 'suspended', createdAt: '2026-03-01' },
-]
+import { team as teamApi } from '../../services/api'
 
 const INPUT = "w-full border rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#1D9E75] transition-colors"
+const MIN_PASSWORD = 8
 
 // Modal FUERA del componente padre
-function NewMemberModal({ isCentral, onClose, onCreate }) {
+function NewMemberModal({ isCentral, onClose, onCreated }) {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState('worker')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const inputStyle = { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    onCreate({ id: Date.now().toString(), email, role, status: 'active', createdAt: new Date().toISOString() })
-    onClose()
+    if (password.length < MIN_PASSWORD) { setError(`La contraseña necesita al menos ${MIN_PASSWORD} caracteres.`); return }
+    setSaving(true)
+    setError('')
+    try {
+      const created = await teamApi.create({ email: email.trim(), password, role, name: name.trim() || undefined })
+      // El alta devuelve id, email, rol y nombre; el resto es lo que el servidor asigna
+      onCreated({ status: 'active', created_at: new Date().toISOString(), ...created })
+    } catch (err) {
+      setError(err.message || 'No se pudo crear el miembro')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -29,16 +38,20 @@ function NewMemberModal({ isCentral, onClose, onCreate }) {
       <div className="rounded-2xl p-6 w-full max-w-md border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-bold" style={{ color: 'var(--text)' }}>Nuevo miembro</h2>
-          <button onClick={onClose} style={{ color: 'var(--text2)' }}><X size={20} /></button>
+          <button onClick={onClose} style={{ color: 'var(--text2)' }} aria-label="Cerrar"><X size={20} /></button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs block mb-1.5" style={{ color: 'var(--text2)' }}>Nombre</label>
+            <input className={INPUT} style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Opcional" />
+          </div>
           <div>
             <label className="text-xs block mb-1.5" style={{ color: 'var(--text2)' }}>Correo</label>
             <input className={INPUT} style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="nombre@airsunbox.com" required />
           </div>
           <div>
             <label className="text-xs block mb-1.5" style={{ color: 'var(--text2)' }}>Contraseña</label>
-            <input className={INPUT} style={inputStyle} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Mínimo 8 caracteres" required />
+            <input className={INPUT} style={inputStyle} type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder={`Mínimo ${MIN_PASSWORD} caracteres`} required />
           </div>
           <div>
             <label className="text-xs block mb-1.5" style={{ color: 'var(--text2)' }}>Rol</label>
@@ -47,9 +60,12 @@ function NewMemberModal({ isCentral, onClose, onCreate }) {
               {isCentral && <option value="admin">Administrador</option>}
             </select>
           </div>
+          {error && <p role="alert" className="text-sm font-medium text-red-500">{error}</p>}
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 border rounded-lg py-2.5 text-sm" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>Cancelar</button>
-            <button type="submit" className="flex-1 bg-[#1D9E75] hover:bg-[#25C48F] text-white py-2.5 rounded-lg text-sm font-medium">Crear</button>
+            <button type="submit" disabled={saving} className="flex-1 bg-[#1D9E75] hover:bg-[#25C48F] text-white py-2.5 rounded-lg text-sm font-medium disabled:opacity-60">
+              {saving ? 'Creando…' : 'Crear'}
+            </button>
           </div>
         </form>
       </div>
@@ -59,12 +75,44 @@ function NewMemberModal({ isCentral, onClose, onCreate }) {
 
 export default function AdminTeam() {
   const { user } = useAuthStore()
-  const [team, setTeam] = useState(MOCK_TEAM)
+  const [team, setTeam] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [busyId, setBusyId] = useState(null)
   const [showModal, setShowModal] = useState(false)
   const isCentral = user?.role === 'superadmin'
+  const canCreate = isCentral || user?.role === 'admin'
 
-  const toggleStatus = (id) => setTeam(prev => prev.map(m => m.id === id ? { ...m, status: m.status === 'active' ? 'suspended' : 'active' } : m))
-  const promote = (id) => setTeam(prev => prev.map(m => m.id === id ? { ...m, role: m.role === 'worker' ? 'admin' : 'worker' } : m))
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      setTeam(await teamApi.list() || [])
+    } catch (err) {
+      setError(err.message || 'No se pudo cargar el equipo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  // Mismas reglas que el servidor: nadie se cambia a sí mismo, el superadmin
+  // no se toca, y a los administradores solo los maneja el superadmin.
+  const canManage = (m) => m.id !== user?.id && m.role !== 'superadmin' && (isCentral || m.role === 'worker')
+
+  const update = async (m, data) => {
+    setBusyId(m.id)
+    setError('')
+    try {
+      const updated = await teamApi.update(m.id, data)
+      setTeam(prev => prev.map(x => x.id === m.id ? { ...x, ...updated } : x))
+    } catch (err) {
+      setError(err.message || 'No se pudo actualizar el miembro')
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   return (
     <AdminLayout>
@@ -72,44 +120,73 @@ export default function AdminTeam() {
         <NewMemberModal
           isCentral={isCentral}
           onClose={() => setShowModal(false)}
-          onCreate={m => { setTeam(prev => [...prev, m]); setShowModal(false) }}
+          onCreated={m => { setTeam(prev => [...prev, m]); setShowModal(false) }}
         />
       )}
       <div className="p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Equipo</h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>{team.length} miembros del equipo AirSunBox</p>
+            <h1 className="font-display text-2xl font-bold" style={{ color: 'var(--text)' }}>Equipo</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text2)' }}>
+              {loading ? 'Cargando…' : `${team.length} ${team.length === 1 ? 'miembro' : 'miembros'} del equipo AirSunBox`}
+            </p>
           </div>
-          <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-[#1D9E75] hover:bg-[#25C48F] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
-            <Plus size={16} /> Nuevo miembro
-          </button>
+          {canCreate && (
+            <button onClick={() => setShowModal(true)} className="flex items-center gap-2 bg-[#1D9E75] hover:bg-[#25C48F] text-white px-4 py-2.5 rounded-lg text-sm font-medium">
+              <Plus size={16} /> Nuevo miembro
+            </button>
+          )}
         </div>
+
+        {error && (
+          <div role="alert" className="mb-6 rounded-xl px-5 py-4 text-sm font-medium flex items-center justify-between gap-3" style={{ background: 'rgba(239,68,68,0.08)', color: '#EF4444' }}>
+            {error}
+            <button onClick={load} className="font-bold underline">Reintentar</button>
+          </div>
+        )}
+
         <div className="space-y-3">
-          {team.map(m => (
-            <div key={m.id} className={`border rounded-xl p-4 flex items-center gap-4 ${m.status === 'suspended' ? 'opacity-60' : ''}`}
-              style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.role === 'admin' || m.role === 'superadmin' ? 'bg-[#A78BFA]/10' : 'bg-[#1D9E75]/10'}`}>
-                {m.role === 'admin' || m.role === 'superadmin' ? <Shield size={18} className="text-[#A78BFA]" /> : <User size={18} className="text-[#1D9E75]" />}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{m.email}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${m.role === 'superadmin' ? 'bg-amber-500/10 text-amber-400' : m.role === 'admin' ? 'bg-[#A78BFA]/10 text-[#A78BFA]' : 'bg-[#1D9E75]/10 text-[#1D9E75]'}`}>
-                    {m.role === 'superadmin' ? 'Super Admin' : m.role === 'admin' ? 'Admin' : 'Trabajador'}
-                  </span>
-                  {m.status === 'suspended' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-400">Suspendido</span>}
+          {team.map(m => {
+            const isAdmin = m.role === 'admin' || m.role === 'superadmin'
+            const busy = busyId === m.id
+            return (
+              <div key={m.id} className={`border rounded-xl p-4 flex items-center gap-4 ${m.status === 'suspended' ? 'opacity-60' : ''}`}
+                style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAdmin ? 'bg-[#A78BFA]/10' : 'bg-[#1D9E75]/10'}`}>
+                  {isAdmin ? <Shield size={18} className="text-[#A78BFA]" /> : <User size={18} className="text-[#1D9E75]" />}
                 </div>
-                <div className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>Desde {new Date(m.createdAt).toLocaleDateString('es-GT')}</div>
-              </div>
-              {isCentral && m.role !== 'superadmin' && (
-                <div className="flex gap-2">
-                  <button onClick={() => promote(m.id)} className="p-2 rounded-lg transition-colors hover:bg-[#1E2E28]" style={{ color: 'var(--text2)' }} title="Cambiar rol"><Crown size={14} /></button>
-                  <button onClick={() => toggleStatus(m.id)} className="p-2 rounded-lg transition-colors hover:text-amber-400 hover:bg-[#1E2E28]" style={{ color: 'var(--text2)' }}><Ban size={14} /></button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{m.name || m.email}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${m.role === 'superadmin' ? 'bg-amber-500/10 text-amber-500' : m.role === 'admin' ? 'bg-[#A78BFA]/10 text-[#A78BFA]' : 'bg-[#1D9E75]/10 text-[#1D9E75]'}`}>
+                      {m.role === 'superadmin' ? 'Super Admin' : m.role === 'admin' ? 'Admin' : 'Trabajador'}
+                    </span>
+                    {m.status === 'suspended' && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/10 text-red-500">Suspendido</span>}
+                    {m.id === user?.id && <span className="text-xs" style={{ color: 'var(--text2)' }}>(vos)</span>}
+                  </div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
+                    {m.name ? `${m.email} · ` : ''}Desde {new Date(m.created_at).toLocaleDateString('es-GT')}
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+                {canManage(m) && (
+                  <div className="flex gap-2">
+                    {isCentral && (
+                      <button disabled={busy} onClick={() => update(m, { role: m.role === 'worker' ? 'admin' : 'worker' })}
+                        className="p-2 rounded-lg transition-colors hover:bg-black/5 disabled:opacity-50" style={{ color: 'var(--text2)' }}
+                        title={m.role === 'worker' ? 'Hacer administrador' : 'Pasar a trabajador'}>
+                        <Crown size={14} />
+                      </button>
+                    )}
+                    <button disabled={busy} onClick={() => update(m, { status: m.status === 'active' ? 'suspended' : 'active' })}
+                      className="p-2 rounded-lg transition-colors hover:text-amber-500 hover:bg-black/5 disabled:opacity-50" style={{ color: 'var(--text2)' }}
+                      title={m.status === 'active' ? 'Suspender' : 'Reactivar'}>
+                      {m.status === 'active' ? <Ban size={14} /> : <RotateCcw size={14} />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
     </AdminLayout>
