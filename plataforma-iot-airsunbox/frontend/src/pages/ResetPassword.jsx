@@ -4,6 +4,7 @@ import { auth } from '../services/api'
 import { Lock, Eye, EyeOff, ArrowLeft, ShieldCheck } from 'lucide-react'
 
 import logoImg from "../assets/logo2.svg";
+import useAuthStore from '../store/auth'
 
 const COLORS = {
   primary: "#67B7E8",
@@ -50,6 +51,9 @@ export default function ResetPassword() {
     setLoading(true)
     try {
       await auth.resetPassword(token, password)
+      // Cualquier sesión abierta en este navegador queda cerrada: se entra
+      // de nuevo con la contraseña nueva
+      useAuthStore.getState().logout()
       setDone(true)
       setTimeout(() => navigate('/login'), 2200)
     } catch (err) {
