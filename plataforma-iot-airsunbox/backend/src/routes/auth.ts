@@ -4,7 +4,7 @@ import { Type } from '@sinclair/typebox'
 import bcrypt from 'bcrypt'
 import * as usersRepo from '../repositories/users.js'
 import * as orgsRepo from '../repositories/organizations.js'
-import { login, register, requestPasswordReset, resetPassword, isInternalRole, isAdminRole, isValidRole, verifyOtpLogin, sendTwoFactorCode, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
+import { login, register, requestPasswordReset, resetPassword, checkResetToken, isInternalRole, isAdminRole, isValidRole, verifyOtpLogin, sendTwoFactorCode, enableTwoFactor, disableTwoFactor } from '../services/authService.js'
 import { createMailer } from '../lib/mailer.js'
 
 export default async function authRoutes(app: FastifyInstance) {
@@ -239,6 +239,17 @@ export default async function authRoutes(app: FastifyInstance) {
     const result = await requestPasswordReset(app, req.body?.email || '', mailer)
     if (!result.ok) return reply.code(result.status || 400).send({ error: result.error })
     return reply.code(result.status || 200).send({ message: result.message })
+  })
+
+  // ── Recuperación de contraseña — ¿el enlace sigue vigente? ──
+  api.post('/reset-password/check', {
+    schema: {
+      body: Type.Object({
+        token: Type.Optional(Type.String())
+      })
+    }
+  }, async (req) => {
+    return { valid: await checkResetToken(app, req.body?.token) }
   })
 
   // ── Recuperación de contraseña — restablecer con el token ──

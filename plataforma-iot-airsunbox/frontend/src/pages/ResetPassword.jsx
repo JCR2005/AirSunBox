@@ -73,6 +73,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [linkProblem, setLinkProblem] = useState(!token)
+  const [checking, setChecking] = useState(!!token)
   const [done, setDone] = useState(false)
   const [countdown, setCountdown] = useState(6)
   const passRef = useRef(null)
@@ -83,6 +84,19 @@ export default function ResetPassword() {
   const longEnough = password.length >= MIN
   const matches = confirm.length > 0 && confirm === password
   const mismatch = confirm.length > 0 && confirm !== password
+
+  // Revisa el enlace al abrir la página: si ya se usó o venció, no tiene
+  // sentido mostrar el formulario. Si la revisión falla por red, se muestra
+  // igual y el servidor lo valida al guardar.
+  useEffect(() => {
+    if (!token) return
+    let alive = true
+    auth.checkResetToken(token)
+      .then(r => { if (alive && !r?.valid) setLinkProblem(true) })
+      .catch(() => {})
+      .finally(() => { if (alive) setChecking(false) })
+    return () => { alive = false }
+  }, [token])
 
   useEffect(() => {
     if (!done) return
@@ -132,6 +146,17 @@ export default function ResetPassword() {
           <p>Cerramos tu sesión en todos los dispositivos. Entrá con tu contraseña nueva.</p>
           <p className="mt-3 text-xs" aria-live="polite">Te llevamos al inicio de sesión en {countdown} s…</p>
         </Outcome>
+      </RecoveryShell>
+    )
+  }
+
+  if (checking) {
+    return (
+      <RecoveryShell step={3}>
+        <div className="flex flex-col items-center gap-3 py-10 text-sm" style={{ color: RC.textMuted }} aria-live="polite">
+          <span style={{ color: RC.primary }}><Spinner /></span>
+          Revisando el enlace…
+        </div>
       </RecoveryShell>
     )
   }
