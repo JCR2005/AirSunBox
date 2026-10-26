@@ -5,6 +5,7 @@ import * as orgsRepo from '../repositories/organizations.js'
 import * as spacesRepo from '../repositories/spaces.js'
 import { seedAirTemplate } from './aqiService.js'
 import { isInternalRole } from './authService.js'
+import { markPasswordChanged } from './sessionRevocation.js'
 import crypto from 'node:crypto'
 
 // Contraseña inicial/restablecida para clientes: se muestra una sola vez
@@ -231,6 +232,7 @@ export async function resetClientPassword(
   const newPassword = generateClientPassword()
   const hash = await bcrypt.hash(newPassword, 10)
   await usersRepo.resetClientPassword(app.db, clientUser.id, hash)
+  await markPasswordChanged(app, clientUser.id)
 
   return { ok: true, credentials: { email: clientUser.email, password: newPassword } }
 }

@@ -30,10 +30,12 @@ async function request(path, options = {}) {
   
   // Sesión caducada o inválida: cerrar sesión y volver al login. Se excluyen
   // las rutas de /auth/ donde 401 significa credenciales o código incorrectos.
-  if (res.status === 401 && getToken() && !path.startsWith('/auth/')) {
+  if (res.status === 401 && getToken() && (!path.startsWith('/auth/') || data?.code === 'SESSION_REVOKED')) {
     useAuthStore.getState().logout()
     localStorage.removeItem('token')
-    if (window.location.pathname !== '/login') window.location.assign('/login')
+    // La contraseña cambió en otro lado: se avisa en el login
+    const target = data?.code === 'SESSION_REVOKED' ? '/login?sesion=revocada' : '/login'
+    if (window.location.pathname !== '/login') window.location.assign(target)
   }
 
   if (!res.ok) {
