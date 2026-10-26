@@ -1,12 +1,12 @@
 import ScrollHint from '../components/ScrollHint'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import EditSpaceModal from '../components/airsunbox/EditSpaceModal'
 import { spaces as spacesApi, variables as variablesApi, devices as devicesApi } from '../services/api'
 import {
   Plus, Trash2, Pencil, ArrowLeft, ArrowRight, Trash, RefreshCw,
-  Server, Wifi, WifiOff, MapPin, Gauge, ListChecks, Layers, X, Check
+  Server, Wifi, WifiOff, MapPin, Gauge, ListChecks, Layers, X, Check, MoreHorizontal
 } from 'lucide-react'
 import { spaceIcon, generateLabel, TYPE_LABELS, normalizeVarName } from './spaceUtils'
 import MapPicker from '../components/MapPicker'
@@ -434,6 +434,16 @@ export default function SpaceDetail() {
   const [editModal, setEditModal] = useState(false)
   const [msg, setMsg] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef(null)
+  useEffect(() => {
+    if (!moreOpen) return
+    const onDown = (e) => { if (!moreRef.current?.contains(e.target)) setMoreOpen(false) }
+    const onKey = (e) => { if (e.key === 'Escape') setMoreOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [moreOpen])
   const [deleting, setDeleting] = useState(false)
 
   const load = async () => {
@@ -540,30 +550,29 @@ export default function SpaceDetail() {
           <ArrowLeft size={16} /> Volver a espacios
         </button>
 
-        {/* ── Hero / Header del espacio ── */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 pb-8 border-b" style={{ borderColor: 'var(--border)' }}>
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: accent + '26', color: accent }}>
+        {/* ── Encabezado del espacio ── */}
+        <header className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 mb-8">
+          <div className="flex items-start gap-4 min-w-0">
+            <span className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ background: accent + '24', color: accent }} aria-hidden="true">
               {spaceIcon(space.icon, space.type, 26)}
-            </div>
+            </span>
             <div className="min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl lg:text-3xl font-bold tracking-tight" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
+                <h1 className="font-display text-[1.9rem] md:text-[2.4rem] font-extrabold leading-[1.1] break-words" style={{ color: 'var(--text)' }}>
                   {space.name}
                 </h1>
-                <span className="text-xs font-bold px-3 py-1 rounded-lg capitalize" style={{ background: accent + '15', color: accent }}>
-                  {TYPE_LABELS[space.type] || space.type}
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-md" style={{ background: accent + '1A', color: accent }}>
+                  {TYPE_LABELS[space.type] || (space.type ? space.type.charAt(0).toUpperCase() + space.type.slice(1) : 'Otro')}
                 </span>
               </div>
-              <p className="text-xs font-mono uppercase mt-1" style={{ color: 'var(--text2)' }}>{space.slug}</p>
-
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <p className="text-sm max-w-md" style={{ color: 'var(--text2)' }}>
+              <div className="flex items-center gap-1.5 mt-2">
+                <p className="text-sm max-w-xl" style={{ color: 'var(--text2)' }}>
                   {space.description || 'Sin descripción. Editalo para agregarle contexto.'}
                 </p>
                 <button
                   onClick={() => setEditModal(true)}
-                  className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors shrink-0"
+                  aria-label="Editar espacio"
                   title="Editar espacio (nombre, tipo, icono, color)"
                 >
                   <Pencil size={13} style={{ color: 'var(--text2)' }} />
@@ -572,22 +581,46 @@ export default function SpaceDetail() {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <button onClick={() => navigate(`/espacios/${id}/aqi`)} className="flex items-center justify-center gap-2 text-white px-5 py-3 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5" style={{ background: accent, boxShadow: `0 4px 12px ${accent}40` }}>
-              <Gauge size={16} strokeWidth={2.5} /> Configurar AQI y variables
-            </button>
-            <button onClick={() => setShowAddDevice(true)} className="flex items-center justify-center gap-2 border rounded-xl px-4 py-3 text-sm font-bold transition-all hover:bg-black/5 dark:hover:bg-white/5" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowAddDevice(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+              style={{ background: accent }}
+            >
               <Plus size={16} /> Nueva estación
             </button>
             <button
-              onClick={() => setConfirmDelete(true)}
-              className="flex items-center justify-center gap-2 border rounded-xl px-4 py-3 text-sm font-bold transition-all hover:bg-red-500/5"
-              style={{ borderColor: 'var(--border)', color: '#EF4444' }}
+              onClick={() => navigate(`/espacios/${id}/aqi`)}
+              className="flex items-center justify-center gap-2 border rounded-xl px-4 py-2.5 text-sm font-bold transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ borderColor: 'var(--border)', color: 'var(--text)', background: 'var(--card)' }}
             >
-              <Trash2 size={16} /> Eliminar
+              <Gauge size={16} /> Configurar índice
             </button>
+            <div className="relative" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen(o => !o)}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                aria-label="Más opciones del espacio"
+                className="w-10 h-10 flex items-center justify-center border rounded-xl transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ borderColor: 'var(--border)', color: 'var(--text2)', background: 'var(--card)' }}
+              >
+                <MoreHorizontal size={18} />
+              </button>
+              {moreOpen && (
+                <div role="menu" className="absolute right-0 top-full mt-2 w-52 rounded-2xl border p-1.5 z-30 shadow-[0_12px_32px_rgba(15,31,24,0.14)] user-menu-pop" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                  <button role="menuitem" onClick={() => { setMoreOpen(false); setEditModal(true) }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-[rgba(103,183,232,0.10)]" style={{ color: 'var(--text)' }}>
+                    <Pencil size={15} style={{ color: 'var(--text2)' }} /> Editar espacio
+                  </button>
+                  <div className="h-px my-1.5 mx-2" style={{ background: 'var(--border)' }} />
+                  <button role="menuitem" onClick={() => { setMoreOpen(false); setConfirmDelete(true) }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left hover:bg-red-500/10" style={{ color: '#E5484D' }}>
+                    <Trash2 size={15} /> Eliminar espacio
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        </header>
 
         {msg && (
           <div className="mb-6 rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>
@@ -600,61 +633,62 @@ export default function SpaceDetail() {
           </div>
         )}
 
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Estaciones', value: deviceList.length, icon: <Server size={18} /> },
-            { label: 'En línea', value: onlineCount, icon: <Wifi size={18} /> },
-            { label: 'Categorías del índice', value: aqiConfig.categories.length, icon: <Gauge size={18} /> },
-            { label: 'Variables incluidas', value: aqiConfig.variables.length, icon: <ListChecks size={18} /> },
-          ].map((s, i) => (
-            <div key={i} className="rounded-2xl p-5 border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: accent + '1F', color: accent }}>
-                  {s.icon}
-                </div>
-                <div>
-                  <div className="text-2xl font-bold leading-none" style={{ color: 'var(--text)' }}>{s.value}</div>
-                  <div className="text-[11px] font-medium mt-1" style={{ color: 'var(--text2)' }}>{s.label}</div>
-                </div>
-              </div>
+        {/* ── Resumen: estado de las estaciones y configuración del índice ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="rounded-2xl p-5 border flex flex-col" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>Estaciones</span>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: accent + '1F', color: accent }}><Server size={17} /></span>
             </div>
-          ))}
+            <div className="mt-3 text-3xl md:text-4xl font-bold tracking-tight" style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{deviceList.length}</div>
+            <p className="mt-auto pt-3 text-xs" style={{ color: 'var(--text2)' }}>{deviceList.length ? 'en este espacio' : 'aún sin estaciones'}</p>
+          </div>
+
+          <div className="rounded-2xl p-5 border flex flex-col" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>En línea</span>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(44,182,125,0.12)', color: '#2CB67D' }}><Wifi size={17} /></span>
+            </div>
+            <div className="mt-3 text-3xl md:text-4xl font-bold tracking-tight" style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>{onlineCount}</div>
+            <div className="mt-3">
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${deviceList.length ? Math.round((onlineCount / deviceList.length) * 100) : 0}%`, background: '#2CB67D' }} />
+              </div>
+              <p className="mt-2 text-xs" style={{ color: 'var(--text2)' }}>
+                {deviceList.length ? `${Math.round((onlineCount / deviceList.length) * 100)}% reportando` : '—'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate(`/espacios/${id}/aqi`)}
+            className="group rounded-2xl p-5 border flex flex-col text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40"
+            style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = accent + '80' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>Índice de calidad</span>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: accent + '1F', color: accent }}><Gauge size={17} /></span>
+            </div>
+            <div className="mt-3 flex items-baseline gap-4" style={{ color: 'var(--text)' }}>
+              <span><span className="text-3xl md:text-4xl font-bold tracking-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>{aqiConfig.categories.length}</span> <span className="text-sm" style={{ color: 'var(--text2)' }}>categorías</span></span>
+              <span><span className="text-3xl md:text-4xl font-bold tracking-tight" style={{ fontVariantNumeric: 'tabular-nums' }}>{aqiConfig.variables.length}</span> <span className="text-sm" style={{ color: 'var(--text2)' }}>variables</span></span>
+            </div>
+            <span className="mt-auto pt-3 text-xs font-bold inline-flex items-center gap-1 group-hover:gap-2 transition-all" style={{ color: accent }}>
+              Configurar índice <ArrowRight size={12} />
+            </span>
+          </button>
         </div>
 
-        {/* ── Acceso al apartado de configuración del AQI ── */}
-        <button
-          onClick={() => navigate(`/espacios/${id}/aqi`)}
-          className="w-full group mb-8 rounded-2xl border p-5 flex items-center justify-between gap-4 cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg"
-          style={{ background: `linear-gradient(135deg, ${accent}18, rgba(43,168,160,0.06))`, borderColor: accent + '38' }}
-        >
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: accent + '20', color: accent }}>
-              <Gauge size={22} />
-            </div>
-            <div className="text-left">
-              <div className="text-sm font-bold" style={{ color: 'var(--text)' }}>Configurar el índice de calidad de {space.name}</div>
-              <div className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
-                Categorías, variables y límites que definen el AQI del espacio ({aqiConfig.categories.length} categorías · {aqiConfig.variables.length} variables).
-              </div>
-            </div>
-          </div>
-          <span className="flex items-center gap-1 text-sm font-bold group-hover:gap-2 transition-all" style={{ color: accent }}>
-            Configurar <ArrowRight size={14} />
-          </span>
-        </button>
-
         {/* ── Estaciones del espacio ── */}
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Estaciones del espacio</h2>
+        <div className="mb-4">
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Estaciones del espacio</h2>
+          {deviceList.length > 0 && (
             <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
-              {deviceList.length === 0 ? 'Todavía no hay estaciones en este espacio.' : `${deviceList.length} estación(es) dentro de ${space.name}.`}
+              {deviceList.length === 1 ? '1 estación' : `${deviceList.length} estaciones`} dentro de {space.name}
             </p>
-          </div>
-          <button onClick={() => setShowAddDevice(true)} className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{ background: accent }}>
-            <Plus size={15} /> Nueva estación
-          </button>
+          )}
         </div>
 
         {deviceList.length > 0 ? (
@@ -664,11 +698,22 @@ export default function SpaceDetail() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-14 rounded-2xl border border-dashed" style={{ borderColor: 'var(--border)' }}>
-            <Layers size={30} className="mx-auto mb-3 opacity-20" />
-            <p className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Sin estaciones aún</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text2)' }}>Creá la primera con "Nueva estación".</p>
-          </div>
+          <section className="rounded-2xl border px-6 py-12 text-center" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <span className="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center" style={{ background: accent + '1F', color: accent }} aria-hidden="true">
+              <Server size={24} />
+            </span>
+            <h3 className="mt-5 font-display text-xl font-extrabold" style={{ color: 'var(--text)' }}>Agregá la primera estación</h3>
+            <p className="mt-2 text-sm max-w-md mx-auto" style={{ color: 'var(--text2)' }}>
+              Cada estación envía sus mediciones a este espacio y aparece en el mapa y en los reportes.
+            </p>
+            <button
+              onClick={() => setShowAddDevice(true)}
+              className="mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-opacity hover:opacity-90"
+              style={{ background: accent }}
+            >
+              <Plus size={16} /> Agregar estación
+            </button>
+          </section>
         )}
 
         {/* ── Modal confirmar eliminación ── */}
