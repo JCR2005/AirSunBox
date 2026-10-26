@@ -1,0 +1,18 @@
+# Volcados de base de datos (contienen datos reales, no se suben)
+backup_*.sql
+*.sql.gz
+
+# Respaldos y archivos comprimidos locales
+*.tgz
+*.tar.gz
+plataforma-iot-sanik.zip
+hardware/
+
+# Dockerfiles de desarrollo (el compose usa los oficiales)
+**/Dockerfile.dev
+
+# Entornos locales
+*.env.local
+*.env.production
+# Grafo de contexto del agente (contiene hallazgos de seguridad abiertos)
+.contexto/

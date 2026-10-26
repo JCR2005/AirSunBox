@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <defs>
+    <!-- Filtro de sombra suave para el círculo blanco exterior -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#67B7E8" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <g transform="translate(-10, 30)">
+    <!-- 1. RAYOS DEL SOL (Azul Claro) -->
+    <g stroke="#67B7E8" stroke-width="6" stroke-linecap="round" opacity="0.85">
+      <!-- Rayos principales (Cruz) -->
+      <line x1="260" y1="90" x2="260" y2="40" />
+      <line x1="260" y1="350" x2="260" y2="400" />
+      <line x1="130" y1="220" x2="80" y2="220" />
+      <line x1="390" y1="220" x2="440" y2="220" />
+
+      <!-- Rayos diagonales -->
+      <line x1="168" y1="128" x2="132" y2="92" />
+      <line x1="352" y1="312" x2="388" y2="348" />
+      <line x1="352" y1="128" x2="388" y2="92" />
+      <line x1="168" y1="312" x2="132" y2="348" />
+
+      <!-- Rayos intermedios cortos -->
+      <line x1="205" y1="105" x2="190" y2="70" />
+      <line x1="315" y1="105" x2="330" y2="70" />
+      <line x1="205" y1="335" x2="190" y2="370" />
+      <line x1="315" y1="335" x2="330" y2="370" />
+      <line x1="145" y1="165" x2="110" y2="150" />
+      <line x1="145" y1="275" x2="110" y2="290" />
+      <line x1="375" y1="165" x2="410" y2="150" />
+      <line x1="375" y1="275" x2="410" y2="290" />
+    </g>
+
+    <!-- 2. HALO BLANCO EXTERIOR (Con transparencia y sombra) -->
+    <circle cx="260" cy="220" r="105" fill="#FFFFFF" opacity="0.6" filter="url(#shadow)" />
+    <circle cx="260" cy="220" r="90" fill="#F4FAFE" opacity="0.8" />
+
+    <!-- 3. CUERPO DEL SOL (Azul Degradado Principal) -->
+    <circle cx="260" cy="220" r="75" fill="#4AA9E5" />
+
+    <!-- 4. BRILLO INTERNO (El circulito más claro arriba a la izquierda) -->
+    <circle cx="232" cy="192" r="22" fill="#76C4F4" opacity="0.6" />
+  </g>
+</svg>

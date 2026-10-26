@@ -1,0 +1,1472 @@
+════════════════════════════════════════════════════════════════
+ HISTORIAL COMPLETO DE SESIÓN — Plataforma IoT Sanik
+ Fecha: jueves 17 de septiembre de 2026
+ Repo : /home/carlos/Documentos/Sanik/plataforma-iot-sanik
+════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────
+ 1. ARQUITECTURA DEL PROYECTO (resumen leído de los archivos)
+────────────────────────────────────────────────────────────────
+ • Stack: React 18 + Vite 5 (frontend) · Fastify + node-postgres (backend)
+   · Redis 7 · EMQX 5 (MQTT) · TimescaleDB (PostgreSQL 16)
+ • Orquestación: docker-compose v1 (docker-compose.yml, 124 líneas)
+ • Servicios del compose: db / redis / mqtt / backend / frontend
+ • Red Docker interna: plataforma-iot-sanik_iot_network
+ • Frontend: build estático de producción servido por nginx (puerto 80)
+   — SIN hot-reload. Los cambios en src/ exigen reconstruir el contenedor:
+     docker compose up -d --build frontend
+
+────────────────────────────────────────────────────────────────
+ 2. HISTORIAL DE EDICIONES REALIZADAS EN ESTA SESIÓN
+────────────────────────────────────────────────────────────────
+
+── PUNTO 1 · SLUG AUTOMÁTICO (pedido por el usuario) ──
+   Consigna: “el slug es automático, no debería aparecer en el form”.
+   Archivo tocado: frontend/src/pages/Spaces.jsx
+   ➤ Antes: el modal “Nuevo espacio” tenía 2 inputs editables: Nombre +
+     “Identificador (slug)” que el usuario debía tipear a mano.
+   ➤ Ahora (líneas 406-407): el slug se genera SOLO desde el nombre:
+         slug: generateLabel(newName.trim())
+     y NINGÚN campo de slug aparece en el modal (cero referencias a
+     newSlug/setNewSlug en todo el archivo — verificado por grep).
+   Resultado: slug 100% automático e invisible. ✓
+
+── PUNTO 2 · “TOQUE VUE” AL FRONTEND (look nuevo) ──
+   Consigna: “dale un toque nueva/o al frontend, me entendés?”.
+   Interpretación (confirmada por el usuario): rediseño del modal de
+   creación de espacios con un look fresco de iconos — NO es un cambio
+   a Vue.js (el frontend es React). El “toque vue” = toque nuevo.
+   Archivo tocado (mismo): frontend/src/pages/Spaces.jsx, modal 
+   “Nuevo espacio” (líneas ~723-757 en el dump de la sección 3).
+   Llave: selector de tipo de monitoreo con ICONOS de colores:
+         Aire  (Wind)     · Agua (Droplets)  
+         Suelo (Mountain) · Ruido (Volume2)  · Otro (Type)
+     + descripción opcional + slug en vivo (auto) bajo el nombre.
+
+── PUNTO 3 · DESPLIEGUE / VER EN EL NAVEGADOR ──
+   a) Reconstruí la imagen del frontend (docker-compose v1): ✓ compiló
+      el bundle nuevo (dist) sin errores.
+   b) El compose v1.29.2 falló al RECREAR el contenedor por el bug
+      conocido: KeyError: 'ContainerConfig' (legacy builder).
+   c) Solución aplicada (sin tocar código):
+         docker rm -f iot_frontend
+         docker run -d --name iot_frontend --restart unless-stopped \
+           --network plataforma-iot-sanik_iot_network -p 80:80 \
+           plataforma-iot-sanik_frontend:latest
+   d) Verificación: ✓ contenedor Up · ✓ HTTP 200 en localhost
+
+────────────────────────────────────────────────────────────────
+ 3. CONTENIDO ACTUAL DE ARCHIVOS — CON NUMERACIÓN DE LÍNEA EXACTA
+────────────────────────────────────────────────────────────────
+ (dump generado con awk numerado — numeración = número real en disco)
+
+
+───────────────── A. frontend/src/pages/Spaces.jsx  (PÁGINA ESPACIOS — la EDITED) ─────────────────
+
+    1 | import { useEffect, useState } from 'react'
+    2 | import { useNavigate } from 'react-router-dom'
+    3 | import ClienteLayout from '../components/sanik/ClienteLayout'
+    4 | import { spaces as spacesApi, devices as devicesApi, variables as variablesApi } from '../services/api'
+    5 | import {
+    6 |   Plus, Save, Trash2, ChevronUp, ChevronDown, Pencil, ArrowLeft,
+    7 |   Layers, X, Check, Activity, Server, Wifi, WifiOff, ArrowRight, MapPin,
+    8 |   Wind, Droplets, Mountain, Volume2, Type
+    9 | } from 'lucide-react'
+   10 | 
+   11 | const COLORS = { primary: '#67B7E8' }
+   12 | const INPUT = "w-full border rounded-xl px-4 py-3 text-sm outline-none transition-all duration-200 focus:ring-2 focus:ring-[#67B7E8]/20 focus:border-[#67B7E8]"
+   13 | const inputStyle = { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }
+   14 | 
+   15 | const DEFAULT_CATS = [
+   16 |   { name: 'Bien',   color: '#10B981' },
+   17 |   { name: 'Precaución', color: '#F59E0B' },
+   18 |   { name: 'Mal',    color: '#EF4444' }
+   19 | ]
+   20 | 
+   21 | // Tramas equitativas del índice 0-100 según el nº de categorías
+   22 | function buildTram(n) {
+   23 |   const out = []
+   24 |   for (let i = 0; i < n; i++) {
+   25 |     out.push({
+   26 |       score_lo: Math.round((100 / n) * i),
+   27 |       score_hi: Math.round((100 / n) * (i + 1)) - 1
+   28 |     })
+   29 |   }
+   30 |   out[n - 1].score_hi = 100
+   31 |   return out
+   32 | }
+   33 | 
+   34 | function toConfig(categories, includedVars, ranges) {
+   35 |   return {
+   36 |     categories: categories.map((c, i) => ({
+   37 |       name: c.name, color: c.color, score_lo: c.score_lo, score_hi: c.score_hi
+   38 |     })),
+   39 |     variables: includedVars.map((v, i) => ({ variable_label: v.label })),
+   40 |     ranges
+   41 |   }
+   42 | }
+   43 | 
+   44 | // ─── Modal "Nueva estación" (estilo del modal admin de enlazar estación) ───
+   45 | function AddDeviceModal({ spaceId, onClose, onAdd }) {
+   46 |   const [form, setForm] = useState({ name: '', label: '', lat: '', lng: '' })
+   47 |   const [catalog, setCatalog] = useState([])
+   48 |   const [selectedVariables, setSelectedVariables] = useState([])
+   49 |   const [loading, setLoading] = useState(false)
+   50 |   const [error, setError] = useState('')
+   51 |   const [success, setSuccess] = useState(false)
+   52 | 
+   53 |   useEffect(() => {
+   54 |     const fetchCatalog = async () => {
+   55 |       try {
+   56 |         const data = await devicesApi.catalog()
+   57 |         setCatalog(data)
+   58 |         setSelectedVariables(data.map(v => v.label))
+   59 |       } catch { /* sin catálogo no se bloquea */ }
+   60 |     }
+   61 |     fetchCatalog()
+   62 |   }, [])
+   63 | 
+   64 |   const generateLabel = (text) => text
+   65 |     .toLowerCase()
+   66 |     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+   67 |     .replace(/[^a-z0-9]+/g, '-')
+   68 |     .replace(/(^-|-$)+/g, '')
+   69 | 
+   70 |   const handleToggleVariable = (label) => {
+   71 |     setSelectedVariables(prev => prev.includes(label)
+   72 |       ? prev.filter(x => x !== label)
+   73 |       : [...prev, label])
+   74 |   }
+   75 | 
+   76 |   const handleSelectAll = () => {
+   77 |     if (selectedVariables.length === catalog.length) setSelectedVariables([])
+   78 |     else setSelectedVariables(catalog.map(v => v.label))
+   79 |   }
+   80 | 
+   81 |   const handleSubmit = async (e) => {
+   82 |     e.preventDefault()
+   83 |     setLoading(true)
+   84 |     setError('')
+   85 |     try {
+   86 |       const device = await devicesApi.create({
+   87 |         name: form.name,
+   88 |         label: form.label,
+   89 |         lat: form.lat ? parseFloat(form.lat) : null,
+   90 |         lng: form.lng ? parseFloat(form.lng) : null,
+   91 |         selectedVariables,
+   92 |         spaceId
+   93 |       })
+   94 |       setSuccess(true)
+   95 |       setTimeout(() => { onAdd(device); onClose() }, 1500)
+   96 |     } catch (err) {
+   97 |       setError(err.message || 'No se pudo crear el dispositivo')
+   98 |       setLoading(false)
+   99 |     }
+  100 |   }
+  101 | 
+  102 |   return (
+  103 |     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  104 |       <div className="rounded-[24px] p-8 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90vh] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+  105 |         {success ? (
+  106 |           <div className="flex flex-col items-center justify-center py-10 text-center animate-in zoom-in-95 duration-300">
+  107 |             <div className="w-16 h-16 bg-[#2BA8A0]/10 text-[#2BA8A0] rounded-full flex items-center justify-center mb-4 shadow-sm shadow-[#2BA8A0]/10">
+  108 |               <Check size={32} strokeWidth={3} />
+  109 |             </div>
+  110 |             <h3 className="text-xl font-bold tracking-tight mb-2" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
+  111 |               ¡Estación enlazada!
+  112 |             </h3>
+  113 |             <p className="text-sm max-w-[280px] text-center" style={{ color: 'var(--text2)' }}>
+  114 |               El dispositivo <strong>{form.name}</strong> quedó dentro de este espacio.
+  115 |             </p>
+  116 |           </div>
+  117 |         ) : (
+  118 |           <>
+  119 |             <div className="flex items-center justify-between mb-6">
+  120 |               <h2 className="text-xl font-bold tracking-tight" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Nueva estación</h2>
+  121 |               <button onClick={onClose} className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}><X size={18} /></button>
+  122 |             </div>
+  123 |             <form onSubmit={handleSubmit} className="space-y-4">
+  124 |               {error && (
+  125 |                 <div className="rounded-xl px-4 py-3 text-sm font-medium" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444' }}>
+  126 |                   {error}
+  127 |                 </div>
+  128 |               )}
+  129 | 
+  130 |               <div>
+  131 |                 <label className="text-sm font-medium block mb-2" style={{ color: 'var(--text)' }}>Nombre de la estación</label>
+  132 |                 <input
+  133 |                   type="text"
+  134 |                   required
+  135 |                   value={form.name}
+  136 |                   onChange={e => setForm(prev => ({ ...prev, name: e.target.value, label: generateLabel(e.target.value) }))}
+  137 |                   placeholder="Ej. Sensor principal"
+  138 |                   className={INPUT}
+  139 |                   style={inputStyle}
+  140 |                 />
+  141 |               </div>
+  142 | 
+  143 |               <div>
+  144 |                 <label className="text-sm font-medium block mb-2" style={{ color: 'var(--text)' }}>Identificador único (Label/ID)</label>
+  145 |                 <input
+  146 |                   type="text"
+  147 |                   required
+  148 |                   value={form.label}
+  149 |                   onChange={e => setForm({ ...form, label: e.target.value })}
+  150 |                   placeholder="Ej. sensor-principal"
+  151 |                   className={INPUT}
+  152 |                   style={inputStyle}
+  153 |                 />
+  154 |               </div>
+  155 | 
+  156 |               <div className="grid grid-cols-2 gap-3">
+  157 |                 <div>
+  158 |                   <label className="text-sm font-medium block mb-2" style={{ color: 'var(--text)' }}>Latitud</label>
+  159 |                   <input type="number" step="any" value={form.lat} onChange={e => setForm({ ...form, lat: e.target.value })} placeholder="14.8347" className={INPUT} style={inputStyle} />
+  160 |                 </div>
+  161 |                 <div>
+  162 |                   <label className="text-sm font-medium block mb-2" style={{ color: 'var(--text)' }}>Longitud</label>
+  163 |                   <input type="number" step="any" value={form.lng} onChange={e => setForm({ ...form, lng: e.target.value })} placeholder="-91.5181" className={INPUT} style={inputStyle} />
+  164 |                 </div>
+  165 |               </div>
+  166 | 
+  167 |               <div className="pt-2">
+  168 |                 <div className="flex items-center justify-between mb-2">
+  169 |                   <label className="text-sm font-bold tracking-tight" style={{ color: 'var(--text)' }}>Variables a medir</label>
+  170 |                   <button type="button" onClick={handleSelectAll} className="text-[11px] font-bold px-2 py-1 rounded bg-black/5 dark:bg-white/5 hover:opacity-80 transition-all" style={{ color: COLORS.primary }}>
+  171 |                     {selectedVariables.length === catalog.length ? 'Desmarcar todas' : 'Seleccionar todas'}
+  172 |                   </button>
+  173 |                 </div>
+  174 |                 <div className="grid grid-cols-2 gap-2 border rounded-xl p-3 max-h-[160px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+  175 |                   {catalog.map(v => {
+  176 |                     const isSelected = selectedVariables.includes(v.label)
+  177 |                     return (
+  178 |                       <button
+  179 |                         key={v.label}
+  180 |                         type="button"
+  181 |                         onClick={() => handleToggleVariable(v.label)}
+  182 |                         className={`flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs font-semibold transition-all border ${isSelected ? 'border-[#2BA8A0] bg-[#2BA8A0]/5 text-[#2BA8A0]' : 'border-transparent opacity-70'}`}
+  183 |                         style={!isSelected ? { color: 'var(--text)', background: 'var(--card)' } : {}}
+  184 |                       >
+  185 |                         <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#2BA8A0] border-[#2BA8A0]' : 'border-neutral-400'}`}>
+  186 |                           {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
+  187 |                         </div>
+  188 |                         <span className="truncate">{v.name} <span className="opacity-50 text-[10px]">({v.unit})</span></span>
+  189 |                       </button>
+  190 |                     )
+  191 |                   })}
+  192 |                   {catalog.length === 0 && (
+  193 |                     <p className="text-center text-[11px] py-4 col-span-2" style={{ color: 'var(--text2)' }}>Cargando catálogo maestro...</p>
+  194 |                   )}
+  195 |                 </div>
+  196 |               </div>
+  197 | 
+  198 |               <div className="bg-[#2BA8A0]/10 rounded-xl p-4 text-xs font-medium text-[#2BA8A0]">
+  199 |                 El estado inicial será <strong>Pendiente</strong> hasta que reporte señal física.
+  200 |               </div>
+  201 | 
+  202 |               <div className="flex gap-3 pt-2">
+  203 |                 <button type="button" onClick={onClose} className="flex-1 rounded-xl py-3 text-sm font-semibold hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}>Cancelar</button>
+  204 |                 <button type="submit" disabled={loading} className="flex-1 text-white py-3 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5 disabled:opacity-50" style={{ background: COLORS.primary, boxShadow: `0 4px 12px ${COLORS.primary}40` }}>{loading ? 'Creando...' : 'Crear'}</button>
+  205 |               </div>
+  206 |             </form>
+  207 |           </>
+  208 |         )}
+  209 |       </div>
+  210 |     </div>
+  211 |   )
+  212 | }
+  213 | 
+  214 | // ─── Tarjeta de estación dentro de un espacio ────────────────────────────
+  215 | function getStatusColor(status) {
+  216 |   return status === 'online' ? '#2BA8A0' : '#F59E0B'
+  217 | }
+  218 | 
+  219 | function DeviceCard({ device, onDetail }) {
+  220 |   const isOnline = device.status === 'online'
+  221 |   const color = getStatusColor(device.status)
+  222 |   return (
+  223 |     <div
+  224 |       onClick={() => onDetail(device.id)}
+  225 |       className="group rounded-2xl p-5 border cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+  226 |       style={{ background: 'var(--card)', borderColor: isOnline ? color + '40' : 'var(--border)' }}
+  227 |     >
+  228 |       <div className="flex items-start justify-between mb-4">
+  229 |         <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: color + '1A', color }}>
+  230 |           <Server size={18} />
+  231 |         </div>
+  232 |         <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: color + '1A', color }}>
+  233 |           {isOnline
+  234 |             ? <><span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} /><Wifi size={9} /> En línea</>
+  235 |             : <><WifiOff size={9} /> Sin señal</>}
+  236 |         </span>
+  237 |       </div>
+  238 |       <h4 className="font-bold text-sm mb-0.5 truncate" style={{ color: 'var(--text)' }}>{device.name}</h4>
+  239 |       <p className="text-xs font-mono mb-3" style={{ color: 'var(--text2)' }}>{device.label}</p>
+  240 |       <div className="space-y-1 mb-4">
+  241 |         {device.lat && (
+  242 |           <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text2)' }}>
+  243 |             <MapPin size={11} /> {Number(device.lat).toFixed(4)}, {Number(device.lng).toFixed(4)}
+  244 |           </div>
+  245 |         )}
+  246 |       </div>
+  247 |       <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+  248 |         <span className="text-xs" style={{ color: 'var(--text2)' }}>{device.variable_count || 0} variables</span>
+  249 |         <span className="flex items-center gap-1 text-xs font-semibold group-hover:gap-2 transition-all" style={{ color: '#67B7E8' }}>
+  250 |           Ver detalles <ArrowRight size={11} />
+  251 |         </span>
+  252 |       </div>
+  253 |     </div>
+  254 |   )
+  255 | }
+  256 | 
+  257 | export default function Spaces() {
+  258 |   const navigate = useNavigate()
+  259 | 
+  260 |   const [list, setList] = useState([])
+  261 |   const [loading, setLoading] = useState(true)
+  262 |   const [catalog, setCatalog] = useState([])
+  263 | 
+  264 |   const [space, setSpace] = useState(null)          // espacio seleccionado
+  265 |   const [creating, setCreating] = useState(false)   // modal nuevo espacio
+  266 |   const [newName, setNewName] = useState('')
+  267 |   const [newType, setNewType] = useState('aire')
+  268 |   const [newDescription, setNewDescription] = useState('')
+  269 | 
+  270 |   // Dispositivos del espacio abierto
+  271 |   const [deviceList, setDeviceList] = useState([])
+  272 |   const [loadingDevices, setLoadingDevices] = useState(false)
+  273 |   const [showAddDevice, setShowAddDevice] = useState(false)
+  274 | 
+  275 |   // Estado del editor
+  276 |   const [numCats, setNumCats] = useState(3)
+  277 |   const [cats, setCats] = useState([])
+  278 |   const [included, setIncluded] = useState([])      // [{label,nombre}]
+  279 |   const [ranges, setRanges] = useState([])          // [{variable_label,cat_order,min_value,max_value}]
+  280 |   const [saving, setSaving] = useState(false)
+  281 |   const [msg, setMsg] = useState('')
+  282 | 
+  283 |   const loadSpaces = () => {
+  284 |     spacesApi.list()
+  285 |       .then(d => { setList(d); setLoading(false) })
+  286 |       .catch(() => setLoading(false))
+  287 |   }
+  288 | 
+  289 |   useEffect(() => {
+  290 |     loadSpaces()
+  291 |     variablesApi.list().then(setCatalog).catch(() => {})
+  292 |   }, [])
+  293 | 
+  294 |   // Al abrir un espacio, cargar su config y sus dispositivos
+  295 |   const openSpace = async (id) => {
+  296 |     setMsg('')
+  297 |     const cfg = await spacesApi.config(id)
+  298 |     setSpace(cfg)
+  299 |     setDeviceList([])
+  300 |     setLoadingDevices(true)
+  301 |     spacesApi.devices(id)
+  302 |       .then(setDeviceList)
+  303 |       .catch(() => {})
+  304 |       .finally(() => setLoadingDevices(false))
+  305 | 
+  306 |     const c = cfg.aqiConfig
+  307 |     const nc = Math.max(c.categories.length, 2)
+  308 |     setNumCats(nc)
+  309 |     setCats(c.categories.map((x, i) => ({
+  310 |       name: x.name, color: x.color, score_lo: x.score_lo, score_hi: x.score_hi, _id: i
+  311 |     })))
+  312 | 
+  313 |     // Variables incluidas (en orden de prioridad)
+  314 |     const inc = c.variables
+  315 |       .map(v => {
+  316 |         const catVar = catalog.find(x => x.label === v.variable_label)
+  317 |         return { label: v.variable_label, nombre: catVar?.name || v.variable_label }
+  318 |       })
+  319 |     setIncluded(inc)
+  320 | 
+  321 |     // Rangos -> map variable -> {cat_order: max}
+  322 |     const rangeMap = {}
+  323 |     c.ranges.forEach(r => {
+  324 |       if (!rangeMap[r.variable_label]) rangeMap[r.variable_label] = {}
+  325 |       rangeMap[r.variable_label][r.cat_order] = r.max_value
+  326 |     })
+  327 |     const builtRanges = []
+  328 |     inc.forEach(v => {
+  329 |       for (let i = 0; i < nc; i++) {
+  330 |         builtRanges.push({
+  331 |           variable_label: v.label,
+  332 |           cat_order: i + 1,
+  333 |           min_value: i === 0 ? 0 : null, // se rellena desde la DB si existe
+  334 |           max_value: (rangeMap[v.label] && rangeMap[v.label][i + 1] != null)
+  335 |             ? rangeMap[v.label][i + 1]
+  336 |             : null
+  337 |         })
+  338 |       }
+  339 |     })
+  340 |     setRanges(builtRanges)
+  341 |   }
+  342 | 
+  343 |   // Ajustar tramas cuando cambia el nº de categorías
+  344 |   const applyNumCats = (n) => {
+  345 |     setNumCats(n)
+  346 |     const tram = buildTram(n)
+  347 |     let next = tram.map((t, i) => ({
+  348 |       ...(cats[i] || DEFAULT_CATS[i] || { name: `Nivel ${i + 1}`, color: '#10B981' }),
+  349 |       score_lo: t.score_lo, score_hi: t.score_hi, _id: i
+  350 |     }))
+  351 |     while (next.length < n) {
+  352 |       next.push({ ...DEFAULT_CATS[next.length % DEFAULT_CATS.length], ...tram[next.length], _id: next.length })
+  353 |     }
+  354 |     next = next.slice(0, n)
+  355 |     setCats(next)
+  356 | 
+  357 |     const newRanges = []
+  358 |     included.forEach(v => {
+  359 |       for (let i = 0; i < n; i++) {
+  360 |         newRanges.push({
+  361 |           variable_label: v.label,
+  362 |           cat_order: i + 1,
+  363 |           min_value: null,
+  364 |           max_value: null
+  365 |         })
+  366 |       }
+  367 |     })
+  368 |     setRanges(newRanges)
+  369 |   }
+  370 | 
+  371 |   const toggleVar = (label, nombre) => {
+  372 |     const exists = included.find(v => v.label === label)
+  373 |     if (exists) {
+  374 |       const next = included.filter(v => v.label !== label)
+  375 |       setIncluded(next)
+  376 |       setRanges(ranges.filter(r => r.variable_label !== label))
+  377 |     } else {
+  378 |       const next = [...included, { label, nombre }]
+  379 |       setIncluded(next)
+  380 |       const extra = []
+  381 |       for (let i = 0; i < numCats; i++) {
+  382 |         extra.push({ variable_label: label, cat_order: i + 1, min_value: null, max_value: null })
+  383 |       }
+  384 |       setRanges([...ranges, ...extra])
+  385 |     }
+  386 |   }
+  387 | 
+  388 |   const moveVar = (idx, dir) => {
+  389 |     const a = [...included]
+  390 |     const b = idx + dir
+  391 |     if (b < 0 || b >= a.length) return
+  392 |     ;[a[idx], a[b]] = [a[b], a[idx]]
+  393 |     setIncluded(a)
+  394 |   }
+  395 | 
+  396 |   const setRangeMax = (label, catOrder, val) => {
+  397 |     setRanges(ranges.map(r =>
+  398 |       r.variable_label === label && r.cat_order === catOrder
+  399 |         ? { ...r, max_value: val === '' ? null : Number(val) }
+  400 |         : r
+  401 |     ))
+  402 |   }
+  403 | 
+  404 |   const createSpace = async () => {
+  405 |     if (!newName.trim()) return
+  406 |     setMsg('')
+  407 |     const s = await spacesApi.create({ name: newName.trim(), slug: generateLabel(newName.trim()), type: newType, description: newDescription.trim() || undefined })
+  408 |     setCreating(false)
+  409 |     setNewName(''); setNewType('aire'); setNewDescription('')
+  410 |     await loadSpaces()
+  411 |     await openSpace(s.id)
+  412 |   }
+  413 | 
+  414 |   const save = async () => {
+  415 |     setSaving(true); setMsg('')
+  416 |     try {
+  417 |       await spacesApi.saveConfig(space.id, toConfig(cats, included, ranges))
+  418 |       setMsg('Configuración guardada correctamente.')
+  419 |       loadSpaces()
+  420 |     } catch (e) {
+  421 |       setMsg('Error al guardar: ' + e.message)
+  422 |     } finally {
+  423 |       setSaving(false)
+  424 |     }
+  425 |   }
+  426 | 
+  427 |   const close = () => { setSpace(null); setMsg(''); setDeviceList([]) }
+  428 | 
+  429 |   return (
+  430 |     <ClienteLayout>
+  431 |       <div
+  432 |         className="min-h-full px-4 py-6 md:px-8 md:py-10"
+  433 |         style={{ backgroundImage: 'radial-gradient(circle at 50% -20%, rgba(103,183,232,0.15) 0%, rgba(103,183,232,0.04) 30%, transparent 70%)' }}
+  434 |       >
+  435 |         <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+  436 |           <div>
+  437 |             <h1 className="text-2xl md:text-3xl font-bold mb-1 font-syne" style={{ color: 'var(--text)' }}>
+  438 |               Espacios
+  439 |             </h1>
+  440 |             <p className="text-xs md:text-sm" style={{ color: 'var(--text2)' }}>
+  441 |               Gestioná tus espacios y el índice de calidad de cada uno
+  442 |             </p>
+  443 |           </div>
+  444 |           <button
+  445 |             onClick={() => setCreating(true)}
+  446 |             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+  447 |             style={{ background: '#67B7E8' }}
+  448 |           >
+  449 |             <Plus size={16} /> Nuevo espacio
+  450 |           </button>
+  451 |         </div>
+  452 | 
+  453 |         {/* ── Vista de lista ── */}
+  454 |         {!space && (
+  455 |           loading ? (
+  456 |             <div className="text-center py-12 text-sm" style={{ color: 'var(--text2)' }}>Cargando...</div>
+  457 |           ) : list.length === 0 ? (
+  458 |             <div className="text-center py-16 rounded-2xl border border-dashed" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>
+  459 |               <Layers size={32} className="mx-auto mb-3 opacity-20" />
+  460 |               <p className="text-sm font-medium">Aún no tenés espacios</p>
+  461 |             </div>
+  462 |           ) : (
+  463 |             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+  464 |               {list.map(s => (
+  465 |                 <div
+  466 |                   key={s.id}
+  467 |                   onClick={() => openSpace(s.id)}
+  468 |                   className="group rounded-2xl p-5 border cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg"
+  469 |                   style={{ background: 'var(--card)', borderColor: 'var(--border)' }}
+  470 |                 >
+  471 |                   <div className="flex items-start justify-between mb-4">
+  472 |                     <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(103,183,232,0.12)', color: '#67B7E8' }}>
+  473 |                       <Layers size={18} />
+  474 |                     </div>
+  475 |                     <Pencil size={15} className="opacity-0 group-hover:opacity-60 transition-opacity" style={{ color: 'var(--text2)' }} />
+  476 |                   </div>
+  477 |                   <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--text)' }}>{s.name}</h3>
+  478 |                   <span className="text-xs font-mono uppercase" style={{ color: '#67B7E8' }}>{s.slug}</span>
+  479 |                   <div className="flex items-center justify-between mt-2">
+  480 |                     <p className="text-[11px]" style={{ color: 'var(--text2)' }}>{s.type}</p>
+  481 |                     <span className="text-[11px] font-semibold flex items-center gap-1" style={{ color: 'var(--text2)' }}>
+  482 |                       <Server size={11} /> {s.device_count ?? 0} {s.device_count === 1 ? 'estación' : 'estaciones'}
+  483 |                     </span>
+  484 |                   </div>
+  485 |                 </div>
+  486 |               ))}
+  487 |             </div>
+  488 |           )
+  489 |         )}
+  490 | 
+  491 |         {/* ── Editor de un espacio ── */}
+  492 |         {space && (
+  493 |           <div className="rounded-3xl border overflow-hidden" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+  494 |             <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
+  495 |               <div className="flex items-center gap-3">
+  496 |                 <button onClick={close} className="p-2 rounded-xl hover:opacity-70" style={{ color: 'var(--text2)' }}>
+  497 |                   <ArrowLeft size={18} />
+  498 |                 </button>
+  499 |                 <div>
+  500 |                   <h2 className="font-bold text-lg" style={{ color: 'var(--text)' }}>{space.name}</h2>
+  501 |                   <p className="text-xs" style={{ color: 'var(--text2)' }}>Configuración del índice de calidad ({space.slug})</p>
+  502 |                 </div>
+  503 |               </div>
+  504 |             </div>
+  505 | 
+  506 |             <div className="p-5 md:p-6 space-y-8">
+  507 |               {msg && (
+  508 |                 <div className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: 'rgba(16,185,129,0.1)', color: '#10B981' }}>
+  509 |                   {msg}
+  510 |                 </div>
+  511 |               )}
+  512 | 
+  513 |               {/* 0. Estaciones del espacio */}
+  514 |               <section>
+  515 |                 <div className="flex items-center justify-between mb-1">
+  516 |                   <div>
+  517 |                     <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Estaciones del espacio</h3>
+  518 |                     <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
+  519 |                       {deviceList.length === 0 ? 'Todavía no hay estaciones en este espacio.' : `${deviceList.length} estación(es) dentro de ${space.name}.`}
+  520 |                     </p>
+  521 |                   </div>
+  522 |                   <button
+  523 |                     onClick={() => setShowAddDevice(true)}
+  524 |                     className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+  525 |                     style={{ background: '#67B7E8' }}
+  526 |                   >
+  527 |                     <Plus size={15} /> Nueva estación
+  528 |                   </button>
+  529 |                 </div>
+  530 | 
+  531 |                 {loadingDevices ? (
+  532 |                   <div className="text-center py-10 text-sm" style={{ color: 'var(--text2)' }}>Cargando estaciones...</div>
+  533 |                 ) : deviceList.length > 0 ? (
+  534 |                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
+  535 |                     {deviceList.map(d => (
+  536 |                       <DeviceCard key={d.id} device={d} onDetail={id => navigate(`/devices/${id}`)} />
+  537 |                     ))}
+  538 |                   </div>
+  539 |                 ) : (
+  540 |                   <div className="mt-4 text-center py-10 rounded-2xl border border-dashed" style={{ borderColor: 'var(--border)' }}>
+  541 |                     <Server size={30} className="mx-auto mb-3 opacity-20" />
+  542 |                     <p className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Sin estaciones aún</p>
+  543 |                     <p className="text-xs mt-1" style={{ color: 'var(--text2)' }}>Creá la primera con "Nueva estación".</p>
+  544 |                   </div>
+  545 |                 )}
+  546 |               </section>
+  547 | 
+  548 |               {/* 1. Categorías */}
+  549 |               <section>
+  550 |                 <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--text)' }}>1. Categorías del índice</h3>
+  551 |                 <p className="text-xs mb-3" style={{ color: 'var(--text2)' }}>
+  552 |                   Cuántos niveles de calidad tiene tu índice (tramas de 0 a 100 auto).
+  553 |                 </p>
+  554 |                 <div className="flex items-center gap-2 mb-4">
+  555 |                   {[2, 3, 4, 5, 6].map(n => (
+  556 |                     <button
+  557 |                       key={n}
+  558 |                       onClick={() => applyNumCats(n)}
+  559 |                       className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+  560 |                       style={numCats === n ? { background: '#67B7E8', color: 'white' } : { background: 'var(--bg)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+  561 |                     >
+  562 |                       {n}
+  563 |                     </button>
+  564 |                   ))}
+  565 |                 </div>
+  566 |                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+  567 |                   {cats.map((c, i) => (
+  568 |                     <div key={c._id} className="rounded-xl border p-3" style={{ borderColor: 'var(--border)' }}>
+  569 |                       <label className="text-[10px] font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>
+  570 |                         Nivel {i + 1} · {c.score_lo}–{c.score_hi}
+  571 |                       </label>
+  572 |                       <input
+  573 |                         value={c.name}
+  574 |                         onChange={e => setCats(cats.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+  575 |                         className="w-full bg-transparent border-b text-sm font-semibold outline-none py-1"
+  576 |                         style={{ color: 'var(--text)', borderColor: 'var(--border)' }}
+  577 |                       />
+  578 |                       <div className="flex items-center gap-2 mt-2">
+  579 |                         <input
+  580 |                           type="color"
+  581 |                           value={c.color}
+  582 |                           onChange={e => setCats(cats.map((x, j) => j === i ? { ...x, color: e.target.value } : x))}
+  583 |                           className="w-8 h-8 rounded cursor-pointer"
+  584 |                         />
+  585 |                         <span className="text-xs font-mono" style={{ color: 'var(--text2)' }}>{c.color}</span>
+  586 |                       </div>
+  587 |                     </div>
+  588 |                   ))}
+  589 |                 </div>
+  590 |               </section>
+  591 | 
+  592 |               {/* 2. Variables */}
+  593 |               <section>
+  594 |                 <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--text)' }}>2. Variables del índice</h3>
+  595 |                 <p className="text-xs mb-3" style={{ color: 'var(--text2)' }}>
+  596 |                   Incluí las variables que participan y ordená la prioridad (arriba pesa más).
+  597 |                 </p>
+  598 |                 <div className="flex flex-wrap gap-2 mb-4">
+  599 |                   {catalog.map(v => {
+  600 |                     const on = included.find(x => x.label === v.label)
+  601 |                     return (
+  602 |                       <button
+  603 |                         key={v.label}
+  604 |                         onClick={() => toggleVar(v.label, v.name)}
+  605 |                         className="px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center gap-1.5"
+  606 |                         style={on
+  607 |                           ? { background: '#67B7E8', color: 'white', borderColor: '#67B7E8' }
+  608 |                           : { background: 'var(--bg)', color: 'var(--text2)', borderColor: 'var(--border)' }}
+  609 |                       >
+  610 |                         {on ? <Check size={12} /> : <Activity size={12} />} {v.name}
+  611 |                       </button>
+  612 |                     )
+  613 |                   })}
+  614 |                 </div>
+  615 |                 {included.length > 0 && (
+  616 |                   <div className="space-y-2">
+  617 |                     {included.map((v, idx) => (
+  618 |                       <div key={v.label} className="flex items-center gap-2 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--border)' }}>
+  619 |                         <div className="flex flex-col">
+  620 |                           <button onClick={() => moveVar(idx, -1)} className="text-[--text2] hover:text-[#67B7E8]" style={{ color: idx === 0 ? 'transparent' : 'var(--text2)' }} disabled={idx === 0}>
+  621 |                             <ChevronUp size={14} />
+  622 |                           </button>
+  623 |                           <button onClick={() => moveVar(idx, 1)} className="hover:text-[#67B7E8]" style={{ color: idx === included.length - 1 ? 'transparent' : 'var(--text2)' }} disabled={idx === included.length - 1}>
+  624 |                             <ChevronDown size={14} />
+  625 |                           </button>
+  626 |                         </div>
+  627 |                         <div className="w-6 text-center text-xs font-bold" style={{ color: 'var(--text2)' }}>{idx + 1}</div>
+  628 |                         <div className="flex-1">
+  629 |                           <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{v.nombre}</div>
+  630 |                           <div className="text-[11px] font-mono" style={{ color: 'var(--text2)' }}>{v.label}</div>
+  631 |                         </div>
+  632 |                         <button onClick={() => toggleVar(v.label, v.nombre)} style={{ color: '#EF4444' }} className="hover:opacity-70">
+  633 |                           <Trash2 size={15} />
+  634 |                         </button>
+  635 |                       </div>
+  636 |                     ))}
+  637 |                   </div>
+  638 |                 )}
+  639 |               </section>
+  640 | 
+  641 |               {/* 3. Rangos */}
+  642 |               {included.length > 0 && (
+  643 |                 <section>
+  644 |                   <h3 className="font-bold text-sm mb-1" style={{ color: 'var(--text)' }}>3. Límites de cada variable</h3>
+  645 |                   <p className="text-xs mb-3" style={{ color: 'var(--text2)' }}>
+  646 |                     Límite superior (max) de cada categoría. El límite del último nivel queda abierto.
+  647 |                   </p>
+  648 |                   <div className="overflow-x-auto">
+  649 |                     <table className="w-full text-sm border-collapse min-w-[560px]">
+  650 |                       <thead>
+  651 |                         <tr>
+  652 |                           <th className="text-left py-2 pr-4 font-bold" style={{ color: 'var(--text2)' }}>Variable</th>
+  653 |                           {cats.map((c, i) => (
+  654 |                             <th key={c._id} className="text-left py-2 px-2 font-bold" style={{ color: c.color }}>{c.name}</th>
+  655 |                           ))}
+  656 |                         </tr>
+  657 |                       </thead>
+  658 |                       <tbody>
+  659 |                         {included.map(v => (
+  660 |                           <tr key={v.label} style={{ borderTop: '1px solid var(--border)', }}>
+  661 |                             <td className="py-2 pr-4 font-semibold whitespace-nowrap" style={{ color: 'var(--text)' }}>{v.nombre}</td>
+  662 |                             {cats.map((c, i) => {
+  663 |                               const r = ranges.find(x => x.variable_label === v.label && x.cat_order === c._id + 1)
+  664 |                               if (i === cats.length - 1) {
+  665 |                                 return <td key={c._id} className="py-2 px-2 text-xs" style={{ color: 'var(--text2)' }}>sin límite</td>
+  666 |                               }
+  667 |                               return (
+  668 |                                 <td key={c._id} className="py-2 px-2">
+  669 |                                   <div className="flex items-center gap-1">
+  670 |                                     <input
+  671 |                                       type="number"
+  672 |                                       placeholder="max"
+  673 |                                       value={r?.max_value ?? ''}
+  674 |                                       onChange={e => setRangeMax(v.label, c._id + 1, e.target.value)}
+  675 |                                       className="w-24 bg-transparent border rounded-lg px-2 py-1 text-sm outline-none"
+  676 |                                       style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+  677 |                                     />
+  678 |                                     <span className="text-[10px]" style={{ color: 'var(--text2)' }}>max</span>
+  679 |                                   </div>
+  680 |                                 </td>
+  681 |                               )
+  682 |                             })}
+  683 |                           </tr>
+  684 |                         ))}
+  685 |                       </tbody>
+  686 |                     </table>
+  687 |                   </div>
+  688 |                 </section>
+  689 |               )}
+  690 | 
+  691 |               {/* Guardar */}
+  692 |               <div className="flex justify-end gap-3 pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+  693 |                 <button onClick={close} className="px-4 py-2.5 rounded-xl text-sm font-bold border" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>
+  694 |                   Cancelar
+  695 |                 </button>
+  696 |                 <button
+  697 |                   onClick={save}
+  698 |                   disabled={saving}
+  699 |                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+  700 |                   style={{ background: '#67B7E8' }}
+  701 |                 >
+  702 |                   <Save size={15} /> {saving ? 'Guardando...' : 'Guardar configuración'}
+  703 |                 </button>
+  704 |               </div>
+  705 |             </div>
+  706 |           </div>
+  707 |         )}
+  708 | 
+  709 |         {/* ── Modal nueva estación ── */}
+  710 |         {showAddDevice && space && (
+  711 |           <AddDeviceModal
+  712 |             spaceId={space.id}
+  713 |             onClose={() => setShowAddDevice(false)}
+  714 |             onAdd={() => {
+  715 |               setDeviceList([])
+  716 |               setLoadingDevices(true)
+  717 |               spacesApi.devices(space.id)
+  718 |                 .then(setDeviceList)
+  719 |                 .catch(() => {})
+  720 |                 .finally(() => setLoadingDevices(false))
+  721 |             }}
+  722 |           />
+  723 |         )}
+  724 | 
+  725 |         {/* ── Modal nuevo espacio ── */}
+  726 |         {creating && (
+  727 |           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.4)' }}>
+  728 |             <div className="w-full max-w-md rounded-2xl p-6" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+  729 |               <div className="flex items-center justify-between mb-5">
+  730 |                 <h3 className="font-bold text-lg" style={{ color: 'var(--text)' }}>Nuevo espacio</h3>
+  731 |                 <button onClick={() => setCreating(false)} style={{ color: 'var(--text2)' }}><X size={18} /></button>
+  732 |               </div>
+  733 |               <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>Nombre</label>
+  734 |               <input
+  735 |                 value={newName}
+  736 |                 onChange={e => setNewName(e.target.value)}
+  737 |                 placeholder="Ej: Calidad de agua"
+  738 |                 className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none mb-1"
+  739 |                 style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+  740 |               />
+  741 |               {newName.trim() && (
+  742 |                 <div className="flex items-center gap-1.5 mb-3 text-xs font-mono px-1" style={{ color: 'var(--text2)' }}>
+  743 |                   <Check size={12} /> slug: {generateLabel(newName.trim())}
+  744 |                 </div>
+  745 |               )}
+  746 | 
+  747 |               <label className="text-xs font-bold uppercase tracking-wide mb-2 block" style={{ color: 'var(--text2)' }}>Tipo de monitoreo</label>
+  748 |               <div className="grid grid-cols-4 gap-2 mb-3">
+  749 |                 {[
+  750 |                   { v: 'aire',  l: 'Aire',   i: <Wind size={18} />, c: '#67B7E8' },
+  751 |                   { v: 'agua',  l: 'Agua',   i: <Droplets size={18} />, c: '#43B6A0' },
+  752 |                   { v: 'suelo', l: 'Suelo',  i: <Mountain size={18} />, c: '#B08460' },
+  753 |                   { v: 'ruido', l: 'Ruido',  i: <Volume2 size={18} />, c: '#C0637D' }
+  754 |                 ].map(t => (
+  755 |                   <button
+  756 |                     key={t.v}
+  757 |                     type="button"
+  758 |                     onClick={() => setNewType(t.v)}
+  759 |                     className="flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-xs font-bold transition-all outline-none"
+  760 |                     style={{
+  761 |                       borderColor: newType === t.v ? t.c : 'var(--border)',
+  762 |                       background: newType === t.v ? t.c + '18' : 'var(--bg)',
+  763 |                       color: newType === t.v ? t.c : 'var(--text2)',
+  764 |                       boxShadow: newType === t.v ? `0 0 0 2px ${t.c}40` : 'none'
+  765 |                     }}
+  766 |                   >
+  767 |                     {t.i}
+  768 |                     {t.l}
+  769 |                   </button>
+  770 |                 ))}
+  771 |               </div>
+  772 | 
+  773 |               <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>Descripción (opcional)</label>
+  774 |               <textarea
+  775 |                 value={newDescription}
+  776 |                 onChange={e => setNewDescription(e.target.value)}
+  777 |                 placeholder="Ej: Red de sensores subterráneos..."
+  778 |                 rows={2}
+  779 |                 className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none mb-1 resize-none"
+  780 |                 style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+  781 |               />
+  782 |               <div className="flex justify-end gap-3 mt-5">
+  783 |                 <button onClick={() => setCreating(false)} className="px-4 py-2.5 rounded-xl text-sm font-bold border" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+  784 |                 <button onClick={createSpace} className="px-4 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: '#67B7E8' }}>Crear</button>
+  785 |               </div>
+  786 |             </div>
+  787 |           </div>
+  788 |         )}
+  789 |       </div>
+  790 |     </ClienteLayout>
+  791 |   )
+  792 | }
+
+
+───────────────── B. frontend/src/services/api.js  (cliente API) ─────────────────
+
+    1 | const BASE =
+    2 |   import.meta.env.VITE_API_BASE ||
+    3 |   (import.meta.env.DEV ? 'http://localhost:3000/api' : '/api')
+    4 | 
+    5 | function getToken() {
+    6 |   return localStorage.getItem('sanik_token') || localStorage.getItem('token')
+    7 | }
+    8 | 
+    9 | async function request(path, options = {}) {
+   10 |   let res
+   11 |   try {
+   12 |     const token = getToken()
+   13 |     res = await fetch(`${BASE}${path}`, {
+   14 |       headers: {
+   15 |         'Content-Type': 'application/json',
+   16 |         'bypass-tunnel-reminder': 'true', 
+   17 |         'ngrok-skip-browser-warning': 'true', 
+   18 |         ...(token ? { Authorization: `Bearer ${token}` } : {})
+   19 |       },
+   20 |       ...options
+   21 |     })
+   22 |   } catch (err) {
+   23 |     throw new Error('No se pudo conectar con el servidor. Verifica que el backend esté activo.')
+   24 |   }
+   25 | 
+   26 |   const contentType = res.headers.get('content-type') || ''
+   27 |   const data = contentType && contentType.includes('application/json') ? await res.json() : null
+   28 |   
+   29 |   if (!res.ok) {
+   30 |     throw new Error(data?.error || data?.message || 'Error del servidor')
+   31 |   }
+   32 |   return data
+   33 | }
+   34 | 
+   35 | export const auth = {
+   36 |   login: (email, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+   37 |   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+   38 |   me: () => request('/auth/me')
+   39 | }
+   40 | 
+   41 | export const devices = {
+   42 |   list: (orgId) => request(`/devices${orgId ? `?orgId=${orgId}` : ''}`),
+   43 |   get: (id, orgId) => request(`/devices/${id}${orgId ? `?orgId=${orgId}` : ''}`),
+   44 |   create: (data) => request('/devices', { method: 'POST', body: JSON.stringify(data) }),
+   45 |   update: (id, data, orgId) => request(`/devices/${id}${orgId ? `?orgId=${orgId}` : ''}`, { method: 'PUT', body: JSON.stringify(data) }),
+   46 |   delete: (id, orgId) => request(`/devices/${id}${orgId ? `?orgId=${orgId}` : ''}`, { method: 'DELETE' }),
+   47 |   variables: (id, orgId) => request(`/devices/${id}/variables${orgId ? `?orgId=${orgId}` : ''}`),
+   48 |   lastValues: (id, orgId) => request(`/devices/${id}/last-values${orgId ? `?orgId=${orgId}` : ''}`),
+   49 |   catalog: () => request('/devices/catalog'),
+   50 |   aqi: (id, orgId) => request(`/devices/${id}/aqi${orgId ? `?orgId=${orgId}` : ''}`),
+   51 |   
+   52 |   
+   53 |   listPublic: () => request('/public/devices'),
+   54 |   aqiPublic:  (id)  => request(`/public/devices/${id}/aqi`),
+   55 |   zonaAqi:    (ids) => request(`/public/zones/aqi?ids=${ids.join(',')}`)
+   56 | 
+   57 | }
+   58 | 
+   59 | export const variables = {
+   60 |   list: () => request('/variables/catalog'),
+   61 |   create: (data) => request('/variables/catalog', { method: 'POST', body: JSON.stringify(data) }),
+   62 |   delete: (label) => request(`/variables/catalog/${label}`, { method: 'DELETE' }),
+   63 |   getRanges: (label, orgId) => request(`/variables/ranges/${label}${orgId ? `?orgId=${orgId}` : ''}`)
+   64 | }
+   65 | 
+   66 | export const dots = {
+   67 |   get: (deviceId, variable, range = '24h', aggregation = 'avg', bucket = '15 minutes', orgId) =>
+   68 |     request(`/dots/${deviceId}/${variable}?range=${range}&aggregation=${aggregation}&bucket=${bucket}${orgId ? `&orgId=${orgId}` : ''}`),
+   69 |   
+   70 |   getRaw: (deviceId, variable, page = 1, limit = 10, orgId) =>
+   71 |     request(`/dots/${deviceId}/${variable}/raw?page=${page}&limit=${limit}${orgId ? `&orgId=${orgId}` : ''}`),
+   72 | 
+   73 |   getMultiple: (deviceId, variables, range = '24h', orgId) =>
+   74 |     request(`/dots/${deviceId}?variables=${variables.join(',')}&range=${range}${orgId ? `&orgId=${orgId}` : ''}`)
+   75 | }
+   76 | 
+   77 | export const alerts = {
+   78 |   list: (deviceId) => request(`/alerts/${deviceId}`),
+   79 |   create: (data) => request('/alerts', { method: 'POST', body: JSON.stringify(data) }),
+   80 |   toggle: (id, active) => request(`/alerts/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }),
+   81 |   delete: (id) => request(`/alerts/${id}`, { method: 'DELETE' })
+   82 | }
+   83 | 
+   84 | export const organizations = {
+   85 |   list: () => request('/organizations'),
+   86 |   get: (id) => request(`/organizations/${id}`),
+   87 |   create: (data) => request('/organizations', { method: 'POST', body: JSON.stringify(data) }),
+   88 |   update: (id, data) => request(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+   89 |   updateStatus: (id, status) => request(`/organizations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+   90 |   setPaymentExempt: (id, exempt) => request(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify({ paymentExempt: exempt }) }),
+   91 |   setBCategory: (id, bCategory) => request(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify({ bCategory }) }),
+   92 |   revealCredentials: (id, adminPassword) => request(`/organizations/${id}/reveal-credentials`, { method: 'POST', body: JSON.stringify({ adminPassword }) }),
+   93 |   resetPassword: (id) => request(`/organizations/${id}/reset-client-password`, { method: 'POST', body: JSON.stringify({}) })
+   94 | }
+   95 | 
+   96 | export const spaces = {
+   97 |   list: () => request('/spaces'),
+   98 |   create: (data) => request('/spaces', { method: 'POST', body: JSON.stringify(data) }),
+   99 |   get: (id) => request(`/spaces/${id}`),
+  100 |   devices: (id) => request(`/spaces/${id}/devices`),
+  101 |   config: (id) => request(`/spaces/${id}/aqi`),
+  102 |   saveConfig: (id, data) => request(`/spaces/${id}/aqi`, { method: 'PUT', body: JSON.stringify(data) }),
+  103 |   calculate: (id, values) => request(`/spaces/${id}/aqi/calculate`, { method: 'POST', body: JSON.stringify({ values }) }),
+  104 |   delete: (id) => request(`/spaces/${id}`, { method: 'DELETE' })
+  105 | }
+  106 | 
+  107 | export const reports = {
+  108 |   getHeatmapData: (orgId, startDate, endDate) => request(`/reports/heatmap?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
+  109 |   getRespiratoryRisk: (orgId, startDate, endDate) => request(`/reports/respiratory-risk?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
+  110 |   getGlobalStats: () => request('/reports/stats'),
+  111 | 
+  112 |   // Public/Global reports (no orgId required/used)
+  113 |   getGlobalHeatmap: (startDate, endDate) => request(`/public/reports/heatmap?start=${startDate || ''}&end=${endDate || ''}`),
+  114 |   getGlobalRespiratoryRisk: (startDate, endDate) => request(`/public/reports/respiratory-risk?start=${startDate || ''}&end=${endDate || ''}`),
+  115 |   getGlobalEnvironmentalReport: (startDate, endDate) => request(`/public/reports/environmental?start=${startDate || ''}&end=${endDate || ''}`),
+  116 |   getGlobalPublicStats: () => request('/public/reports/stats')
+  117 | }
+
+
+───────────────── C. backend/src/routes/spaces.js  (rutas CRUD espacios) ─────────────────
+
+    1 | import { getSpaceConfig, computeAqi, seedAirTemplate } from '../utils/aqi.js'
+    2 | 
+    3 | export default async function spacesRoutes(app) {
+    4 |   app.addHook('onRequest', app.authenticate)
+    5 | 
+    6 |   // ── LISTAR ESPACIOS DEL ORG DEL USUARIO ─────────────
+    7 |   app.get('/', async (req) => {
+    8 |     const { rows } = await app.db.query(
+    9 |       `SELECT s.id, s.name, s.slug, s.type, s.hidden, s.description, s.created_at,
+   10 |               COUNT(d.id)::int as device_count
+   11 |        FROM spaces s
+   12 |        LEFT JOIN devices d ON d.space_id = s.id
+   13 |        WHERE s.org_id = $1
+   14 |        GROUP BY s.id
+   15 |        ORDER BY s.created_at ASC`,
+   16 |       [req.user.orgId]
+   17 |     )
+   18 |     return rows
+   19 |   })
+   20 | 
+   21 |   // ── CREAR ESPACIO ─────────────────────────────────
+   22 |   app.post('/', async (req, reply) => {
+   23 |     const { name, slug, type, description } = req.body
+   24 |     if (!name || !slug) {
+   25 |       return reply.code(400).send({ error: 'Faltan campos obligatorios (name, slug)' })
+   26 |     }
+   27 | 
+   28 |     const client = await app.db.connect()
+   29 |     try {
+   30 |       await client.query('BEGIN')
+   31 |       const { rows: [space] } = await client.query(
+   32 |         `INSERT INTO spaces (org_id, name, slug, type, description, hidden)
+   33 |          VALUES ($1, $2, $3, $4, $5, FALSE)
+   34 |          RETURNING *`,
+   35 |         [req.user.orgId, name.trim(), slug.trim().toLowerCase().replace(/\s+/g, '_'), type || 'other', description?.trim()]
+   36 |       )
+   37 |       if (space.type === 'aire')
+   38 |         await seedAirTemplate(client, space.id)
+   39 |       await client.query('COMMIT')
+   40 |       return reply.code(201).send(space)
+   41 |     } catch (err) {
+   42 |       await client.query('ROLLBACK')
+   43 |       if (err.code === '23505')
+   44 |         return reply.code(400).send({ error: 'Ya existe un espacio con ese identificador' })
+   45 |       app.log.error(err)
+   46 |       return reply.code(500).send({ error: 'Error al crear el espacio' })
+   47 |     } finally {
+   48 |       client.release()
+   49 |     }
+   50 |   })
+   51 | 
+   52 |   // ── VERIFICAR PERTENENCIA ─────────────────────────
+   53 |   async function getOwnerSpace(id, orgId) {
+   54 |     const { rows: [s] } = await app.db.query(
+   55 |       `SELECT * FROM spaces WHERE id = $1 AND org_id = $2`,
+   56 |       [id, orgId]
+   57 |     )
+   58 |     return s
+   59 |   }
+   60 | 
+   61 |   // ── DETALLE DE ESPACIO ────────────────────────────
+   62 |   app.get('/:id', async (req, reply) => {
+   63 |     const space = await getOwnerSpace(req.params.id, req.user.orgId)
+   64 |     if (!space) return reply.code(404).send({ error: 'Espacio no encontrado' })
+   65 |     return space
+   66 |   })
+   67 | 
+   68 |   // ── DISPOSITIVOS DEL ESPACIO ──────────────────────
+   69 |   app.get('/:id/devices', async (req, reply) => {
+   70 |     const space = await getOwnerSpace(req.params.id, req.user.orgId)
+   71 |     if (!space) return reply.code(404).send({ error: 'Espacio no encontrado' })
+   72 | 
+   73 |     const { rows } = await app.db.query(
+   74 |       `SELECT d.*,
+   75 |               COUNT(dv.variable_label)::int as variable_count,
+   76 |               CASE WHEN d.last_seen > NOW() - INTERVAL '5 minutes'
+   77 |                    THEN 'online' ELSE 'offline' END as status
+   78 |        FROM devices d
+   79 |        LEFT JOIN device_variables dv ON dv.device_id = d.id
+   80 |        WHERE d.space_id = $1
+   81 |        GROUP BY d.id
+   82 |        ORDER BY d.created_at DESC`,
+   83 |       [space.id]
+   84 |     )
+   85 |     return rows
+   86 |   })
+   87 | 
+   88 |   // ── CONFIG AQI COMPLETA DEL ESPACIO ───────────────
+   89 |   app.get('/:id/aqi', async (req, reply) => {
+   90 |     const space = await getOwnerSpace(req.params.id, req.user.orgId)
+   91 |     if (!space) return reply.code(404).send({ error: 'Espacio no encontrado' })
+   92 | 
+   93 |     const config = await getSpaceConfig(app, space.id)
+   94 |     return { ...space, aqiConfig: config }
+   95 |   })
+   96 | 
+   97 |   // ── GUARDAR CONFIG AQI DEL ESPACIO ────────────────
+   98 |   // body: {
+   99 |   //   categories: [{ name, color, score_lo, score_hi }],
+  100 |   //   variables: [{ variable_label }],            // en orden de prioridad
+  101 |   //   ranges:    [{ variable_label, cat_order, min_value, max_value }]
+  102 |   // }
+  103 |   app.put('/:id/aqi', async (req, reply) => {
+  104 |     const space = await getOwnerSpace(req.params.id, req.user.orgId)
+  105 |     if (!space) return reply.code(404).send({ error: 'Espacio no encontrado' })
+  106 | 
+  107 |     const { categories = [], variables = [], ranges = [] } = req.body || {}
+  108 | 
+  109 |     if (!categories.length || !variables.length || !ranges.length) {
+  110 |       return reply.code(400).send({ error: 'Se requieren categories, variables y ranges' })
+  111 |     }
+  112 | 
+  113 |     const client = await app.db.connect()
+  114 |     try {
+  115 |       await client.query('BEGIN')
+  116 | 
+  117 |       await client.query('DELETE FROM space_variable_ranges WHERE space_id = $1', [space.id])
+  118 |       await client.query('DELETE FROM space_aqi_variables WHERE space_id = $1', [space.id])
+  119 |       await client.query('DELETE FROM space_aqi_categories WHERE space_id = $1', [space.id])
+  120 | 
+  121 |       for (let i = 0; i < categories.length; i++) {
+  122 |         const c = categories[i]
+  123 |         await client.query(
+  124 |           `INSERT INTO space_aqi_categories (space_id, name, color, cat_order, score_lo, score_hi)
+  125 |            VALUES ($1, $2, $3, $4, $5, $6)`,
+  126 |           [space.id, c.name, c.color || '#10B981', i + 1, Number(c.score_lo ?? 0), Number(c.score_hi ?? 100)]
+  127 |         )
+  128 |       }
+  129 | 
+  130 |       for (let i = 0; i < variables.length; i++) {
+  131 |         await client.query(
+  132 |           `INSERT INTO space_aqi_variables (space_id, variable_label, priority)
+  133 |            VALUES ($1, $2, $3)
+  134 |            ON CONFLICT (space_id, variable_label) DO NOTHING`,
+  135 |           [space.id, variables[i].variable_label, i + 1]
+  136 |         )
+  137 |       }
+  138 | 
+  139 |       for (const r of ranges) {
+  140 |         await client.query(
+  141 |           `INSERT INTO space_variable_ranges (space_id, variable_label, cat_order, min_value, max_value)
+  142 |            VALUES ($1, $2, $3, $4, $5)`,
+  143 |           [space.id, r.variable_label, r.cat_order, Number(r.min_value), r.max_value == null ? null : Number(r.max_value)]
+  144 |         )
+  145 |       }
+  146 | 
+  147 |       await client.query('COMMIT')
+  148 |     } catch (err) {
+  149 |       await client.query('ROLLBACK')
+  150 |       app.log.error(err)
+  151 |       return reply.code(500).send({ error: 'Error al guardar la configuración' })
+  152 |     } finally {
+  153 |       client.release()
+  154 |     }
+  155 | 
+  156 |     const config = await getSpaceConfig(app, space.id)
+  157 |     return { ...space, aqiConfig: config }
+  158 |   })
+  159 | 
+  160 |   // ── CALCULAR AQI DE UN ESPACIO (diagnóstico) ──────
+  161 |   app.post('/:id/aqi/calculate', async (req, reply) => {
+  162 |     const space = await getOwnerSpace(req.params.id, req.user.orgId)
+  163 |     if (!space) return reply.code(404).send({ error: 'Espacio no encontrado' })
+  164 | 
+  165 |     const config = await getSpaceConfig(app, space.id)
+  166 |     const values = req.body?.values || {}
+  167 |     return computeAqi(values, config)
+  168 |   })
+  169 | 
+  170 |   // ── ELIMINAR ESPACIO ──────────────────────────────
+  171 |   app.delete('/:id', async (req, reply) => {
+  172 |     const { rowCount } = await app.db.query(
+  173 |       `DELETE FROM spaces WHERE id = $1 AND org_id = $2`,
+  174 |       [req.params.id, req.user.orgId]
+  175 |     )
+  176 |     if (rowCount === 0) return reply.code(404).send({ error: 'Espacio no encontrado' })
+  177 |     return { message: 'Espacio eliminado' }
+  178 |   })
+  179 | }
+
+
+───────────────── D. docker-compose.yml  (orquestación) ─────────────────
+
+    1 | services:
+    2 | 
+    3 |   # ─────────────────────────────────────────
+    4 |   # BASE DE DATOS — TimescaleDB
+    5 |   # ─────────────────────────────────────────
+    6 |   timescaledb:
+    7 |     image: timescale/timescaledb:latest-pg16
+    8 |     container_name: iot_db
+    9 |     restart: unless-stopped
+   10 |     environment:
+   11 |       POSTGRES_USER: iot_user
+   12 |       POSTGRES_PASSWORD: iot_password
+   13 |       POSTGRES_DB: iot_platform
+   14 |     ports:
+   15 |       - "5432:5432"
+   16 |     volumes:
+   17 |       - timescale_data:/var/lib/postgresql/data
+   18 |       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+   19 |     networks:
+   20 |       - iot_network
+   21 | 
+   22 |   # ─────────────────────────────────────────
+   23 |   # CACHE — Redis
+   24 |   # ─────────────────────────────────────────
+   25 |   redis:
+   26 |     image: redis:7-alpine
+   27 |     container_name: iot_redis
+   28 |     restart: unless-stopped
+   29 |     ports:
+   30 |       - "6379:6379"
+   31 |     volumes:
+   32 |       - redis_data:/data
+   33 |     networks:
+   34 |       - iot_network
+   35 | 
+   36 |   # ─────────────────────────────────────────
+   37 |   # MQTT BROKER — EMQX
+   38 |   # ─────────────────────────────────────────
+   39 |   emqx:
+   40 |     image: emqx:5
+   41 |     container_name: iot_mqtt
+   42 |     restart: unless-stopped
+   43 |     ports:
+   44 |       - "1883:1883"    # MQTT
+   45 |       - "8083:8083"    # MQTT sobre WebSocket
+   46 |       - "8084:8084"    # MQTT sobre WebSocket seguro
+   47 |       - "8883:8883"    # MQTT seguro (TLS)
+   48 |       - "18083:18083"  # Panel de administración EMQX
+   49 |     volumes:
+   50 |       - emqx_data:/opt/emqx/data
+   51 |     environment:
+   52 |       EMQX_NAME: iot_broker
+   53 |       EMQX_HOST: 127.0.0.1
+   54 |     networks:
+   55 |       - iot_network
+   56 | 
+   57 |   # ─────────────────────────────────────────
+   58 |   # BACKEND — Node.js + Fastify
+   59 |   # ─────────────────────────────────────────
+   60 |   backend:
+   61 |     build:
+   62 |       context: ./backend
+   63 |       dockerfile: Dockerfile
+   64 |     container_name: iot_backend
+   65 |     restart: unless-stopped
+   66 |     ports:
+   67 |       - "3000:3000"
+   68 |     environment:
+   69 |       NODE_ENV: production
+   70 |       PORT: 3000
+   71 |       # Base de datos
+   72 |       DB_HOST: timescaledb
+   73 |       DB_PORT: 5432
+   74 |       DB_USER: iot_user
+   75 |       DB_PASSWORD: iot_password
+   76 |       DB_NAME: iot_platform
+   77 |       # Redis
+   78 |       REDIS_HOST: redis
+   79 |       REDIS_PORT: 6379
+   80 |       # MQTT
+   81 |       MQTT_HOST: emqx
+   82 |       MQTT_PORT: 1883
+   83 |      
+   84 |       JWT_SECRET: 
+   85 |     depends_on:
+   86 |       - timescaledb
+   87 |       - redis
+   88 |       - emqx
+   89 |     networks:
+   90 |       - iot_network
+   91 | 
+   92 |   # ─────────────────────────────────────────
+   93 |   # FRONTEND — React + Vite
+   94 |   # ─────────────────────────────────────────
+   95 |   frontend:
+   96 |     build:
+   97 |       context: ./frontend
+   98 |       dockerfile: Dockerfile
+   99 |     container_name: iot_frontend
+  100 |     restart: unless-stopped
+  101 |     ports:
+  102 |       - "80:80"
+  103 |     environment:
+  104 |       VITE_API_URL: http://localhost:3000
+  105 |       VITE_WS_URL: ws://localhost:3000
+  106 |     depends_on:
+  107 |       - backend
+  108 |     networks:
+  109 |       - iot_network
+  110 | 
+  111 | # ─────────────────────────────────────────
+  112 | # VOLÚMENES (datos persistentes)
+  113 | # ─────────────────────────────────────────
+  114 | volumes:
+  115 |   timescale_data:
+  116 |   redis_data:
+  117 |   emqx_data:
+  118 | 
+  119 | # ─────────────────────────────────────────
+  120 | # RED INTERNA
+  121 | # ─────────────────────────────────────────
+  122 | networks:
+  123 |   iot_network:
+  124 |     driver: bridge
+
+
+───────────────── E. frontend/Dockerfile  (build multi-stage → nginx) ─────────────────
+
+    1 | FROM node:20-alpine AS builder
+    2 | WORKDIR /app
+    3 | COPY package.json .
+    4 | RUN npm install
+    5 | COPY . .
+    6 | RUN npm run build
+    7 | 
+    8 | FROM nginx:alpine
+    9 | COPY --from=builder /app/dist /usr/share/nginx/html
+   10 | COPY nginx.conf /etc/nginx/conf.d/default.conf
+   11 | EXPOSE 80
+
+
+───────────────── F. frontend/src/App.jsx  (rutas /espacios y /dispositivos) ─────────────────
+
+    1 | import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+    2 | import useAuthStore from './store/auth'
+    3 | import Landing from './pages/Landing'
+    4 | import PublicMap from './pages/PublicMap'
+    5 | import Login from './pages/Login'
+    6 | import Devices from './pages/Devices'
+    7 | import Dashboard from './pages/Dashboard'
+    8 | import Alerts from './pages/Alerts'
+    9 | import Profile from './pages/Profile'
+   10 | import AdminDashboard from './pages/admin/Dashboard'
+   11 | import AdminClients from './pages/admin/Clients'
+   12 | import AdminClientDetail from './pages/admin/ClientDetail'
+   13 | import AdminDeviceDetail from './pages/admin/DeviceDetail'
+   14 | import AdminTeam from './pages/admin/Team'
+   15 | import AdminVariables from './pages/admin/Variables'
+   16 | import AdminRequests from './pages/admin/Requests'
+   17 | import ClientDeviceDetail from './pages/DeviceDetail'
+   18 | import Reports from './pages/Reports'
+   19 | import GlobalReports from './pages/GlobalReports'
+   20 | import VariableDetail from './pages/VariableDetail'
+   21 | import Spaces from './pages/Spaces'
+   22 | const ADMIN_ROLES = ['admin', 'superadmin', 'worker']
+   23 | 
+   24 | /**
+   25 |  * Componente genérico para proteger rutas.
+   26 |  * @param {Array} allowedRoles - Roles que pueden acceder. Si se omite, basta con estar autenticado.
+   27 |  * @param {string} redirectTo - Ruta a la que redirigir si no tiene permisos (por defecto /login o /devices).
+   28 |  */
+   29 | function ProtectedRoute({ children, allowedRoles, redirectTo }) {
+   30 |   const { token, user, org } = useAuthStore()
+   31 | 
+   32 |   // 1. Si no hay token, al login siempre
+   33 |   if (!token) {
+   34 |     return <Navigate to="/login" replace />
+   35 |   }
+   36 | 
+   37 |   // 2. Si hay roles permitidos definidos, verificar
+   38 |   if (allowedRoles && !allowedRoles.includes(user?.role)) {
+   39 |     // Redirección inteligente según el rol
+   40 |     const defaultRedirect = ADMIN_ROLES.includes(user?.role)
+   41 |       ? '/admin'
+   42 |       : (org?.type === 'B' ? '/espacios' : '/dispositivos')
+   43 |     return <Navigate to={redirectTo || defaultRedirect} replace />
+   44 |   }
+   45 | 
+   46 |   return children
+   47 | }
+   48 | 
+   49 | /**
+   50 |  * Componente para rutas que SOLO pueden verse si NO estás logueado (Landing, Login).
+   51 |  */
+   52 | function PublicRoute({ children }) {
+   53 |   const { token, user, org } = useAuthStore()
+   54 | 
+   55 |   if (token) {
+   56 |     const dashboard = ADMIN_ROLES.includes(user?.role)
+   57 |       ? '/admin'
+   58 |       : (org?.type === 'B' ? '/espacios' : '/dispositivos')
+   59 |     return <Navigate to={dashboard} replace />
+   60 |   }
+   61 |   return children
+   62 | }
+   63 | 
+   64 | /**
+   65 |  * Componente para switchear secciones según el tipo de organización cliente:
+   66 |  * · B (independiente)  → gestiona sus espacios (cada espacio contiene sus estaciones)
+   67 |  * · A (dependiente)    → gestiona sus estaciones directas
+   68 |  * Si alguien entra a la ruta que no le corresponde, se redirige a la suya.
+   69 |  */
+   70 | function ClientScopeRoute({ isEspacios, children }) {
+   71 |   const { token, user, org } = useAuthStore()
+   72 | 
+   73 |   if (!token) return <Navigate to="/login" replace />
+   74 |   if (!['client'].includes(user?.role)) return <Navigate to="/admin" replace />
+   75 | 
+   76 |   const isB = org?.type === 'B'
+   77 |   if (isEspacios && !isB) return <Navigate to="/dispositivos" replace />
+   78 |   if (!isEspacios && isB) return <Navigate to="/espacios" replace />
+   79 | 
+   80 |   return children
+   81 | }
+   82 | 
+   83 | export default function App() {
+   84 |   return (
+   85 |     <BrowserRouter>
+   86 |       <Routes>
+   87 |         {/* Rutas Públicas */}
+   88 |         <Route path="/"      element={<PublicRoute><Landing /></PublicRoute>} />
+   89 |         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+   90 |         <Route path="/mapa"  element={<PublicRoute><PublicMap /></PublicRoute>} />
+   91 |         <Route path="/reportes-globales" element={<GlobalReports />} />
+   92 |         {/* --- RUTAS EXCLUSIVAS DE CLIENTES (CORREGIDAS) --- */}
+   93 |         <Route path="/variableDetail/:deviceId/:variableLabel" element={<ProtectedRoute allowedRoles={['client']}><VariableDetail /></ProtectedRoute>} />
+   94 |         {/* ARREGLO 2: Ruta base del Dashboard agregada */}
+   95 |         <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['client']}><Dashboard /></ProtectedRoute>} />
+   96 |         
+   97 |         {/* Ruta para ver el dashboard específico de 1 dispositivo (la que ya tenías) */}
+   98 |         <Route path="/dashboard/:id" element={<ProtectedRoute allowedRoles={['client']}><Dashboard /></ProtectedRoute>} />
+   99 |         
+  100 |         <Route path="/devices/:id" element={<ProtectedRoute allowedRoles={['client']}><ClientDeviceDetail /></ProtectedRoute>} />
+  101 |         {/* ARREGLO 3: Cambiamos /devices por /dispositivos para que encaje con tu menú lateral */}
+  102 |         <Route path="/dispositivos" element={<ClientScopeRoute><Devices /></ClientScopeRoute>} />
+  103 |         <Route path="/espacios" element={<ClientScopeRoute isEspacios><Spaces /></ClientScopeRoute>} />
+  104 |         {/* <Route path="/devices"           element={<ProtectedRoute allowedRoles={['client']}><Devices /></ProtectedRoute>} /> */}
+  105 | 
+  106 |         <Route path="/alerts/:deviceId" element={<ProtectedRoute allowedRoles={['client']}><Alerts /></ProtectedRoute>} />
+  107 |         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+  108 | 
+  109 |         {/* Rutas de Administración (Admin, Superadmin, Worker) */}
+  110 |         <Route path="/admin" element={
+  111 |           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+  112 |             <AdminDashboard />
+  113 |           </ProtectedRoute>
+  114 |         } />
+  115 | 
+  116 |         <Route path="/admin/clientes" element={
+  117 |           <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+  118 |             <AdminClients />
+  119 |           </ProtectedRoute>
+  120 |         } />
+  121 | 
+  122 |         <Route path="/admin/clientes/:clientId" element={
+  123 |           <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+  124 |             <AdminClientDetail />
+  125 |           </ProtectedRoute>
+  126 |         } />
+  127 | 
+  128 |         <Route path="/admin/clientes/:clientId/dispositivo/:deviceId" element={
+  129 |           <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+  130 |             <AdminDeviceDetail />
+  131 |           </ProtectedRoute>
+  132 |         } />
+  133 | 
+  134 |         <Route path="/admin/equipo" element={
+  135 |           <ProtectedRoute allowedRoles={['superadmin']}>
+  136 |             <AdminTeam />
+  137 |           </ProtectedRoute>
+  138 |         } />
+  139 | 
+  140 |         <Route path="/admin/variables" element={
+  141 |           <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+  142 |             <AdminVariables />
+  143 |           </ProtectedRoute>
+  144 |         } />
+  145 | 
+  146 |         <Route path="/admin/solicitudes" element={
+  147 |           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+  148 |             <AdminRequests />
+  149 |           </ProtectedRoute>
+  150 |         } />
+  151 | 
+  152 |         <Route path="/reportes" element={
+  153 |           <ProtectedRoute allowedRoles={['client']}>
+  154 |             <Reports />
+  155 |           </ProtectedRoute>
+  156 |         } />
+  157 | 
+  158 |         {/* Comodín de redirección */}
+  159 |         <Route path="*" element={<Navigate to="/" replace />} />
+  160 |       </Routes>
+  161 |     </BrowserRouter>
+  162 |   )
+  163 | }
+

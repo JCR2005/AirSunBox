@@ -1,0 +1,224 @@
+====================================================
+PLATAFORMA SANIK | CASOS DE USO EXTENDIDOS
+====================================================
+Este documento se actualiza conforme se agregan funciones.
+Última actualización: 2026-09-16
+
+SECCIÓN: COMUNES (usados por todos los roles)
+====================================================
+
+
+====================================================
+CASO DE USO: Iniciar sesión
+IDENTIFICADOR: CU-01
+ACTORES: Usuario (I) — cliente, admin, superadmin o worker
+TIPO: Primario | Esencial
+REFERENCIAS: Incluye validación de formulario | Relacionado con CU-02 (Registrar cuenta de organización independiente)
+PRECONDICIÓN: El usuario debe estar en la página de inicio de sesión (ruta /login) sin sesión activa previa.
+POSTCONDICIÓN: El token JWT y los datos del usuario y de su organización quedan guardados en el navegador (localStorage) y el usuario es redirigido a su panel según su rol.
+
+PROPÓSITO:
+Permitir al usuario autenticarse en la plataforma con su correo y contraseña para acceder a su panel.
+
+RESUMEN:
+El usuario ingresa su correo y contraseña en el formulario de inicio de sesión y presiona "Ingresar". El sistema consulta sus credenciales contra la base de datos, valida la contraseña, genera un token JWT y redirige al panel correspondiente a su rol.
+
+CURSO NORMAL (BÁSICO):
+1. Actor: El usuario abre la página /login.
+2. Actor: El usuario escribe su correo electrónico en el campo "Correo electrónico" (tipo email, obligatorio).
+3. Actor: El usuario escribe su contraseña en el campo "Contraseña" (obligatorio).
+4. Actor: El usuario hace clic en "Ingresar".
+5. Sistema: Envía las credenciales al backend mediante la petición POST /auth/login.
+6. Sistema: Busca el usuario en la base de datos por su correo electrónico (incluye su rol, estado y datos de la organización).
+7. Sistema: Valida la contraseña ingresada contra el hash almacenado (bcrypt).
+8. Sistema: Genera un token JWT con el id del usuario, el id de su organización y su rol.
+9. Sistema: Guarda el token, el usuario y la organización en localStorage del navegador.
+10. Sistema: Redirige según el rol: Sanik (admin/superadmin/worker) a /admin, cliente de organización tipo B a /espacios, cliente regular a /dispositivos.
+
+ESCENARIOS ALTERNOS:
+
+Escenario alterno 1 - Campo obligatorio vacío
+1. Actor: El usuario deja vacío el campo "Correo electrónico" o "Contraseña" y presiona "Ingresar".
+2. Sistema: El navegador bloquea el envío del formulario porque los campos son obligatorios (required). (Sigue en la página)
+
+Escenario alterno 2 - Correo no registrado o contraseña incorrecta
+1. Actor: El usuario ingresa un correo inexistente o una contraseña equivocada y presiona "Ingresar".
+2. Sistema: El backend responde 401 con el mensaje "Correo o contraseña incorrectos".
+3. Sistema: Muestra el mensaje en el banner de error de la página. (Sigue en la página)
+
+Escenario alterno 3 - Cuenta de usuario suspendida
+1. Actor: El usuario con estado "suspended" ingresa sus credenciales y presiona "Ingresar".
+2. Sistema: El backend responde 403 con el mensaje "Tu cuenta está suspendida. Contactá a Sanik.".
+3. Sistema: Muestra el mensaje en el banner de error de la página y no inicia sesión. (Sigue en la página)
+
+Escenario alterno 4 - Organización cliente suspendida
+1. Actor: El usuario de una organización con estado "suspended" (que no sea personal Sanik) ingresa sus credenciales.
+2. Sistema: El backend responde 403 con el mensaje "Tu organización está suspendida. Contactá a Sanik.".
+3. Sistema: Muestra el mensaje en el banner de error de la página y no inicia sesión. (Sigue en la página)
+
+Escenario alterno 5 - El backend no responde o no está activo
+1. Actor: El usuario completa el formulario y presiona "Ingresar".
+2. Sistema: No logra conectar con el servidor.
+3. Sistema: Muestra el mensaje "No se pudo conectar con el servidor. Verifica que el backend esté activo." y conserva los datos ingresados en el formulario. (Sigue en la página)
+
+Escenario alterno 6 - El usuario aún no tiene cuenta
+1. Actor: El usuario hace clic en "¿No tienes cuenta? Crear cuenta".
+2. Sistema: Cambia el formulario al modo de registro. Incluye (CU-02. Registrar cuenta de organización independiente).
+
+
+====================================================
+CASO DE USO: Registrar cuenta de organización independiente
+IDENTIFICADOR: CU-02
+ACTORES: Usuario (I) — persona u organización que se autogestiona
+TIPO: Primario | Esencial
+REFERENCIAS: Incluye validación de formulario (confirmación de contraseña) | Relacionado con CU-01 (Iniciar sesión)
+PRECONDICIÓN: El usuario debe estar en la página /login en el modo "Crear cuenta", sin sesión activa.
+POSTCONDICIÓN: La organización independiente (tipo B, autogestionada) y su usuario administrador quedan registrados como activos; no se crea ningún espacio predeterminado y el usuario es redirigido a /espacios.
+
+PROPÓSITO:
+Permitir a una persona u organización registrarse por cuenta propia y empezar a gestionar sus espacios sin intervención de Sanik.
+
+RESUMEN:
+El usuario cambia al modo de registro, completa los datos de la organización y confirmación de contraseña y presiona "Crear cuenta". El sistema valida, registra la organización con su usuario y redirige a /espacios.
+
+CURSO NORMAL (BÁSICO):
+#    Acción (Actor / Sistema)
+1    Actor: El usuario hace clic en "¿No tienes cuenta? Crear cuenta".
+2    Sistema: Muestra el formulario de registro con los campos de organización, datos del usuario, contraseña y ubicación.
+3    Actor: El usuario completa los campos obligatorios y escribe su contraseña y la confirmación.
+4    Actor: El usuario hace clic en "Crear cuenta".
+5    Sistema: Valida que las contraseñas coincidan y que tengan al menos 6 caracteres.
+6    Sistema: Envía los datos al backend con la petición POST /auth/register.
+7    Sistema: Verifica que el correo no esté registrado y genera un identificador único (slug) para la organización.
+8    Sistema: Crea la organización (tipo B, autogestionada, categoría independiente) y su usuario administrador, sin crear espacios.
+9    Sistema: Inicia la sesión generando un token JWT y guarda los datos en localStorage.
+10   Sistema: Redirige al usuario a /espacios.
+
+ESCENARIOS ALTERNOS:
+
+Escenario alterno 1 - Cancelar y volver a inicio de sesión
+1. Actor: El usuario hace clic en "¿Ya tienes cuenta? Inicia sesión".
+2. Sistema: Cambia el formulario al modo inicio de sesión. (Sigue en la página)
+
+Escenario alterno 2 - Contraseñas que no coinciden
+1. Actor: El usuario ingresa contraseñas diferentes en "Contraseña" y "Confirmar contraseña".
+2. Sistema: Muestra el mensaje "Las contraseñas no coinciden" y no envía el formulario. (Sigue en la página)
+
+Escenario alterno 3 - Contraseña demasiado corta
+1. Actor: El usuario ingresa una contraseña de menos de 6 caracteres.
+2. Sistema: Muestra el mensaje "La contraseña debe tener al menos 6 caracteres" y no envía el formulario. (Sigue en la página)
+
+Escenario alterno 4 - Correo ya registrado
+1. Actor: El usuario ingresa un correo que ya existe y presiona "Crear cuenta".
+2. Sistema: El backend responde 400 con el mensaje "Ese correo ya está registrado" y la página lo muestra en el banner de error. (Sigue en la página)
+
+Escenario alterno 5 - Nombre de organización vacío
+1. Actor: El usuario presiona "Crear cuenta" sin nombre de organización.
+2. Sistema: El backend responde 400 con el mensaje "El nombre de la organización es obligatorio" y la página muestra el error. (Sigue en la página)
+
+Escenario alterno 6 - El backend no responde o no está activo
+1. Actor: El usuario completa el formulario correctamente y presiona "Crear cuenta".
+2. Sistema: No logra conectar con el servidor y muestra "No se pudo conectar con el servidor. Verifica que el backend esté activo.", conservando los datos ingresados. (Sigue en la página)
+
+
+====================================================
+CASO DE USO: Registrar cuenta individual
+IDENTIFICADOR: CU-03
+ACTORES: Usuario (I) — persona natural que se autogestiona
+TIPO: Primario | Esencial
+REFERENCIAS: Incluye validación de formulario (confirmación de contraseña) | Relacionado con CU-01 (Iniciar sesión) y CU-02 (Registrar cuenta de organización independiente)
+PRECONDICIÓN: El usuario debe estar en la página /login en el modo "Crear cuenta", sin sesión activa.
+POSTCONDICIÓN: La cuenta individual queda registrada como activa: su organización interna se llama "Cuenta de <nombre>" y no se crea ningún espacio. El usuario es redirigido a /espacios.
+
+PROPÓSITO:
+Permitir que una persona natural se registre por cuenta propia para medir en su casa o en un proyecto personal, sin intervención de Sanik.
+
+RESUMEN:
+El usuario cambia al modo de registro, elige "Individual", completa su nombre, correo y contraseña (confirmándola) y presiona "Crear cuenta". El sistema registra la cuenta y redirige a /espacios.
+
+CURSO NORMAL (BÁSICO):
+#    Acción (Actor / Sistema)
+1    Actor: El usuario hace clic en "¿No tienes cuenta? Crear cuenta".
+2    Sistema: Muestra el formulario de registro con el selector de tipo de cuenta.
+3    Actor: El usuario selecciona "Individual".
+4    Sistema: Muestra el campo "Tu nombre completo" y oculta el de nombre de organización.
+5    Actor: El usuario completa su nombre completo, correo, contraseña y confirmación.
+6    Actor: El usuario hace clic en "Crear cuenta".
+7    Sistema: Valida que las contraseñas coincidan y tengan al menos 6 caracteres.
+8    Sistema: Envía los datos al backend con la petición POST /auth/register y accountType "individual".
+9    Sistema: Crea la cuenta: su organización interna se llama "Cuenta de <nombre>", sin crear espacios.
+10   Sistema: Inicia la sesión generando un token JWT, guarda los datos en localStorage y redirige a /espacios.
+
+ESCENARIOS ALTERNOS:
+
+Escenario alterno 1 - Cancelar y volver a inicio de sesión
+1. Actor: El usuario hace clic en "¿Ya tienes cuenta? Inicia sesión".
+2. Sistema: Cambia el formulario al modo inicio de sesión. (Sigue en la página)
+
+Escenario alterno 2 - Cambiar el tipo de cuenta a Organización
+1. Actor: El usuario hace clic en "Organización" en el selector de tipo de cuenta.
+2. Sistema: Muestra el campo "Nombre de la organización" y el nombre pasa a "Nombre del representante". Incluye (CU-02. Registrar cuenta de organización independiente). (Sigue en la página)
+
+Escenario alterno 3 - Contraseñas que no coinciden
+1. Actor: El usuario ingresa contraseñas diferentes en "Contraseña" y "Confirmar contraseña".
+2. Sistema: Muestra el mensaje "Las contraseñas no coinciden" y no envía el formulario. (Sigue en la página)
+
+Escenario alterno 4 - Contraseña demasiado corta
+1. Actor: El usuario ingresa una contraseña de menos de 6 caracteres.
+2. Sistema: Muestra el mensaje "La contraseña debe tener al menos 6 caracteres" y no envía el formulario. (Sigue en la página)
+
+Escenario alterno 5 - Correo ya registrado
+1. Actor: El usuario ingresa un correo que ya existe y presiona "Crear cuenta".
+2. Sistema: El backend responde 400 con "Ese correo ya está registrado" y la página lo muestra en el banner de error. (Sigue en la página)
+
+Escenario alterno 6 - El backend no responde o no está activo
+1. Actor: El usuario completa el formulario correctamente y presiona "Crear cuenta".
+2. Sistema: No logra conectar con el servidor y muestra "No se pudo conectar con el servidor. Verifica que el backend esté activo.", conservando los datos ingresados. (Sigue en la página)
+
+
+====================================================
+CASO DE USO: Ver panel de monitoreo (Dashboard)
+IDENTIFICADOR: CU-04
+ACTORES: Usuario (I) — cliente autenticado (individuo u organización)
+TIPO: Primario | Esencial
+REFERENCIAS: Relacionado con CU-01 (Iniciar sesión) y con las vistas /dispositivos y /espacios
+PRECONDICIÓN: El usuario debe haber iniciado sesión con una cuenta de cliente (individuo u organización) y tener acceso a la ruta /dashboard.
+POSTCONDICIÓN: El panel muestra el resumen de las estaciones de la organización con sus estados y categorías de AQI; los indicadores se actualizan en tiempo real mientras la conexión WebSocket esté activa.
+
+PROPÓSITO:
+Dar al usuario un resumen visual y en tiempo real del estado de sus estaciones y de su ubicación.
+
+RESUMEN:
+Al entrar al panel, el sistema carga las estaciones de la organización y su AQI, muestra tarjetas de resumen, un mapa con las estaciones y una lista de "Estado de red", y mantiene los indicadores actualizados mediante WebSocket.
+
+CURSO NORMAL (BÁSICO):
+#    Acción (Actor / Sistema)
+1    Actor: El usuario accede a /dashboard (redirigido al iniciar sesión o haciendo clic en "Dashboard").
+2    Sistema: Consulta las estaciones de la organización con GET /devices y muestra "Preparando tu panel...".
+3    Sistema: Muestra la fecha, el saludo y las tarjetas de resumen: Total de estaciones, En línea y Sin conexión.
+4    Sistema: Consulta el AQI de cada estación para asignar el color de sus indicadores.
+5    Sistema: Muestra el mapa de ubicación con las estaciones de la organización.
+6    Sistema: Muestra en cada estación un popup con su nombre y estado (conectada/desconectada) o categoría de AQI.
+7    Sistema: Muestra la lista "Estado de red" con las primeras 6 estaciones y su indicador de estado.
+8    Sistema: Conecta por WebSocket y actualiza el AQI de las estaciones cada vez que llegan datos nuevos.
+9    Actor: El usuario hace clic en una estación de la lista o en "Ver todas las estaciones".
+10   Sistema: Redirige al usuario a /dispositivos.
+
+ESCENARIOS ALTERNOS:
+
+Escenario alterno 1 - Hay estaciones sin conexión
+1. Actor: El usuario entra al panel con estaciones reportadas como "offline" o "inactive".
+2. Sistema: Muestra el banner "N estación(es) sin conexión" en la parte superior del panel. (Sigue en la página)
+
+Escenario alterno 2 - No hay estaciones registradas aún
+1. Actor: El usuario entra al panel sin estaciones creadas en su organización.
+2. Sistema: Muestra las tarjetas marcando 0, el mapa vacío y la lista "Estado de red" con "No hay estaciones registradas aún.". (Sigue en la página)
+
+Escenario alterno 3 - El backend no responde al cargar las estaciones
+1. Actor: El usuario entra al panel y el servidor no responde a GET /devices.
+2. Sistema: El panel termina la carga sin estaciones y muestra el estado vacío, sin mensaje de error en pantalla. (Sigue en la página)
+
+
+====================================================
+(SIGUIENTE CASO DE USO PENDIENTE...)
+====================================================
