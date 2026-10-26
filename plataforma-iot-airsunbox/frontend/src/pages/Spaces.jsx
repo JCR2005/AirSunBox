@@ -1,5 +1,5 @@
 import ScrollHint from '../components/ScrollHint'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import EditSpaceModal from '../components/airsunbox/EditSpaceModal'
@@ -21,6 +21,8 @@ export default function Spaces() {
 
   const [creating, setCreating] = useState(false)   // modal nuevo espacio
   const [newName, setNewName] = useState('')
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef(null)
   const [newType, setNewType] = useState('aire')
   const [newCustomType, setNewCustomType] = useState('')
   const [newCustomIcon, setNewCustomIcon] = useState('')
@@ -42,7 +44,12 @@ export default function Spaces() {
   const TYPE_ICONS = { aire: 'aire', agua: 'agua', suelo: 'suelo', ruido: 'ruido' }
 
   const createSpace = async () => {
-    if (!newName.trim()) return
+    // Sin nombre: avisar en el campo en vez de no hacer nada
+    if (!newName.trim()) {
+      setNameError('Escribí un nombre para el espacio.')
+      nameInputRef.current?.focus()
+      return
+    }
     const finalType = newType === 'otro' ? (newCustomType.trim() || 'otro') : newType
     const finalIcon = newCustomIcon || TYPE_ICONS[finalType] || 'otro'
     const s = await spacesApi.create({
@@ -54,6 +61,7 @@ export default function Spaces() {
       description: newDescription.trim()
     })
     setCreating(false)
+    setNameError('')
     setNewName(''); setNewType('aire'); setNewCustomType(''); setNewCustomIcon(''); setNewDescription(''); setNewColor('#67B7E8')
     await loadSpaces()
     navigate(`/espacios/${s.id}`)
@@ -186,16 +194,26 @@ export default function Spaces() {
               <ScrollHint />
               <div className="flex items-center justify-between mb-5">
                 <h3 className="font-bold text-lg" style={{ color: 'var(--text)' }}>Nuevo espacio</h3>
-                <button onClick={() => setCreating(false)} style={{ color: 'var(--text2)' }}><X size={18} /></button>
+                <button onClick={() => { setCreating(false); setNameError('') }} style={{ color: 'var(--text2)' }} aria-label="Cerrar"><X size={18} /></button>
               </div>
-              <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>Nombre</label>
+              <label htmlFor="new-space-name" className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>
+                Nombre <span style={{ color: '#E5484D' }} aria-hidden="true">*</span>
+              </label>
               <input
+                id="new-space-name"
+                ref={nameInputRef}
                 value={newName}
-                onChange={e => setNewName(e.target.value)}
+                onChange={e => { setNewName(e.target.value); if (nameError) setNameError('') }}
                 placeholder="Ej: Calidad de agua"
-                className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none mb-1"
-                style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text)' }}
+                required
+                aria-invalid={!!nameError}
+                aria-describedby={nameError ? 'new-space-name-error' : undefined}
+                className="w-full border rounded-xl px-3 py-2.5 text-sm outline-none mb-1 transition-colors"
+                style={{ borderColor: nameError ? '#E5484D' : 'var(--border)', background: 'var(--bg)', color: 'var(--text)', boxShadow: nameError ? '0 0 0 3px rgba(229,72,77,0.15)' : 'none' }}
               />
+              {nameError && (
+                <p id="new-space-name-error" role="alert" className="mb-2 px-1 text-xs font-semibold" style={{ color: '#E5484D' }}>{nameError}</p>
+              )}
               {newName.trim() && (
                 <div className="flex items-center gap-1.5 mb-3 text-xs font-mono px-1" style={{ color: 'var(--text2)' }}>
                   <Check size={12} /> slug: {generateLabel(newName.trim())}

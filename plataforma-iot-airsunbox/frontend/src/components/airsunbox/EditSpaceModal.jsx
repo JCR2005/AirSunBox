@@ -1,5 +1,5 @@
 import ScrollHint from '../ScrollHint'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { X, Check, ChevronDown } from 'lucide-react'
 import { spaces as spacesApi } from '../../services/api'
 import { generateLabel, SPACE_TYPES, SPACE_ICONS, SPACE_COLORS } from '../../pages/spaceUtils'
@@ -13,6 +13,8 @@ const DEFAULT_COLOR = '#67B7E8'
 export default function EditSpaceModal({ space, onClose, onSaved }) {
   const isCustom = !ACTIVE_TYPES.includes(space.type)
   const [name, setName] = useState(space.name || '')
+  const [nameError, setNameError] = useState('')
+  const nameInputRef = useRef(null)
   const [description, setDescription] = useState(space.description || '')
   const [type, setType] = useState(isCustom ? 'otro' : space.type)
   const [customType, setCustomType] = useState(isCustom ? space.type : '')
@@ -25,7 +27,11 @@ export default function EditSpaceModal({ space, onClose, onSaved }) {
 
   const save = async (e) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim()) {
+      setNameError('Escribí un nombre para el espacio.')
+      nameInputRef.current?.focus()
+      return
+    }
     setSaving(true); setError('')
     try {
       const updated = await spacesApi.update(space.id, {
@@ -57,13 +63,23 @@ export default function EditSpaceModal({ space, onClose, onSaved }) {
           <Check size={12} /> slug: {generateLabel(name.trim() || space.slug)}
         </div>
 
-        <label className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>Nombre</label>
+        <label htmlFor="edit-space-name" className="text-xs font-bold uppercase tracking-wide mb-1 block" style={{ color: 'var(--text2)' }}>
+          Nombre <span style={{ color: '#E5484D' }} aria-hidden="true">*</span>
+        </label>
         <input
+          id="edit-space-name"
+          ref={nameInputRef}
           value={name}
-          onChange={e => setName(e.target.value)}
-          className={INPUT + " mb-3 w-full"}
-          style={inputStyle}
+          onChange={e => { setName(e.target.value); if (nameError) setNameError('') }}
+          required
+          aria-invalid={!!nameError}
+          aria-describedby={nameError ? 'edit-space-name-error' : undefined}
+          className={INPUT + (nameError ? " mb-1 w-full" : " mb-3 w-full")}
+          style={{ ...inputStyle, ...(nameError ? { borderColor: '#E5484D', boxShadow: '0 0 0 3px rgba(229,72,77,0.15)' } : {}) }}
         />
+        {nameError && (
+          <p id="edit-space-name-error" role="alert" className="mb-3 px-1 text-xs font-semibold" style={{ color: '#E5484D' }}>{nameError}</p>
+        )}
 
         <label className="text-xs font-bold uppercase tracking-wide mb-2 block" style={{ color: 'var(--text2)' }}>Tipo de monitoreo</label>
         <div className="grid grid-cols-5 gap-2 mb-3">
