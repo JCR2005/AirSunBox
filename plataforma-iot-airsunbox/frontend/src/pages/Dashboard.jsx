@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import { devices as devicesApi } from '../services/api'
-import { Activity, AlertTriangle, ChevronRight, Cpu, MapPin, Radio } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronRight, CloudSun, Cpu, MapPin, Moon, Radio, Sun } from 'lucide-react'
 import useAuthStore from '../store/auth'
 import { useWebSocket } from '../hooks/useWebSocket'
 
@@ -135,6 +135,14 @@ export default function ClientDashboard() {
     </ClienteLayout>
   )
 
+  // Saludo según la hora: sol de día (como el logo), atardecer y luna de noche
+  const hour = new Date().getHours()
+  const greeting = hour < 12
+    ? { text: 'Buenos días', Icon: Sun, color: '#E0A23B', tint: 'rgba(224,162,59,0.14)' }
+    : hour < 19
+      ? { text: 'Buenas tardes', Icon: CloudSun, color: SKY, tint: 'rgba(103,183,232,0.14)' }
+      : { text: 'Buenas noches', Icon: Moon, color: '#8B9CF7', tint: 'rgba(139,156,247,0.16)' }
+
   const KPIS = [
     { label: 'Total de estaciones', value: total, icon: Cpu, color: SKY,
       note: total ? 'registradas en tu red' : 'aún sin estaciones' },
@@ -151,15 +159,30 @@ export default function ClientDashboard() {
       <div className="min-h-full px-4 py-6 md:px-8 md:py-10 page-bg">
         <style>{pulseStyle}</style>
 
-        {/* Encabezado (mismo patrón que Espacios y Estaciones) */}
-        <div className="mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold mb-1" style={{ color: 'var(--text)' }}>
-            {greetingName ? `Hola, ${greetingName}` : 'Panel general'}
-          </h1>
-          <p className="text-xs md:text-sm first-letter:uppercase" style={{ color: 'var(--text2)' }}>
-            {today} · así está tu red de monitoreo
+        {/* Encabezado: saludo según la hora, en vivo */}
+        <header className="mb-6 md:mb-8">
+          <div className="flex items-center gap-3">
+            <span className="w-11 h-11 md:w-12 md:h-12 rounded-2xl flex items-center justify-center shrink-0"
+                  style={{ background: greeting.tint, color: greeting.color }} aria-hidden="true">
+              <greeting.Icon size={22} strokeWidth={2.25} />
+            </span>
+            <h1 className="font-display text-[1.9rem] md:text-[2.6rem] font-extrabold leading-[1.1] break-words" style={{ color: 'var(--text)' }}>
+              {greeting.text}{greetingName ? `, ${greetingName}` : ''}
+            </h1>
+          </div>
+          <p className="mt-3 text-sm flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: 'var(--text2)' }}>
+            {total > 0 && (
+              <span className="inline-flex items-center gap-2 font-semibold" style={{ color: activeCount ? '#2CB67D' : 'var(--text2)' }}>
+                <span className={`w-2 h-2 rounded-full ${activeCount ? 'live-dot' : ''}`} style={{ background: activeCount ? '#2CB67D' : OFFLINE }} />
+                {activeCount ? 'En vivo' : 'Sin señal'}
+              </span>
+            )}
+            {total > 0 && <span aria-hidden="true">·</span>}
+            <span className="first-letter:uppercase">{today}</span>
+            {total > 0 && <span aria-hidden="true">·</span>}
+            {total > 0 && <span>{activeCount} de {total} estaciones reportando</span>}
           </p>
-        </div>
+        </header>
 
         {/* Indicadores */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">

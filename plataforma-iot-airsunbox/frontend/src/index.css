@@ -112,3 +112,9 @@ body {
    es solo de la portada; dentro de los paneles se usa DM Sans en negrita. */
 .app-shell .font-syne,
 .app-shell [style*="Syne"] { font-family: 'DM Sans', sans-serif !important; letter-spacing: -0.01em; }
+
+/* ── Títulos de bienvenida: tipografía con más carácter ── */
+.font-display { font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif; letter-spacing: -0.025em; }
+@keyframes live-dot { 0% { box-shadow: 0 0 0 0 rgba(44,182,125,.55); } 100% { box-shadow: 0 0 0 7px rgba(44,182,125,0); } }
+.live-dot { animation: live-dot 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
