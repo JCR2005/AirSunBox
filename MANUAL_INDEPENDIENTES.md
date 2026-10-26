@@ -1,19 +1,19 @@
 # Manual de Usuario — Organizaciones Independientes (Tipo B)
 
-**Plataforma Sanik IoT**  
+**Plataforma AirSunBox**  
 Versión 1.0 — Septiembre 2026
 
 ---
 
 ## 1. Introducción
 
-### 1.1 ¿Qué es Sanik?
-Sanik es una plataforma IoT para monitoreo ambiental (calidad de aire, agua, suelo, ruido, energía). Permite a organizaciones **independientes (Tipo B)** autogestionar sus espacios, estaciones, variables y configuración AQI sin depender del equipo Sanik.
+### 1.1 ¿Qué es AirSunBox?
+AirSunBox es una plataforma IoT para monitoreo ambiental (calidad de aire, agua, suelo, ruido, energía). Permite a organizaciones **independientes (Tipo B)** autogestionar sus espacios, estaciones, variables y configuración AQI sin depender del equipo AirSunBox.
 
 ### 1.2 Tipos de organización
 | Tipo | Descripción | Quién la gestiona |
 |------|-------------|-------------------|
-| **A (Dependiente)** | Gestionada por Sanik; espacios ocultos, catálogo global | Equipo Sanik |
+| **A (Dependiente)** | Gestionada por AirSunBox; espacios ocultos, catálogo global | Equipo AirSunBox |
 | **B (Independiente / Autogestionada)** | El cliente crea sus espacios, variables, AQI, estaciones | **Usted (este manual)** |
 
 > **Este manual cubre exclusivamente organizaciones Tipo B.**
@@ -23,7 +23,7 @@ Sanik es una plataforma IoT para monitoreo ambiental (calidad de aire, agua, sue
 ## 2. Acceso a la plataforma
 
 ### 2.1 Creación de cuenta (Registro)
-1. Acceda a la URL de la plataforma (ej. `https://sanik.example.com`).
+1. Acceda a la URL de la plataforma (ej. `https://18.223.121.208`).
 2. Haga clic en **"Registrarse"** / **"Crear cuenta"**.
 3. Complete el formulario:
    - **Nombre completo**
@@ -216,7 +216,7 @@ Para **cada variable** (filas) y **cada categoría** (columnas, salvo la última
 
 - **Documentación técnica / API**: `/docs` (dentro de la app).
 - **Reportar incidencia**: Botón "Ayuda" → "Reportar problema" (abre formulario con logs).
-- **Correo soporte**: `soporte@sanik.io`
+- **Correo soporte**: `airsunbox@gmail.com`
 - **Horario**: Lunes a viernes 9:00–18:00 (GMT-6).
 
 ---
@@ -229,7 +229,7 @@ Para **cada variable** (filas) y **cada categoría** (columnas, salvo la última
 | **Label** | Identificador técnico único (slug) de variable o estación. |
 | **Space / Espacio** | Contenedor lógico de variables, AQI y estaciones. |
 | **Dot / Trama** | Un paquete de datos MQTT enviado por la estación (variable + valor + timestamp). |
-| **Org Tipo A / B** | Dependiente (Sanik) / Independiente (cliente). |
+| **Org Tipo A / B** | Dependiente (AirSunBox) / Independiente (cliente). |
 | **Mapa público** | Vista abierta `/mapa` con estaciones visibles según reglas. |
 
 ---

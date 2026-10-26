@@ -4,12 +4,12 @@ const puppeteer = require('puppeteer');
 const path = require('path');
 
 // Read markdown
-const md = fs.readFileSync('/home/carlos/Documentos/Sanik/MANUAL_INDEPENDIENTES.md', 'utf8');
+const md = fs.readFileSync(`${__dirname}/MANUAL_INDEPENDIENTES.md`, 'utf8');
 
 // Load screenshots mapping
 let screenshots = {};
 try {
-  screenshots = JSON.parse(fs.readFileSync('/home/carlos/Documentos/Sanik/screenshots/mapping.json', 'utf8'));
+  screenshots = JSON.parse(fs.readFileSync(`${__dirname}/screenshots/mapping.json`, 'utf8'));
 } catch (_) {}
 
 // Build HTML with embedded screenshots
@@ -86,13 +86,13 @@ const fullHtml = `
     const page = await browser.newPage();
     await page.setContent(fullHtml, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.pdf({
-      path: '/home/carlos/Documentos/Sanik/MANUAL_INDEPENDIENTES.pdf',
+      path: `${__dirname}/MANUAL_INDEPENDIENTES.pdf`,
       format: 'A4',
       printBackground: true,
       margin: { top: '20mm', right: '20mm', bottom: '20mm', left: '20mm' }
     });
     await browser.close();
-    const stats = fs.statSync('/home/carlos/Documentos/Sanik/MANUAL_INDEPENDIENTES.pdf');
+    const stats = fs.statSync(`${__dirname}/MANUAL_INDEPENDIENTES.pdf`);
     console.log('✅ PDF generado:', Math.round(stats.size/1024), 'KB');
   } catch (e) {
     console.error('❌ Error:', e.message);
