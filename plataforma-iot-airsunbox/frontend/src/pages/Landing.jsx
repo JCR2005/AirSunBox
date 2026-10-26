@@ -714,6 +714,9 @@ export default function Landing() {
             {/* Simulación de Chat de Bot (Derecha - Animado) */}
             <div style={{ position: "relative", zIndex: 1, flex: "1 1 240px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "10px", opacity: 0.9 }}>
               
+              {/* Conversación ilustrativa del bot: los valores son de ejemplo */}
+              <div style={{ fontSize: ".62rem", fontWeight: 700, letterSpacing: ".02em", color: "rgba(255,255,255,.45)" }}>Ejemplo de conversación con el bot</div>
+
               {/* Mensaje 1 (Bot) */}
               <div className="chat-bubble chat-bot" style={{ animation: "chat-in .5s ease 0.1s both", display: "flex", flexDirection: "column" }}>
                 <div style={{ fontSize: ".58rem", color: "rgba(255,255,255,.4)", marginBottom: "4px" }}>AirSunBox · 09:31</div>
@@ -747,7 +750,7 @@ export default function Landing() {
                       <span style={{ color: "#34D399", fontWeight: "800" }}>Buena</span>
                       <span style={{ width: "6px", height: "10px", color: "rgba(255,255,255,0.4)" }}>✓</span>
                     </div>
-                    <div style={{ fontSize: ".65rem", color: "rgba(255,255,255,.4)", marginTop: "1px" }}>Zona 3 · Ahora</div>
+                    <div style={{ fontSize: ".65rem", color: "rgba(255,255,255,.4)", marginTop: "1px" }}>Zona 3 · Ejemplo</div>
                   </div>
                 </div>
                 {/* Detalles de datos */}
