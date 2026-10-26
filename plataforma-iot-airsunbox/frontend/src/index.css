@@ -57,9 +57,10 @@ body {
 .hover\:border-\[\#1D9E75\]\/40:hover { border-color: rgba(77,182,255,0.4) !important; }
 .text-\[\#25C48F\] { color: var(--accent-l) !important; }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Sin barra de scroll visible en toda la app: el scroll funciona igual
+   (rueda, trackpad, táctil) y los modales muestran ScrollHint */
+* { scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; }
 
 /* ── Map marker ── */
 .map-marker-icon {
@@ -106,3 +107,15 @@ body {
 /* ── Anillo de protección del perfil: se cierra al activar el 2FA ── */
 .protection-ring { transition: stroke-dasharray .6s ease, stroke-dashoffset .6s ease, stroke .3s ease; }
 @media (prefers-reduced-motion: reduce) { .protection-ring { transition: none; } }
+
+/* ── Tipografía dentro de la app: DM Sans también en títulos ──
+   Muchas pantallas piden 'Syne' (font-syne o estilo en línea). Esa fuente
+   es solo de la portada; dentro de los paneles se usa DM Sans en negrita. */
+.app-shell .font-syne,
+.app-shell [style*="Syne"] { font-family: 'DM Sans', sans-serif !important; letter-spacing: -0.01em; }
+
+/* ── Títulos de bienvenida: tipografía con más carácter ── */
+.font-display { font-family: 'Plus Jakarta Sans', 'DM Sans', sans-serif; letter-spacing: -0.025em; }
+@keyframes live-dot { 0% { box-shadow: 0 0 0 0 rgba(44,182,125,.55); } 100% { box-shadow: 0 0 0 7px rgba(44,182,125,0); } }
+.live-dot { animation: live-dot 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }

@@ -46,7 +46,7 @@ export default function AdminLayout({ children }) {
   const filteredNav = NAV.filter(item => item.roles.includes(user?.role))
 
   return (
-    <div className="min-h-screen flex font-sans selection:bg-[#67B7E8] selection:text-white" style={{background:'var(--bg)'}}>
+    <div className="app-shell min-h-screen flex font-sans selection:bg-[#67B7E8] selection:text-white" style={{background:'var(--bg)'}}>
 
       {/* Mobile Backdrop */}
       {sidebarOpen && (

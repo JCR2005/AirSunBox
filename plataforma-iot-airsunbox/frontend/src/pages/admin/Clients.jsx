@@ -1,3 +1,4 @@
+import ScrollHint from '../../components/ScrollHint'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
@@ -61,6 +62,7 @@ function CreateClientModal({ onClose, onCreate }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-opacity">
       <div className="rounded-[24px] p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+        <ScrollHint />
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Nuevo cliente</h2>

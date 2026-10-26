@@ -1,3 +1,4 @@
+import ScrollHint from '../components/ScrollHint'
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -1389,6 +1390,7 @@ export default function ClientDeviceDetail() {
               </button>
             </div>
             <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              <ScrollHint />
               <p className="text-sm" style={{ color: 'var(--text2)' }}>Las variables marcadas participan en el AQI según la prioridad del espacio.</p>
               <div className="space-y-2">
                 {spaceAqiConfig.variables.map((v, i) => {
@@ -1450,6 +1452,7 @@ export default function ClientDeviceDetail() {
               </button>
             </div>
             <div className="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+              <ScrollHint />
               <div className="flex items-center justify-between">
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Marca las que quieras al lado del AQI.</p>
                 <span className="text-[11px] font-black px-2.5 py-1 rounded-full" style={{ background: quickDraft.length >= 4 ? '#F59E0B1A' : '#67B7E81A', color: quickDraft.length >= 4 ? '#F59E0B' : '#67B7E8' }}>
@@ -1523,6 +1526,7 @@ export default function ClientDeviceDetail() {
               </button>
             </div>
             <div className="p-5 space-y-4 max-h-[65vh] overflow-y-auto">
+              <ScrollHint />
               {editError && (
                 <div className="border rounded-xl px-3 py-2 text-xs" style={{ borderColor: '#F97316', color: '#FDBA74', background: 'rgba(249,115,22,0.1)' }}>
                   {editError}

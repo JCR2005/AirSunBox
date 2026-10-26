@@ -1,3 +1,4 @@
+import ScrollHint from '../components/ScrollHint'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
@@ -320,6 +321,7 @@ export default function Alerts() {
         {showModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="rounded-3xl p-8 w-full max-w-xl border shadow-2xl max-h-[92vh] overflow-y-auto" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+              <ScrollHint />
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-bold text-xl" style={{ color: 'var(--text)' }}>Nueva alerta</h2>
                 <button onClick={() => setShowModal(false)} className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}>
