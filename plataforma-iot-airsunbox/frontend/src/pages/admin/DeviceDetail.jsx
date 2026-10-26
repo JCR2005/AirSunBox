@@ -1,3 +1,4 @@
+import ScrollHint from '../../components/ScrollHint'
 import { useEffect, useState, useRef } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -418,6 +419,7 @@ export default function AdminDeviceDetail() {
       {showEdit && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="rounded-2xl p-6 w-full max-w-lg border max-h-[90vh] overflow-y-auto shadow-2xl" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+            <ScrollHint />
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-base" style={{ color: 'var(--text)' }}>Editar dispositivo</h2>
               <button onClick={() => setShowEdit(false)} style={{ color: 'var(--text2)' }}><X size={18} /></button>

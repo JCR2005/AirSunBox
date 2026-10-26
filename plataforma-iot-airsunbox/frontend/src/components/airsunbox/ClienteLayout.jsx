@@ -46,7 +46,7 @@ export default function ClienteLayout({ children }) {
   const displayLabel = org?.name ? org.name.toUpperCase() : 'PANEL CLIENTE'
 
   return (
-    <div className="min-h-screen flex font-sans selection:bg-[#67B7E8] selection:text-white" style={{background:'var(--bg)'}}>
+    <div className="app-shell min-h-screen flex font-sans selection:bg-[#67B7E8] selection:text-white" style={{background:'var(--bg)'}}>
 
       {/* Mobile Backdrop */}
       {sidebarOpen && (
