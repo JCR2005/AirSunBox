@@ -38,7 +38,13 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
+  const [info, setInfo] = useState(() => {
+    // Avisos al llegar desde la recuperación de contraseña o una sesión cerrada
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('contrasena') === 'actualizada') return 'Contraseña actualizada. Entrá con tu contraseña nueva.'
+    if (q.get('sesion') === 'revocada') return 'Tu contraseña cambió y cerramos tu sesión. Entrá con la contraseña nueva.'
+    return ''
+  })
   const [mode, setMode] = useState('login')
   const [reg, setReg] = useState({ orgName: '', email: '', password: '', confirmPassword: '', name: '', phone: '', location: '' })
   const [regCoords, setRegCoords] = useState(null)
@@ -239,7 +245,7 @@ export default function Login() {
         {/* NUEVO: BOTÓN PARA IR A LA PÁGINA PRINCIPAL */}
         <div className="absolute top-6 right-6 z-20">
           <a 
-            href="https://voluble-creponne-e6c74f.netlify.app/" 
+            href="/" 
             className="flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl border transition-all duration-200 hover:shadow-sm"
             style={{ 
               borderColor: COLORS.border, 
@@ -266,7 +272,7 @@ export default function Login() {
             {/* ENLACE EN EL LOGO HACIA LA LANDING */}
             <div className="mb-6 flex justify-center">
               <a 
-                href="https://voluble-creponne-e6c74f.netlify.app/"
+                href="/"
                 className="transition-transform duration-200 hover:scale-105 inline-block"
                 title="Ir a la página principal"
               >

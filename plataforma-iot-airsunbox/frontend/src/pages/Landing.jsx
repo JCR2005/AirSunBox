@@ -489,7 +489,7 @@ export default function Landing() {
         >
           {/* NUEVO: ENLACE DIRECTO AL MAPA EN NETLIFY */}
           <a 
-            href="https://voluble-creponne-e6c74f.netlify.app/mapa" 
+            href="/mapa" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="nav-link" 
@@ -605,7 +605,7 @@ export default function Landing() {
             Ver planes →
           </a>
           <a 
-            href="https://voluble-creponne-e6c74f.netlify.app/mapa" 
+            href="/mapa" 
             target="_blank" 
             rel="noopener noreferrer" 
             className="btn-outline"
@@ -764,7 +764,7 @@ export default function Landing() {
 
                 {/* NUEVO: BOTÓN CLIQUEABLE REAL DENTRO DEL CHAT SIMULADO HACIA EL MAPA */}
                 <a 
-                  href="https://voluble-creponne-e6c74f.netlify.app/mapa" 
+                  href="/mapa" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   style={{ 
@@ -1410,7 +1410,7 @@ export default function Landing() {
           <div style={{ display: "flex", gap: 24 }}>
             {/* ENLACE AL MAPA EN EL FOOTER TAMBIÉN */}
             <a
-              href="https://voluble-creponne-e6c74f.netlify.app/mapa"
+              href="/mapa"
               target="_blank"
               rel="noopener noreferrer"
               style={{
