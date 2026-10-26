@@ -185,7 +185,7 @@ export async function findForgotPasswordUser(db: Queryable, email: string): Prom
 export async function setResetToken(db: Queryable, userId: string, tokenHash: string): Promise<void> {
   await db.query(
     `UPDATE users
-     SET reset_token_hash = $1, reset_token_expires_at = NOW() + INTERVAL '60 minutes'
+     SET reset_token_hash = $1, reset_token_expires_at = NOW() + INTERVAL '10 minutes'
      WHERE id = $2`,
     [tokenHash, userId]
   )
@@ -204,13 +204,21 @@ export async function findValidResetToken(db: Queryable, tokenHash: string): Pro
   return rows
 }
 
-export async function clearResetTokenAndSetPassword(db: Queryable, userId: string, passwordHash: string): Promise<void> {
-  await db.query(
+// Consume el token en el mismo UPDATE que cambia la contraseña: si dos pedidos
+// usan el mismo enlace a la vez, solo el primero lo encuentra vigente.
+export async function clearResetTokenAndSetPassword(
+  db: Queryable,
+  userId: string,
+  tokenHash: string,
+  passwordHash: string
+): Promise<boolean> {
+  const result = await db.query(
     `UPDATE users
      SET password_hash = $1, reset_token_hash = NULL, reset_token_expires_at = NULL
-     WHERE id = $2`,
-    [passwordHash, userId]
+     WHERE id = $2 AND reset_token_hash = $3 AND reset_token_expires_at > NOW()`,
+    [passwordHash, userId, tokenHash]
   )
+  return (result.rowCount ?? 0) > 0
 }
 
 export async function findClientUserByOrg(db: Queryable, orgId: string, fields: 'credentials' | 'reset' = 'reset'): Promise<ClientUserRow[]> {
@@ -230,7 +238,11 @@ export async function resetClientPassword(
   passwordHash: string
 ): Promise<void> {
   await db.query(
-    "UPDATE users SET password_hash = $1, temp_password = NULL, status = 'active' WHERE id = $2",
+    // También anula un enlace de recuperación pendiente
+    `UPDATE users
+     SET password_hash = $1, temp_password = NULL, status = 'active',
+         reset_token_hash = NULL, reset_token_expires_at = NULL
+     WHERE id = $2`,
     [passwordHash, userId]
   )
 }

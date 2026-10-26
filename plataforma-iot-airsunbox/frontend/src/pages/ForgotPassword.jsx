@@ -59,7 +59,7 @@ export default function ForgotPassword() {
 
         <ul className="mt-6 rounded-2xl border divide-y text-sm" style={{ borderColor: RC.border }}>
           {[
-            { Icon: Clock, text: 'El enlace vale 60 minutos y sirve una sola vez.' },
+            { Icon: Clock, text: 'El enlace vale 10 minutos y sirve una sola vez.' },
             { Icon: Inbox, text: 'Si no lo ves, revisá Spam o Promociones.' },
           ].map(({ Icon, text }) => (
             <li key={text} className="flex items-center gap-3 px-4 py-3" style={{ borderColor: RC.border, color: RC.textMuted }}>
