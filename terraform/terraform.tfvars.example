@@ -1,0 +1,6 @@
+instance_id       = "i-REPLACE_WITH_EXISTING_INSTANCE_ID"
+vpc_id            = "vpc-REPLACE_WITH_EXISTING_VPC_ID"
+subnet_id         = "subnet-REPLACE_WITH_EXISTING_SUBNET_ID"
+security_group_id = "sg-REPLACE_WITH_EXISTING_SECURITY_GROUP_ID"
+ebs_volume_id     = "vol-REPLACE_WITH_EXISTING_EBS_VOLUME_ID"
+iam_role_name     = "sanik-iot-ec2-role"
