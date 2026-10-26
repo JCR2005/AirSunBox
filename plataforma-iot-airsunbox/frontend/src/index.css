@@ -106,3 +106,9 @@ body {
 /* ── Anillo de protección del perfil: se cierra al activar el 2FA ── */
 .protection-ring { transition: stroke-dasharray .6s ease, stroke-dashoffset .6s ease, stroke .3s ease; }
 @media (prefers-reduced-motion: reduce) { .protection-ring { transition: none; } }
+
+/* ── Tipografía dentro de la app: DM Sans también en títulos ──
+   Muchas pantallas piden 'Syne' (font-syne o estilo en línea). Esa fuente
+   es solo de la portada; dentro de los paneles se usa DM Sans en negrita. */
+.app-shell .font-syne,
+.app-shell [style*="Syne"] { font-family: 'DM Sans', sans-serif !important; letter-spacing: -0.01em; }

@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import { devices as devicesApi } from '../services/api'
-import { ChevronRight, Radio } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronRight, Cpu, MapPin, Radio } from 'lucide-react'
 import useAuthStore from '../store/auth'
 import { useWebSocket } from '../hooks/useWebSocket'
 
@@ -114,7 +114,10 @@ export default function ClientDashboard() {
 
   const defaultCenter = [14.8347, -91.5185]
   const mapCenter = devices.length > 0 && devices[0].lat ? [devices[0].lat, devices[0].lng] : defaultCenter
-  const greetingName = org?.name || user?.name || ''
+  // Cuenta individual: el nombre de la persona ("Hola, Ana"), no "Cuenta de Ana"
+  const greetingName = org?.accountType === 'individual'
+    ? (user?.name || '').trim().split(/\s+/)[0]
+    : (org?.name || user?.name || '')
 
   // Estado de red: primero las que requieren atención (peor AQI), al final las desconectadas
   const rank = (d) => {
@@ -132,171 +135,179 @@ export default function ClientDashboard() {
     </ClienteLayout>
   )
 
+  const KPIS = [
+    { label: 'Total de estaciones', value: total, icon: Cpu, color: SKY,
+      note: total ? 'registradas en tu red' : 'aún sin estaciones' },
+    { label: 'En línea', value: activeCount, icon: Activity, color: '#2CB67D',
+      note: total ? `${onlinePct}% de la red reportando` : '—', bar: onlinePct },
+    { label: 'Sin conexión', value: offlineCount, icon: AlertTriangle, color: offlineCount ? AMBER : 'var(--text2)',
+      note: offlineCount ? 'requieren revisión' : 'todo en orden', action: offlineCount > 0 },
+  ]
+
+  const cardStyle = { background: 'var(--card)', borderColor: 'var(--border)' }
+
   return (
     <ClienteLayout>
-      <div className="min-h-full px-4 py-8 sm:px-8 lg:px-12 lg:py-12 page-bg">
+      <div className="min-h-full px-4 py-6 md:px-8 md:py-10 page-bg">
         <style>{pulseStyle}</style>
-        <div className="max-w-6xl mx-auto">
 
-          {/* Encabezado */}
-          <header>
-            <p className="text-sm first-letter:uppercase" style={{ color: 'var(--text2)' }}>{today}</p>
-            <h1 className="mt-1 text-3xl sm:text-4xl font-bold leading-tight break-words" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
-              {greetingName ? `Hola, ${greetingName}` : 'Hola'}
-            </h1>
-            <p className="mt-1 text-base" style={{ color: 'var(--text2)' }}>
-              Así está tu red de monitoreo ahora.
-            </p>
-          </header>
+        {/* Encabezado (mismo patrón que Espacios y Estaciones) */}
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold mb-1" style={{ color: 'var(--text)' }}>
+            {greetingName ? `Hola, ${greetingName}` : 'Panel general'}
+          </h1>
+          <p className="text-xs md:text-sm first-letter:uppercase" style={{ color: 'var(--text2)' }}>
+            {today} · así está tu red de monitoreo
+          </p>
+        </div>
 
-          {/* Resumen de la red */}
-          <section aria-label="Resumen de la red" className="mt-8 rounded-2xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-            <dl className="grid grid-cols-3 divide-x" style={{ '--tw-divide-opacity': 1 }}>
-              {[
-                { label: 'Total de estaciones', value: total, color: 'var(--text)' },
-                { label: 'En línea', value: activeCount, color: SKY },
-                { label: 'Sin conexión', value: offlineCount, color: offlineCount ? AMBER : 'var(--text)' },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="px-4 sm:px-6 py-5 flex flex-col justify-between" style={{ borderColor: 'var(--border)' }}>
-                  <dt className="text-sm" style={{ color: 'var(--text2)' }}>{label}</dt>
-                  <dd className="mt-1 text-3xl sm:text-4xl font-bold" style={{ color, fontFamily: "'Syne', sans-serif", fontVariantNumeric: 'tabular-nums' }}>
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            {/* Proporción en línea / sin conexión */}
-            <div className="px-4 sm:px-6 pb-5">
-              <div className="h-1.5 rounded-full overflow-hidden flex" style={{ background: 'var(--border)' }} role="img"
-                   aria-label={`${onlinePct}% de las estaciones en línea`}>
-                <span className="h-full transition-[width] duration-700" style={{ width: `${onlinePct}%`, background: SKY }} />
-                <span className="h-full transition-[width] duration-700" style={{ width: total ? `${Math.round((offlineCount / total) * 100)}%` : 0, background: AMBER }} />
+        {/* Indicadores */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
+          {KPIS.map(({ label, value, icon: Icon, color, note, bar, action }) => (
+            <div key={label} className="rounded-2xl p-5 border flex flex-col" style={cardStyle}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold" style={{ color: 'var(--text2)' }}>{label}</span>
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: `${color.startsWith('#') ? color : '#8FA899'}1F`, color }}>
+                  <Icon size={17} strokeWidth={2.25} />
+                </span>
               </div>
-              <p className="mt-2 text-sm flex items-center gap-2" style={{ color: offlineCount ? AMBER : 'var(--text2)' }}>
-                {offlineCount > 0 ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full" style={{ background: AMBER }} />
-                    {offlineCount === 1 ? '1 estación sin conexión.' : `${offlineCount} estaciones sin conexión.`}
-                    <button type="button" onClick={() => navigate('/dispositivos')} className="font-semibold hover:underline" style={{ color: 'var(--text)' }}>
-                      Revisar
+              <div className="mt-3 text-3xl md:text-4xl font-bold tracking-tight" style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                {value}
+              </div>
+              {bar != null ? (
+                <div className="mt-3">
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                    <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${bar}%`, background: color }} />
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: 'var(--text2)' }}>{note}</p>
+                </div>
+              ) : (
+                <p className="mt-auto pt-3 text-xs flex items-center gap-2" style={{ color: 'var(--text2)' }}>
+                  {note}
+                  {action && (
+                    <button type="button" onClick={() => navigate('/dispositivos')} className="font-semibold inline-flex items-center gap-0.5 hover:gap-1.5 transition-all" style={{ color: AMBER }}>
+                      Revisar <ChevronRight size={12} />
                     </button>
-                  </>
-                ) : total ? (
-                  <>
-                    <span className="w-2 h-2 rounded-full" style={{ background: SKY }} />
-                    Todas las estaciones están reportando.
-                  </>
-                ) : 'Aún no tienes estaciones registradas.'}
-              </p>
+                  )}
+                </p>
+              )}
             </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
+
+          {/* Mapa */}
+          <section aria-labelledby="mapa-titulo" className="xl:col-span-2 rounded-2xl border p-4 md:p-5 flex flex-col" style={cardStyle}>
+            <div className="flex items-center gap-3 mb-4">
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(103,183,232,0.12)', color: SKY }}>
+                <MapPin size={17} strokeWidth={2.25} />
+              </span>
+              <div className="min-w-0">
+                <h2 id="mapa-titulo" className="font-bold text-sm md:text-base" style={{ color: 'var(--text)' }}>Mapa de estaciones</h2>
+                <p className="text-xs" style={{ color: 'var(--text2)' }}>Cada punto toma el color de su calidad del aire</p>
+              </div>
+            </div>
+            <div className="rounded-xl overflow-hidden border relative z-0 h-[300px] md:h-[440px]" style={{ borderColor: 'var(--border)' }}>
+              <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {devices.map((device) => {
+                  if (!device.lat || !device.lng) return null
+                  const aqiData = aqis[device.id]
+                  const color = stationColor(device)
+                  return (
+                    <Marker key={device.id} position={[device.lat, device.lng]} icon={createIcon(device)}>
+                      <Popup>
+                        <div className="font-sans text-center min-w-[140px]">
+                          <strong className="block text-sm mb-1.5">{device.name}</strong>
+                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color }}>
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
+                            {!isOnline(device) ? 'Sin conexión' : aqiData?.category ? `${aqiData.category}${aqiData.aqi != null ? ` · AQI ${Math.round(aqiData.aqi)}` : ''}` : 'En línea'}
+                          </span>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  )
+                })}
+              </MapContainer>
+            </div>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs" style={{ color: 'var(--text2)' }} aria-label="Escala de calidad del aire">
+              {AQI_SCALE.map(s => (
+                <li key={s.key} className="inline-flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.label}
+                </li>
+              ))}
+              <li className="inline-flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: OFFLINE }} />Sin conexión
+              </li>
+            </ul>
           </section>
 
-          <div className="mt-8 grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-6 lg:gap-8">
+          {/* Estado de red */}
+          <section aria-labelledby="red-titulo" className="rounded-2xl border p-4 md:p-5 flex flex-col" style={cardStyle}>
+            <div className="flex items-center gap-3 mb-3">
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(44,182,125,0.12)', color: '#2CB67D' }}>
+                <Radio size={17} strokeWidth={2.25} />
+              </span>
+              <div className="min-w-0">
+                <h2 id="red-titulo" className="font-bold text-sm md:text-base" style={{ color: 'var(--text)' }}>Estado de red</h2>
+                <p className="text-xs" style={{ color: 'var(--text2)' }}>Primero las que necesitan atención</p>
+              </div>
+            </div>
 
-            {/* Mapa */}
-            <section aria-labelledby="mapa-titulo">
-              <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-                <h2 id="mapa-titulo" className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Mapa de estaciones</h2>
-                <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text2)' }} aria-label="Escala de calidad del aire">
-                  {AQI_SCALE.map(s => (
-                    <li key={s.key} className="inline-flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />{s.label}
+            {total === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12 rounded-xl border border-dashed" style={{ borderColor: 'var(--border)' }}>
+                <Cpu size={28} style={{ color: 'var(--text2)', opacity: 0.4 }} />
+                <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Registra tu primera estación</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--text2)' }}>Cuando empiece a enviar datos aparecerá aquí y en el mapa.</p>
+              </div>
+            ) : (
+              <ul className="-mx-2 overflow-y-auto max-h-[440px]">
+                {sorted.slice(0, 6).map((device) => {
+                  const aqiData = aqis[device.id]
+                  const color = stationColor(device)
+                  const online = isOnline(device)
+                  return (
+                    <li key={device.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/devices/${device.id}`)}
+                        className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40 group"
+                      >
+                        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-bold"
+                              style={{ background: `${color}1F`, color, fontVariantNumeric: 'tabular-nums' }}>
+                          {online && aqiData?.aqi != null ? Math.round(aqiData.aqi) : <span className="w-2 h-2 rounded-full" style={{ background: color }} />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-bold truncate" style={{ color: 'var(--text)' }}>{device.name}</span>
+                          <span className="block text-xs mt-0.5 truncate" style={{ color: 'var(--text2)' }}>
+                            <span style={{ color: online ? color : 'var(--text2)' }}>{!online ? 'Sin conexión' : aqiData?.category || 'En línea'}</span>
+                            {device.label ? ` · ${device.label}` : ''}
+                          </span>
+                        </span>
+                        <ChevronRight size={16} className="shrink-0 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" style={{ color: 'var(--text2)' }} />
+                      </button>
                     </li>
-                  ))}
-                  <li className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: OFFLINE }} />Sin conexión
-                  </li>
-                </ul>
-              </div>
-              <div className="mt-3 rounded-2xl border overflow-hidden relative z-0 h-[320px] sm:h-[420px]" style={{ borderColor: 'var(--border)' }}>
-                <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {devices.map((device) => {
-                    if (!device.lat || !device.lng) return null
-                    const aqiData = aqis[device.id]
-                    const color = stationColor(device)
-                    return (
-                      <Marker key={device.id} position={[device.lat, device.lng]} icon={createIcon(device)}>
-                        <Popup>
-                          <div className="font-sans text-center min-w-[140px]">
-                            <strong className="block text-sm mb-1.5">{device.name}</strong>
-                            <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color }}>
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                              {!isOnline(device) ? 'Sin conexión' : aqiData?.category ? `${aqiData.category}${aqiData.aqi != null ? ` · AQI ${Math.round(aqiData.aqi)}` : ''}` : 'En línea'}
-                            </span>
-                          </div>
-                        </Popup>
-                      </Marker>
-                    )
-                  })}
-                </MapContainer>
-              </div>
-            </section>
+                  )
+                })}
+              </ul>
+            )}
 
-            {/* Estado de red */}
-            <section aria-labelledby="red-titulo" className="flex flex-col">
-              <h2 id="red-titulo" className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Estado de red</h2>
-              <div className="mt-3 rounded-2xl border flex-1 flex flex-col" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                {total === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-12">
-                    <Radio size={22} style={{ color: SKY }} />
-                    <p className="mt-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>Registra tu primera estación</p>
-                    <p className="mt-1 text-sm" style={{ color: 'var(--text2)' }}>Cuando empiece a enviar datos, la verás aquí y en el mapa.</p>
-                  </div>
-                ) : (
-                  <ul className="px-2 py-1 overflow-y-auto max-h-[420px]">
-                    {sorted.slice(0, 6).map((device, i) => {
-                      const aqiData = aqis[device.id]
-                      const color = stationColor(device)
-                      const online = isOnline(device)
-                      return (
-                        <li key={device.id} className={i ? 'border-t' : ''} style={{ borderColor: 'var(--border)' }}>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/devices/${device.id}`)}
-                            className="w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-left transition-colors hover:bg-[rgba(103,183,232,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40 group"
-                          >
-                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                            <span className="flex-1 min-w-0">
-                              <span className="block text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{device.name}</span>
-                              <span className="block text-xs mt-0.5 truncate" style={{ color: online ? color : 'var(--text2)' }}>
-                                {!online ? 'Sin conexión' : aqiData?.category || 'En línea'}
-                                {device.label ? <span style={{ color: 'var(--text2)' }}> · {device.label}</span> : null}
-                              </span>
-                            </span>
-                            {online && aqiData?.aqi != null && (
-                              <span className="text-lg font-bold shrink-0" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif", fontVariantNumeric: 'tabular-nums' }}>
-                                {Math.round(aqiData.aqi)}
-                              </span>
-                            )}
-                            <ChevronRight size={16} className="shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--text2)' }} />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
+            {total > 6 && (
+              <button
+                type="button"
+                onClick={() => navigate('/dispositivos')}
+                className="mt-auto pt-3 flex items-center justify-center gap-1 text-xs font-bold transition-all hover:gap-2"
+                style={{ color: SKY }}
+              >
+                Ver las {total} estaciones <ChevronRight size={13} />
+              </button>
+            )}
+          </section>
 
-                {total > 6 && (
-                  <div className="mt-auto px-4 pb-4 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => navigate('/dispositivos')}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:border-[#67B7E8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40"
-                      style={{ borderColor: 'var(--border)', color: 'var(--text)', background: 'var(--bg)' }}
-                    >
-                      Ver las {total} estaciones
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-          </div>
         </div>
       </div>
     </ClienteLayout>
