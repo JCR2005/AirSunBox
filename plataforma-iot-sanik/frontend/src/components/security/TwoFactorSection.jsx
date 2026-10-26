@@ -1,342 +1,195 @@
-import { useState, useEffect } from 'react'
-import { Shield, ShieldCheck, ShieldAlert, AlertCircle, Check, Copy, Download, X, Loader2, Eye, EyeOff } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ShieldCheck, ShieldAlert, Check, Copy, Download, Loader2, Mail } from 'lucide-react'
 import useAuthStore from '../../store/auth'
 
-export default function TwoFactorSection() {
-  const { 
-    org, 
-    twoFactorStatus, 
-    backupCodes, 
-    twoFactorLoading, 
-    twoFactorError,
-    fetch2faStatus, 
-    send2faCode,
-    enable2fa, 
-    disable2fa 
-  } = useAuthStore()
+const SKY = '#67B7E8'
+const AMBER = '#E0A23B'
+const RED = '#E5484D'
 
-  const [step, setStep] = useState('idle')
-  const [otpCode, setOtpCode] = useState('')
-  const [disableCode, setDisableCode] = useState('')
-  const [showBackupCodes, setShowBackupCodes] = useState(false)
-  const [copiedIndex, setCopiedIndex] = useState(-1)
-  const [codeSent, setCodeSent] = useState(false)
+const POLICY_TEXT = {
+  required_admins: 'Tu organización exige la verificación en dos pasos a los administradores.',
+  required_all: 'Tu organización exige la verificación en dos pasos a todas las cuentas.',
+}
 
-  const handleSendCode = async () => {
-    const result = await send2faCode()
-    if (result.ok) setCodeSent(true)
+const btnPrimary = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors bg-[#67B7E8] hover:bg-[#55A6D7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40 disabled:opacity-50 disabled:cursor-not-allowed'
+const btnSecondary = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border transition-colors hover:border-[#67B7E8]/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]/40 disabled:opacity-50'
+
+function CodeInput({ value, onChange, backup = false, disabled }) {
+  return (
+    <input
+      inputMode={backup ? 'text' : 'numeric'}
+      autoComplete="one-time-code"
+      maxLength={backup ? 9 : 6}
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(backup
+        ? e.target.value.toUpperCase().replace(/[^0-9A-F-]/g, '').slice(0, 9)
+        : e.target.value.replace(/\D/g, '').slice(0, 6))}
+      placeholder={backup ? '123456 o A1B2-C3D4' : '000000'}
+      aria-label={backup ? 'Código del correo o de respaldo' : 'Código de 6 dígitos'}
+      className="w-full sm:w-56 px-4 py-2.5 rounded-xl border text-center text-lg tracking-[0.3em] font-semibold outline-none transition-colors focus:border-[#67B7E8] focus:ring-2 focus:ring-[#67B7E8]/25 placeholder:tracking-normal placeholder:text-sm placeholder:font-normal"
+      style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
+    />
+  )
+}
+
+// Códigos de respaldo: se muestran una sola vez, al activar.
+function BackupCodesDialog({ codes, onClose }) {
+  const [copied, setCopied] = useState(false)
+  const copyAll = async () => {
+    await navigator.clipboard.writeText(codes.join('\n'))
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
-
-  useEffect(() => {
-    fetch2faStatus()
-  }, [fetch2faStatus])
-
-  const handleEnable = async (e) => {
-    e.preventDefault()
-    if (!otpCode || otpCode.length !== 6) return
-    const result = await enable2fa(otpCode)
-    if (result.ok) {
-      setShowBackupCodes(true)
-      setStep('backup')
-      setOtpCode('')
-      setCodeSent(false)
-    }
-  }
-
-  const handleDisable = async (e) => {
-    e.preventDefault()
-    if (!disableCode) return
-    const result = await disable2fa(disableCode)
-    if (result.ok) {
-      setStep('idle')
-      setDisableCode('')
-      setCodeSent(false)
-    }
-  }
-
-  const copyCode = (code, index) => {
-    navigator.clipboard.writeText(code)
-    setCopiedIndex(index)
-    setTimeout(() => setCopiedIndex(-1), 2000)
-  }
-
-  const downloadCodes = () => {
-    const blob = new Blob([backupCodes.join('\n')], { type: 'text/plain' })
+  const download = () => {
+    const blob = new Blob([`Códigos de respaldo de AirSunBox\nCada código sirve una sola vez.\n\n${codes.join('\n')}\n`], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url
-    a.download = 'sanik-backup-codes.txt'
-    a.click()
+    a.href = url; a.download = 'airsunbox-codigos-de-respaldo.txt'; a.click()
     URL.revokeObjectURL(url)
   }
-
-  const policyLabels = {
-    optional: { label: 'Opcional', bg: 'bg-emerald-50 dark:bg-emerald-900/20', text: 'text-emerald-600 dark:text-emerald-400' },
-    required_admins: { label: 'Requerido para admins', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400' },
-    required_all: { label: 'Requerido para todos', bg: 'bg-red-50 dark:bg-red-900/20', text: 'text-red-600 dark:text-red-400' }
-  }
-
-  const isEnabled = twoFactorStatus?.enabled ?? false
-  const policy = twoFactorStatus?.policy || 'optional'
-  const isRequired = policy !== 'optional'
-  const policyInfo = policyLabels[policy] || policyLabels.optional
-
-  if (step === 'backup') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-200 dark:border-gray-700 animate-in slide-in-from-bottom-4 duration-300">
-          <div className="text-center mb-6">
-            <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center text-3xl" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981' }}>
-              <ShieldCheck size={32} />
-            </div>
-            <h3 className="text-2xl font-bold mb-2" style={{ color: 'var(--text)' }}>¡2FA Activado!</h3>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>
-              Guarda tus códigos de respaldo ahora. <strong>No se mostrarán de nuevo.</strong>
-            </p>
-          </div>
-
-          <div className="space-y-2 mb-6 max-h-64 overflow-y-auto pr-2" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-            {backupCodes.map((code, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-xl border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-                <code className="font-mono text-lg font-bold tracking-widest text-center flex-1" style={{ color: 'var(--text)', letterSpacing: '0.15em' }}>
-                  {backupCodes[i]}
-                </code>
-                <button
-                  onClick={() => copyCode(backupCodes[i], i)}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ background: 'var(--bg)', color: 'var(--text2)', borderColor: 'var(--border)' }}
-                >
-                  {copiedIndex === i ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={downloadCodes}
-              className="flex-1 py-3 px-4 rounded-xl font-bold border transition-colors"
-              style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-            >
-              <Download size={18} className="inline mr-2" /> Descargar
-            </button>
-            <button
-              onClick={() => { setShowBackupCodes(false); setStep('idle'); }}
-              className="flex-1 py-3 px-4 rounded-xl font-bold transition-colors"
-              style={{ background: 'var(--primary)', color: 'white' }}
-            >
-              Entendido
-            </button>
-          </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+      <div className="w-full max-w-md rounded-3xl border p-6 sm:p-8 shadow-2xl user-menu-pop" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(103,183,232,0.14)', color: SKY }}>
+          <ShieldCheck size={24} />
         </div>
+        <h3 id="backup-title" className="mt-4 text-xl font-bold" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
+          Verificación activada
+        </h3>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text2)' }}>
+          Guarda estos códigos. Si un día no te llega el correo, cada uno te deja entrar una vez. No se vuelven a mostrar.
+        </p>
+        <ol className="mt-5 grid grid-cols-2 gap-2">
+          {codes.map(code => (
+            <li key={code} className="rounded-xl border py-2.5 text-center text-base font-semibold tracking-[0.12em] select-all"
+                style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+              {code}
+            </li>
+          ))}
+        </ol>
+        <div className="mt-6 flex flex-col sm:flex-row gap-2">
+          <button type="button" onClick={copyAll} className={`${btnSecondary} flex-1`} style={{ borderColor: 'var(--border)', color: 'var(--text)', background: 'var(--bg)' }}>
+            {copied ? <Check size={16} style={{ color: '#2CB67D' }} /> : <Copy size={16} />} {copied ? 'Copiados' : 'Copiar todos'}
+          </button>
+          <button type="button" onClick={download} className={`${btnSecondary} flex-1`} style={{ borderColor: 'var(--border)', color: 'var(--text)', background: 'var(--bg)' }}>
+            <Download size={16} /> Descargar
+          </button>
+        </div>
+        <button type="button" onClick={onClose} className={`${btnPrimary} w-full mt-2`}>Ya los guardé</button>
       </div>
-    )
+    </div>
+  )
+}
+
+export default function TwoFactorSection({ email }) {
+  const { twoFactorStatus, backupCodes, twoFactorLoading, twoFactorError, fetch2faStatus, send2faCode, enable2fa, disable2fa } = useAuthStore()
+  const [mode, setMode] = useState('idle')      // idle | enabling | disabling
+  const [code, setCode] = useState('')
+  const [codeSent, setCodeSent] = useState(false)
+  const [showCodes, setShowCodes] = useState(false)
+
+  useEffect(() => { fetch2faStatus() }, [fetch2faStatus])
+
+  const enabled = !!twoFactorStatus?.enabled
+  const policyText = POLICY_TEXT[twoFactorStatus?.policy]
+
+  const reset = () => { setMode('idle'); setCode(''); setCodeSent(false); useAuthStore.setState({ twoFactorError: null }) }
+
+  const sendCode = async () => {
+    const r = await send2faCode()
+    if (r.ok) setCodeSent(true)
   }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const r = mode === 'enabling' ? await enable2fa(code) : await disable2fa(code)
+    if (r.ok) {
+      if (mode === 'enabling') setShowCodes(true)
+      reset()
+    }
+  }
+
+  const codeReady = mode === 'enabling' ? code.length === 6 : (code.length === 6 || code.length === 9)
 
   return (
-    <div>
-      {!isEnabled && (
-        <div className="rounded-3xl p-8 border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(249,115,22,0.12)', color: '#F97316' }}>
-                <ShieldAlert size={24} />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Autenticación de dos factores</h3>
-                <p className="text-sm" style={{ color: 'var(--text2)' }}>Añade una capa extra de seguridad a tu cuenta</p>
-              </div>
-            </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${policyInfo.bg} ${policyInfo.text}`}>
-              {policyInfo.label}
-            </span>
-          </div>
+    <div className="py-5">
+      {showCodes && backupCodes?.length > 0 && <BackupCodesDialog codes={backupCodes} onClose={() => setShowCodes(false)} />}
 
-          <div className="space-y-4">
-            <div className="rounded-xl p-4" style={{ background: 'var(--bg)', borderColor: 'var(--border)', borderWidth: '1px', borderStyle: 'solid' }}>
-              <h4 className="font-bold mb-2" style={{ color: 'var(--text)' }}>¿Cómo funciona?</h4>
-              <ul className="text-sm space-y-2" style={{ color: 'var(--text2)' }}>
-                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--primary)' }}></span> Al iniciar sesión, recibirás un código de 6 dígitos por email</li>
-                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--primary)' }}></span> Ingresa el código para acceder</li>
-                <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--primary)' }}></span> Recibirás 8 códigos de respaldo (guárdalos seguros)</li>
-              </ul>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSendCode}
-              disabled={twoFactorLoading}
-              className="w-full py-3 px-6 rounded-xl font-bold border transition-colors"
-              style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)', opacity: twoFactorLoading ? 0.6 : 1 }}
-            >
-              {codeSent ? 'Reenviar código a mi email' : '1. Enviar código a mi email'}
-            </button>
-            {codeSent && (
-              <p className="text-sm flex items-center gap-2" style={{ color: '#10B981' }}>
-                <Check size={16} /> Código enviado. Revisá tu correo (vence en 10 minutos).
-              </p>
-            )}
-
-            <form onSubmit={handleEnable} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text)' }}>2. Código de 6 dígitos recibido por email</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
-                  className="w-full px-4 py-3 rounded-xl border text-center text-2xl tracking-widest font-mono transition-colors"
-                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-                  autoComplete="one-time-code"
-                  required
-                  disabled={twoFactorLoading}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={twoFactorLoading || otpCode.length !== 6}
-                className="w-full py-3 px-6 rounded-xl font-bold transition-colors"
-                style={{ background: 'var(--primary)', color: 'white', opacity: (twoFactorLoading || otpCode.length !== 6) ? 0.6 : 1 }}
-              >
-                {twoFactorLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="w-5 h-5 animate-spin" /> Activando...
-                  </span>
-                ) : (
-                  'Activar 2FA'
-                )}
-              </button>
-            </form>
-
-            {twoFactorError && (
-              <div className="p-3 rounded-xl text-sm flex items-center gap-2" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)', borderWidth: '1px', borderStyle: 'solid' }}>
-                <AlertCircle size={16} /> {twoFactorError}
-              </div>
-            )}
-
-            {isRequired && (
-              <div className="mt-6 p-4 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)', borderWidth: '1px', borderStyle: 'solid' }}>
-                <p className="text-sm flex items-center gap-2" style={{ color: '#EF4444' }}>
-                  <Shield size={16} />
-                  <strong>Política de organización:</strong> {policyInfo.label}. Debes activar 2FA para acceder.
-                </p>
-              </div>
-            )}
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center"
+             style={{ background: enabled ? 'rgba(103,183,232,0.12)' : 'rgba(224,162,59,0.14)', color: enabled ? SKY : AMBER }}>
+          {enabled ? <ShieldCheck size={18} /> : <ShieldAlert size={18} />}
         </div>
-      )}
-
-      {isEnabled && (
-      <div className="rounded-3xl p-8 border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981' }}>
-              <ShieldCheck size={24} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold" style={{ color: 'var(--text)' }}>2FA Activado</h3>
-              <p className="text-sm" style={{ color: 'var(--text2)' }}>Tu cuenta tiene protección adicional</p>
-            </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+            Verificación en dos pasos <span className="font-normal" style={{ color: enabled ? SKY : AMBER }}>({enabled ? 'activada' : 'desactivada'})</span>
           </div>
-          <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${policyInfo.bg} ${policyInfo.text}`}>
-            {policyInfo.label}
-          </span>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
+            {enabled
+              ? `Al iniciar sesión te pedimos un código enviado a tu correo. Te quedan ${twoFactorStatus?.backupCodesLeft ?? 0} códigos de respaldo.`
+              : 'Además de tu contraseña, al iniciar sesión te pediremos un código que llega a tu correo.'}
+          </p>
+          {policyText && <p className="text-sm mt-1" style={{ color: AMBER }}>{policyText}</p>}
         </div>
+        {mode === 'idle' && (
+          enabled
+            ? <button type="button" onClick={() => setMode('disabling')} className={btnSecondary} style={{ borderColor: 'var(--border)', color: 'var(--text)', background: 'var(--bg)' }}>Desactivar</button>
+            : <button type="button" onClick={() => setMode('enabling')} className={btnPrimary}>Activar</button>
+        )}
+      </div>
 
-        <div className="space-y-4">
-          <div className="rounded-xl p-4" style={{ background: 'var(--bg)', borderColor: 'var(--border)', borderWidth: '1px', borderStyle: 'solid' }}>
-            <h4 className="font-bold mb-2 flex items-center gap-2" style={{ color: 'var(--text)' }}>
-              <Shield size={16} /> Tu cuenta está protegida
-            </h4>
-            <ul className="text-sm space-y-2" style={{ color: 'var(--text2)' }}>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> Código OTP por email al iniciar sesión</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> {twoFactorStatus?.backupCodesLeft ?? 0} códigos de respaldo disponibles</li>
-              <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }}></span> Bloqueo tras 3 intentos fallidos (15 min)</li>
-            </ul>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep('disabling')}
-              className="flex-1 py-3 px-6 rounded-xl font-bold border transition-colors"
-              style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-            >
-              Desactivar 2FA
-            </button>
-            <button
-              onClick={() => setShowBackupCodes(true)}
-              className="flex-1 py-3 px-6 rounded-xl font-bold transition-colors"
-              style={{ background: 'var(--primary)', color: 'white' }}
-            >
-              Ver códigos de respaldo
-            </button>
-          </div>
-
-          {twoFactorError && (
-            <div className="p-3 rounded-xl text-sm flex items-center gap-2" style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.3)', borderWidth: '1px', borderStyle: 'solid' }}>
-              <AlertCircle size={16} /> {twoFactorError}
-            </div>
-          )}
-
-          {step === 'disabling' && (
-            <form onSubmit={handleDisable} className="mt-6 space-y-4 animate-in slide-in-from-top-2">
-              <div className="rounded-xl p-4 border" style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.2)' }}>
-                <h4 className="font-bold mb-2 flex items-center gap-2" style={{ color: '#EF4444' }}>
-                  <ShieldAlert size={16} /> Desactivar 2FA
-                </h4>
-                <p className="text-sm mb-4" style={{ color: 'var(--text2)' }}>
-                  Ingresa un código OTP de tu email <strong>o</strong> uno de tus códigos de respaldo para confirmar.
+      {mode !== 'idle' && (
+        <form onSubmit={submit} className="mt-5 sm:ml-14 rounded-2xl border p-4 sm:p-5" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+          <ol className="space-y-5">
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: codeSent ? '#2CB67D' : 'rgba(103,183,232,0.16)', color: codeSent ? '#fff' : SKY }}>
+                {codeSent ? <Check size={14} /> : 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm" style={{ color: 'var(--text)' }}>
+                  {codeSent
+                    ? <>Enviamos un código a <strong>{email}</strong>. Vence en 10 minutos.</>
+                    : <>Te enviaremos un código a <strong>{email || 'tu correo'}</strong>.</>}
                 </p>
-                <button
-                  type="button"
-                  onClick={handleSendCode}
-                  disabled={twoFactorLoading}
-                  className="w-full mb-3 py-2 px-4 rounded-xl text-sm font-bold border transition-colors"
-                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-                >
-                  {codeSent ? 'Código enviado · Reenviar' : 'Enviar código a mi email'}
+                <button type="button" onClick={sendCode} disabled={twoFactorLoading}
+                        className="mt-2 inline-flex items-center gap-2 text-sm font-semibold transition-colors hover:underline disabled:opacity-50" style={{ color: SKY }}>
+                  {twoFactorLoading && !code ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                  {codeSent ? 'Enviar otro código' : 'Enviar código'}
                 </button>
-                <input
-                  type="text"
-                  maxLength={11}
-                  value={disableCode}
-                  onChange={(e) => setDisableCode(e.target.value.toUpperCase().replace(/[^0-9A-F-]/g, '').slice(0, 11))}
-                  placeholder="123456 o ABCD-EF12"
-                  className="w-full px-4 py-3 rounded-xl border text-center text-lg tracking-widest font-mono transition-colors"
-                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-                  required
-                  disabled={twoFactorLoading}
-                />
-                <div className="flex gap-3 mt-4">
-                  <button
-                    type="button"
-                    onClick={() => setStep('idle')}
-                    className="flex-1 py-3 px-4 rounded-xl font-bold border transition-colors"
-                    style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={twoFactorLoading || !disableCode}
-                    className="flex-1 py-3 px-6 rounded-xl font-bold transition-colors"
-                    style={{ background: '#EF4444', color: 'white', opacity: twoFactorLoading ? 0.6 : 1 }}
-                  >
-                    {twoFactorLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin" /> Desactivando...
-                      </span>
-                    ) : (
-                      'Desactivar 2FA'
-                    )}
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <span className="w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'rgba(103,183,232,0.16)', color: SKY }}>2</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm" style={{ color: 'var(--text)' }}>
+                  {mode === 'enabling' ? 'Escribe el código que te llegó.' : 'Escribe el código del correo o uno de tus códigos de respaldo.'}
+                </p>
+                <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                  <CodeInput value={code} onChange={setCode} backup={mode === 'disabling'} disabled={twoFactorLoading} />
+                  <button type="submit" disabled={!codeReady || twoFactorLoading}
+                          className={mode === 'enabling' ? btnPrimary : `${btnSecondary} hover:!border-red-400`}
+                          style={mode === 'enabling' ? undefined : { borderColor: 'var(--border)', color: RED, background: 'var(--card)' }}>
+                    {twoFactorLoading && code ? <Loader2 size={16} className="animate-spin" /> : null}
+                    {mode === 'enabling' ? 'Activar verificación' : 'Desactivar verificación'}
                   </button>
                 </div>
               </div>
-            </form>
+            </li>
+          </ol>
+
+          {twoFactorError && (
+            <p role="alert" className="mt-4 text-sm" style={{ color: RED }}>
+              {twoFactorError === 'No se pudo enviar el código por email'
+                ? 'No pudimos enviar el correo: el servicio de correo no está disponible. Inténtalo más tarde o avisa al administrador.'
+                : twoFactorError}
+            </p>
           )}
-        </div>
-      </div>
+
+          <button type="button" onClick={reset} className="mt-4 text-sm font-medium hover:underline" style={{ color: 'var(--text2)' }}>
+            Cancelar
+          </button>
+        </form>
       )}
     </div>
   )
