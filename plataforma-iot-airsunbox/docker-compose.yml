@@ -13,7 +13,9 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: iot_user
-      POSTGRES_PASSWORD: iot_password
+      # Solo se usa al crear una base nueva (volumen vacío); con la base ya
+      # creada Postgres lo ignora. Sale de plataforma-iot-airsunbox/.env.
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-}
       POSTGRES_DB: iot_platform
     ports:
       # 5433 lo ocupa el contenedor `hospital-db` de otro proyecto en esta
@@ -102,7 +104,6 @@ services:
       DB_HOST: timescaledb
       DB_PORT: 5432
       DB_USER: iot_user
-      DB_PASSWORD: iot_password
       DB_NAME: iot_platform
       DB_POOL_MAX: 50
       DB_IDLE_TIMEOUT: 30000
@@ -115,11 +116,13 @@ services:
       MQTT_PORT: 1883
       # Ingesta worker
       INGEST_WORKER_CONCURRENCY: 4
-      # FRONTEND_URL, SMTP_* y JWT_SECRET vienen del backend/.env (env_file).
-      # No se repiten aquí: una clave en `environment` pisaría la del .env.
-    # JWT_SECRET y SMTP_* salen de aquí. Las claves de `environment` tienen
-    # prioridad, así que DB/Redis/MQTT siguen apuntando a la red de compose.
-    # Sin JWT_SECRET el backend se niega a arrancar en producción.
+      # Los secretos (JWT_SECRET, DB_PASSWORD, SMTP_PASS) y FRONTEND_URL,
+      # SMTP_* vienen del backend/.env (env_file). No se repiten aquí: una
+      # clave en `environment` pisaría la del .env.
+    # En producción backend/.env solo trae SSM_SECRETS_PATH y configuración
+    # no secreta: los secretos se leen de AWS SSM al arrancar
+    # (ver backend/src/lib/secrets.ts). Sin JWT_SECRET o DB_PASSWORD el
+    # backend se niega a arrancar.
     env_file:
       - ./backend/.env
     depends_on:

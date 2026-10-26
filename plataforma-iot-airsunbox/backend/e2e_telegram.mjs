@@ -21,7 +21,7 @@ const log  = m => process.stdout.write(m + '\n')
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const pool = new pg.Pool({
   host: env.DB_HOST || 'timescaledb', port: Number(env.DB_PORT || 5432),
-  user: env.DB_USER || 'iot_user', password: env.DB_PASSWORD || 'iot_password',
+  user: env.DB_USER || 'iot_user', password: env.DB_PASSWORD,
   database: env.DB_NAME || 'iot_platform'
 })
 const { rows: [devRow] } = await pool.query('SELECT token FROM devices WHERE id=$1', [DEVICE])
