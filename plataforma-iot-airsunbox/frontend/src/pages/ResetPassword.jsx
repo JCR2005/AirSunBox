@@ -147,7 +147,7 @@ export default function ResetPassword() {
           }
         >
           {token
-            ? 'Venció (dura 60 minutos) o ya se usó. Pedí uno nuevo y usá el último que te llegue.'
+            ? 'Venció (dura 10 minutos) o ya se usó. Pedí uno nuevo y usá el último que te llegue.'
             : 'Abrilo desde el botón del correo o copiá el enlace completo, sin cortarlo.'}
         </Outcome>
         <p className="text-center text-sm mt-6">

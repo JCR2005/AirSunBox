@@ -15,7 +15,7 @@ export const RC = {
 
 const STEPS = [
   { title: 'Pedí el enlace', text: 'Con el correo de tu cuenta.', Icon: Mail },
-  { title: 'Revisá tu correo', text: 'El enlace vale 60 minutos y sirve una vez.', Icon: ShieldCheck },
+  { title: 'Revisá tu correo', text: 'El enlace vale 10 minutos y sirve una vez.', Icon: ShieldCheck },
   { title: 'Elegí tu contraseña nueva', text: 'Cerramos tu sesión en todos los dispositivos.', Icon: KeyRound },
 ]
 

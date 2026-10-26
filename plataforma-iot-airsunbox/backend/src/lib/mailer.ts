@@ -52,13 +52,13 @@ export function createMailer(log?: FastifyBaseLogger): Mailer {
       const text =
         'Hola,\n\n' +
         'Recibimos una solicitud para restablecer tu contraseña de la plataforma AirSunBox.\n' +
-        'Hacé clic en el siguiente enlace para crear una nueva (válido por 60 minutos):\n\n' +
+        'Hacé clic en el siguiente enlace para crear una nueva (válido por 10 minutos):\n\n' +
         `${url}\n\n` +
         'Si no solicitaste este cambio, podés ignorar este correo.\n\n— AirSunBox'
       const html =
         `<p>Hola,</p>` +
         `<p>Recibimos una solicitud para restablecer tu contraseña de la plataforma <b>AirSunBox</b>.</p>` +
-        `<p>Hacé clic en el siguiente botón para crear una nueva (válido por 60 minutos):</p>` +
+        `<p>Hacé clic en el siguiente botón para crear una nueva (válido por 10 minutos):</p>` +
         `<p><a href="${url}" style="display:inline-block;padding:12px 20px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;">Restablecer contraseña</a></p>` +
         `<p>Si el botón no funciona, copiá este enlace: <code>${url}</code></p>` +
         `<p>Si no solicitaste este cambio, podés ignorar este correo.</p>` +

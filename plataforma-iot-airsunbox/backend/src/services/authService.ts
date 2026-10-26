@@ -289,7 +289,8 @@ export async function resetPassword(
   if (password.length < 8)
     return { ok: false, status: 400, error: 'La contraseña debe tener al menos 8 caracteres' }
 
-  const [match] = await usersRepo.findValidResetToken(app.db, hashResetToken(token))
+  const tokenHash = hashResetToken(token)
+  const [match] = await usersRepo.findValidResetToken(app.db, tokenHash)
 
   if (!match)
     return { ok: false, status: 400, error: 'El enlace es inválido o ya expiró. Volvé a pedir la recuperación.' }
@@ -301,7 +302,9 @@ export async function resetPassword(
     return { ok: false, status: 403, error: 'Tu organización está suspendida. Contactá a AirSunBox.' }
 
   const hash = await bcrypt.hash(password, 10)
-  await usersRepo.clearResetTokenAndSetPassword(app.db, match.id, hash)
+  const consumed = await usersRepo.clearResetTokenAndSetPassword(app.db, match.id, tokenHash, hash)
+  if (!consumed)
+    return { ok: false, status: 400, error: 'El enlace es inválido o ya expiró. Volvé a pedir la recuperación.' }
   // Cierra la sesión en todos los dispositivos
   await markPasswordChanged(app, match.id)
 

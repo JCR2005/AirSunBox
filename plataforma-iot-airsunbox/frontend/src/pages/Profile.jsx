@@ -74,7 +74,7 @@ function PasswordRow({ email }) {
         <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Contraseña</div>
         <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
           {state === 'sent'
-            ? <>Enviamos un enlace a <strong style={{ color: 'var(--text)' }}>{email}</strong>. Vence en 60 minutos y sirve una sola vez.</>
+            ? <>Enviamos un enlace a <strong style={{ color: 'var(--text)' }}>{email}</strong>. Vence en 10 minutos y sirve una sola vez.</>
             : 'Para cambiarla te enviamos un enlace a tu correo.'}
         </p>
         {state === 'error' && <p className="text-sm mt-1" style={{ color: '#E5484D' }}>{error}</p>}
