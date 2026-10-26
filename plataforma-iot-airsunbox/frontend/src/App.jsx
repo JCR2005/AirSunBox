@@ -92,7 +92,9 @@ export default function App() {
         <Route path="/"      element={<PublicRoute><Landing /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        {/* Sin PublicRoute: el enlace del correo debe abrir el formulario aunque
+            haya una sesión abierta en este navegador */}
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/mapa"  element={<PublicRoute><PublicMap /></PublicRoute>} />
         <Route path="/reportes-globales" element={<GlobalReports />} />
         {/* --- RUTAS EXCLUSIVAS DE CLIENTES (CORREGIDAS) --- */}
