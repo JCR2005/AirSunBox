@@ -38,6 +38,7 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [mode, setMode] = useState('login')
   const [reg, setReg] = useState({ orgName: '', email: '', password: '', confirmPassword: '', name: '', phone: '', location: '' })
   const [regCoords, setRegCoords] = useState(null)
@@ -87,6 +88,7 @@ export default function Login() {
     if (!otpCode || otpCode.length !== 6) return
     setLoading(true)
     setError('')
+    setInfo('')
     try {
       const res = await auth.verifyOtp(otpCode, tempToken)
       login(res.token, res.user, res.org)
@@ -101,9 +103,14 @@ export default function Login() {
   const handleResendOtp = async () => {
     setLoading(true)
     setError('')
+    setInfo('')
     try {
-      await auth.login(form.email, form.password)
-      setError('Se ha enviado un nuevo código a tu email')
+      // El backend genera un código nuevo y un pase de verificación nuevo
+      // (válido 10 min): hay que usar ese pase, el anterior pudo vencer.
+      const res = await auth.login(form.email, form.password)
+      if (res.tempToken) setTempToken(res.tempToken)
+      setOtpCode('')
+      setInfo('Te enviamos un código nuevo. Vence en 10 minutos.')
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Error al reenviar código')
     } finally {
@@ -279,6 +286,14 @@ export default function Login() {
             </p>
           </div>
 
+          {info && !error && (
+            <div role="status" className="flex-shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl p-3.5 mb-4 flex items-start gap-2.5">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+              <span className="font-medium">{info}</span>
+            </div>
+          )}
           {error && (
             <div className="flex-shrink-0 bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl p-3.5 mb-4 flex items-start gap-2.5">
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -360,7 +375,7 @@ export default function Login() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setMode('login'); setError(''); setOtpCode(''); setTempToken(''); }}
+                    onClick={() => { setMode('login'); setError(''); setInfo(''); setOtpCode(''); setTempToken(''); }}
                     className="font-medium hover:underline"
                     style={{ color: COLORS.textMuted }}
                   >
