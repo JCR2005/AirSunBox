@@ -41,20 +41,21 @@ const TRUST_PROXY = process.env.TRUST_PROXY || '127.0.0.1,::1,172.16.0.0/12'
 const app: FastifyInstance = Fastify({ logger: true, trustProxy: TRUST_PROXY })
 
 // ── Plugins globales ──────────────────────────
+// Orígenes permitidos: los fijos más CORS_ORIGINS (lista separada por comas)
+// para agregar dominios del despliegue sin tocar código.
+const CORS_ORIGINS = new Set([
+  'https://18.223.121.208',
+  'http://18.223.121.208',
+  'https://voluble-creponne-e6c74f.netlify.app',
+  'http://localhost',
+  'http://localhost:5173',
+  ...(process.env.CORS_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean)
+])
+
 await app.register(cors, {
-  origin: (origin, cb) => {
-    const allowed = [
-      'http://18.223.121.208',
-      'https://voluble-creponne-e6c74f.netlify.app',
-      'http://localhost',
-      'http://localhost:5173'
-    ]
-    if (!origin || allowed.includes(origin)) {
-      cb(null, true)
-    } else {
-      cb(new Error('Not allowed by CORS'), false)
-    }
-  },
+  // Un origen no permitido no recibe cabeceras CORS (el navegador lo bloquea);
+  // pasar un Error aquí convertía la petición en un 500.
+  origin: (origin, cb) => cb(null, !origin || CORS_ORIGINS.has(origin)),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type',
