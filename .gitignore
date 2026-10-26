@@ -19,3 +19,15 @@ hardware/
 
 # Respaldos de base para migración a producción
 respaldos-db/
+
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Dependencias instaladas
+node_modules/
+
+# Archivos compilados
+dist/
