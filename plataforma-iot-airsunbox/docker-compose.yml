@@ -1,0 +1,184 @@
+# Nombre fijo del proyecto: los volúmenes y la red se llaman airsunbox_*
+# sin importar el nombre de la carpeta donde se clone el repositorio.
+name: airsunbox
+
+services:
+
+  # ─────────────────────────────────────────
+  # BASE DE DATOS — TimescaleDB
+  # ─────────────────────────────────────────
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: iot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: iot_user
+      POSTGRES_PASSWORD: iot_password
+      POSTGRES_DB: iot_platform
+    ports:
+      # 5433 lo ocupa el contenedor `hospital-db` de otro proyecto en esta
+      # maquina. El puerto publicado es solo para inspeccion manual con
+      # psql; el backend entra por la red de compose, asi que el valor es
+      # arbitrario mientras no choque.
+      # Solo en 127.0.0.1: no se expone a la red.
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      # Base nueva: esquema + todas las migraciones en orden (ver el script).
+      # Con el volumen ya creado, Postgres no vuelve a ejecutarlo.
+      - ./database:/airsunbox-db:ro
+      - ./database/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iot_user -d iot_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # CACHE — Redis
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: iot_redis
+    restart: unless-stopped
+    ports:
+      # Redis no tiene contraseña: solo accesible desde esta máquina
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # MQTT BROKER — EMQX
+  # ─────────────────────────────────────────
+  emqx:
+    image: emqx:5
+    container_name: iot_mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"    # MQTT
+      - "8883:8883"    # MQTT seguro (TLS)
+      # WebSocket y panel solo en local (el panel trae admin/public por defecto)
+      - "127.0.0.1:8083:8083"    # MQTT sobre WebSocket
+      - "127.0.0.1:8084:8084"    # MQTT sobre WebSocket seguro
+      - "127.0.0.1:18083:18083"  # Panel de administración EMQX
+    volumes:
+      - emqx_data:/opt/emqx/data
+    environment:
+      EMQX_NAME: iot_broker
+      EMQX_HOST: 127.0.0.1
+    healthcheck:
+      test: ["CMD", "emqx_ctl", "status"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # BACKEND — Node.js + Fastify
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: iot_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Base de datos
+      DB_HOST: timescaledb
+      DB_PORT: 5432
+      DB_USER: iot_user
+      DB_PASSWORD: iot_password
+      DB_NAME: iot_platform
+      DB_POOL_MAX: 50
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECT_TIMEOUT: 5000
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      # Ingesta worker
+      INGEST_WORKER_CONCURRENCY: 4
+      # FRONTEND_URL, SMTP_* y JWT_SECRET vienen del backend/.env (env_file).
+      # No se repiten aquí: una clave en `environment` pisaría la del .env.
+    # JWT_SECRET y SMTP_* salen de aquí. Las claves de `environment` tienen
+    # prioridad, así que DB/Redis/MQTT siguen apuntando a la red de compose.
+    # Sin JWT_SECRET el backend se niega a arrancar en producción.
+    env_file:
+      - ./backend/.env
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - iot_network
+
+  # ─────────────────────────────────────────
+  # FRONTEND — React + Vite
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: iot_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    # Las VITE_* se fijan al compilar (vite build), no en runtime. Sin ellas
+    # el frontend usa rutas relativas /api y /ws, que nginx envía al backend.
+    depends_on:
+      - backend
+    networks:
+      - iot_network
+
+# ─────────────────────────────────────────
+# VOLÚMENES (datos persistentes)
+# ─────────────────────────────────────────
+volumes:
+  timescale_data:
+  redis_data:
+  emqx_data:
+
+# ─────────────────────────────────────────
+# RED INTERNA
+# ─────────────────────────────────────────
+networks:
+  iot_network:
+    driver: bridge

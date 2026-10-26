@@ -44,34 +44,34 @@ jobs:
 
       - name: Apply database schema and migrations
         env:
-          SANIK_DB_DIR: plataforma-iot-sanik/database
+          AIRSUNBOX_DB_DIR: plataforma-iot-airsunbox/database
           PGHOST: 127.0.0.1
           PGPORT: 5432
           PGPASSWORD: iot_password
           POSTGRES_USER: iot_user
           POSTGRES_DB: iot_platform
-        run: sh plataforma-iot-sanik/database/initdb/00-schema.sh
+        run: sh plataforma-iot-airsunbox/database/initdb/00-schema.sh
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: plataforma-iot-sanik/backend/package-lock.json
+          cache-dependency-path: plataforma-iot-airsunbox/backend/package-lock.json
 
       - name: Install backend dependencies
-        working-directory: plataforma-iot-sanik/backend
+        working-directory: plataforma-iot-airsunbox/backend
         run: npm ci
 
       - name: Typecheck backend
-        working-directory: plataforma-iot-sanik/backend
+        working-directory: plataforma-iot-airsunbox/backend
         run: npm run typecheck
 
       - name: Build backend
-        working-directory: plataforma-iot-sanik/backend
+        working-directory: plataforma-iot-airsunbox/backend
         run: npm run build
 
       - name: Start backend for smoke tests
-        working-directory: plataforma-iot-sanik/backend
+        working-directory: plataforma-iot-airsunbox/backend
         env:
           NODE_ENV: test
           PORT: 3000
@@ -84,7 +84,7 @@ jobs:
           REDIS_PORT: 6379
           MQTT_HOST: 127.0.0.1
           MQTT_PORT: 1883
-        run: npm start > /tmp/sanik-backend.log 2>&1 &
+        run: npm start > /tmp/airsunbox-backend.log 2>&1 &
 
       - name: Wait for backend
         run: |
@@ -94,11 +94,11 @@ jobs:
             fi
             sleep 2
           done
-          cat /tmp/sanik-backend.log
+          cat /tmp/airsunbox-backend.log
           exit 1
 
       - name: Run backend smoke tests
-        working-directory: plataforma-iot-sanik/backend
+        working-directory: plataforma-iot-airsunbox/backend
         env:
           SMOKE_BASE_URL: http://127.0.0.1:3000
         run: npm test
@@ -112,12 +112,12 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: plataforma-iot-sanik/frontend/package-lock.json
+          cache-dependency-path: plataforma-iot-airsunbox/frontend/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: plataforma-iot-sanik/frontend
+        working-directory: plataforma-iot-airsunbox/frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: plataforma-iot-sanik/frontend
+        working-directory: plataforma-iot-airsunbox/frontend
         run: npm run build

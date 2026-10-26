@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-const SCREENSHOTS_DIR = '/home/carlos/Documentos/Sanik/screenshots';
+const SCREENSHOTS_DIR = `${__dirname}/screenshots`;
 if (!fs.existsSync(SCREENSHOTS_DIR)) fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
 
 // Frontend is served by nginx on port 80 (via docker-compose), backend API on 3000
