@@ -310,8 +310,15 @@ export async function verifyOtpLogin(
   tempToken: string,
   code: string
 ): Promise<AuthResult> {
+  // El pase temporal vale 10 minutos desde el login (o el último reenvío).
+  // Se valida aparte para no confundir un pase vencido con otros errores.
+  let decoded: { userId: string; orgId: string; role: Role; otp_pending: boolean }
   try {
-    const decoded = app.jwt.verify<{ userId: string; orgId: string; role: Role; otp_pending: boolean }>(tempToken)
+    decoded = app.jwt.verify<{ userId: string; orgId: string; role: Role; otp_pending: boolean }>(tempToken)
+  } catch {
+    return { ok: false, status: 401, error: 'La verificación venció. Pedí un código nuevo con "Reenviar código".' }
+  }
+  try {
     if (!decoded.otp_pending) {
       return { ok: false, status: 400, error: 'Token inválido' }
     }
@@ -358,7 +365,8 @@ export async function verifyOtpLogin(
       } : undefined
     }
   } catch (err) {
-    return { ok: false, status: 401, error: 'Token inválido o expirado' }
+    app.log.error(`Error verificando el código 2FA: ${(err as Error)?.message}`)
+    return { ok: false, status: 500, error: 'No se pudo verificar el código. Intentá de nuevo.' }
   }
 }
 
