@@ -35,7 +35,7 @@ temporales privados (`mktemp`, permisos 700) que se borran al terminar.
    de la base a SSM, comprueba la lectura desde un contenedor del EC2 y agrega
    `SSM_SECRETS_PATH` al `.env`.
 2. **Rotación y limpieza:** la contraseña de la base estuvo publicada en el
-   repositorio (`iot_password`), así que se genera una nueva, se guarda en
+   repositorio, así que se genera una nueva, se guarda en
    SSM, se aplica en Postgres y se reinicia el backend (con vuelta atrás
    automática si no queda sano). Después borra los secretos del `.env` del
    servidor y ofrece borrar las copias `.env.bak*`.
@@ -48,7 +48,7 @@ temporales privados (`mktemp`, permisos 700) que se borran al terminar.
 ## Sin acceso a AWS todavía: `db-password.sh`
 
 Mientras no se pueda usar SSM, la contraseña de la base igual se cambia
-(la anterior, `iot_password`, estuvo publicada en el repositorio):
+(la anterior estuvo publicada en el repositorio):
 
 1. `./db-password.sh preparar`: copia la contraseña actual al `backend/.env`
    del servidor (sin corte). Antes de llevar a `main` la versión sin la

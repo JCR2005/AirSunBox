@@ -38,7 +38,7 @@ rotar)
   ssh "$H" "sudo APP=$APP bash -s" <<'EOF'
 set -euo pipefail
 cd "$APP"
-if grep -q 'DB_PASSWORD: iot_password' docker-compose.yml; then
+if grep -qE '^\s+DB_PASSWORD: [^$]' docker-compose.yml; then
   echo "   El servidor todavía tiene la versión con la contraseña en el compose; primero hay que desplegar la nueva." >&2
   exit 1
 fi
