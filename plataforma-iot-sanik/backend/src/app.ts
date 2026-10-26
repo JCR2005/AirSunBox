@@ -112,6 +112,16 @@ await app.register(dbPlugin)
 await app.register(redisPlugin)
 await app.register(ingestQueuePlugin)
 
+// Límite estricto (10/min por IP) solo donde se pueden probar contraseñas o
+// códigos, o disparar correos. Las lecturas con sesión (/auth/me, estado del
+// 2FA) van con el límite general: con 10/min, navegar el perfil daba 429.
+const BRUTE_FORCE_PATHS = [
+  '/api/auth/login', '/api/auth/register', '/api/auth/otp/verify',
+  '/api/auth/forgot-password', '/api/auth/reset-password',
+  '/api/auth/2fa/send-code', '/api/auth/2fa/enable', '/api/auth/2fa/disable'
+]
+const isBruteForceTarget = (path: string) => BRUTE_FORCE_PATHS.some(p => path.startsWith(p))
+
 const rateLimitRedis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
   port: Number(process.env.REDIS_PORT || 6379),
@@ -126,7 +136,7 @@ await app.register(rateLimit, {
   global: true,
   max: (req) => {
     const path = req.routeOptions?.url || req.url
-    if (path.startsWith('/api/auth/')) return 10
+    if (isBruteForceTarget(path)) return 10
     if (path.startsWith('/api/dots/')) return 200
     if (path.startsWith('/ws')) return 60
     return 200
@@ -134,7 +144,7 @@ await app.register(rateLimit, {
   timeWindow: '1 minute',
   keyGenerator: (req) => {
     const path = req.routeOptions?.url || req.url
-    const prefix = path.startsWith('/api/auth/') ? 'auth' :
+    const prefix = isBruteForceTarget(path) ? 'auth' :
                    path.startsWith('/api/dots/') ? 'dots' :
                    path.startsWith('/ws') ? 'ws' : 'api'
     return `${prefix}:${req.ip}`

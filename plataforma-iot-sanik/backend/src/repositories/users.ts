@@ -32,6 +32,8 @@ export interface MeUserRow {
   slug: string | null
   plan: string | null
   location: string | null
+  created_at: Date
+  two_fa_enabled: boolean
 }
 
 export interface ForgotPasswordRow {
@@ -89,7 +91,7 @@ export async function findByEmail(db: Queryable, email: string): Promise<LoginUs
 
 export async function findMe(db: Queryable, userId: string): Promise<MeUserRow[]> {
   const { rows } = await db.query<MeUserRow>(
-    `SELECT u.id, u.email, u.role, u.name, u.phone,
+    `SELECT u.id, u.email, u.role, u.name, u.phone, u.created_at, u.two_fa_enabled,
             o.id as org_id, o.name as org_name, o.slug, o.plan, o.location
      FROM users u
      LEFT JOIN organizations o ON o.id = u.org_id

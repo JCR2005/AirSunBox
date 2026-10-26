@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth'
-import useThemeStore from '../../store/theme'
-import { LayoutDashboard, Users, Cpu, Settings, LogOut, Shield, FileText, ChevronRight, Sun, Moon, Menu, X } from 'lucide-react'
+import UserMenu from '../UserMenu'
+import { LayoutDashboard, Users, Settings, Shield, FileText, ChevronRight, Menu, X } from 'lucide-react'
 
 
 import logoImg from "../../assets/logo2.svg";
@@ -37,12 +37,9 @@ const NAV = [
 
 export default function AdminLayout({ children }) {
   const location = useLocation()
-  const navigate  = useNavigate()
-  const { user, logout } = useAuthStore()
-  const { dark, toggle } = useThemeStore()
+  const { user } = useAuthStore()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const handleLogout = () => { logout(); navigate('/login') }
   const isActive = (path) => path === '/admin' ? location.pathname === '/admin' : location.pathname.startsWith(path)
 
   // Filtrar navegación por rol
@@ -112,38 +109,7 @@ export default function AdminLayout({ children }) {
           })}
         </nav>
 
-        {/* Footer de Usuario - Todo en una "tarjeta" integrada */}
-        <div className="p-4">
-          <div className="rounded-2xl p-4 flex flex-col gap-4 border" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shadow-sm" style={{background: COLORS.primary, color: '#fff'}}>
-                {user?.email?.[0]?.toUpperCase() || 'S'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold truncate" style={{color:'var(--text)'}}>{user?.email || 'superadmin@sanik.io'}</div>
-                <div className="text-xs font-medium mt-0.5" style={{color:'var(--text2)'}}>{user?.role || 'Superadmin'}</div>
-              </div>
-            </div>
-
-            <div className="h-px w-full" style={{ background: 'var(--border)' }} />
-
-            <div className="flex items-center justify-between gap-2">
-              <button onClick={toggle} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-colors hover:bg-black/5 dark:hover:bg-white/5" style={{color:'var(--text2)'}}>
-                {dark ? <Sun size={14} /> : <Moon size={14} />}
-                {dark ? 'Claro' : 'Oscuro'}
-              </button>
-
-              <div className="w-px h-4" style={{ background: 'var(--border)' }} />
-
-              <button onClick={handleLogout} className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold transition-colors hover:bg-red-500/10 hover:text-red-500" style={{color:'var(--text2)'}}>
-                <LogOut size={14} />
-                Salir
-              </button>
-            </div>
-
-          </div>
-        </div>
+        <UserMenu onNavigate={() => setSidebarOpen(false)} />
       </aside>
 
       {/* Contenedor Principal */}

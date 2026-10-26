@@ -16,3 +16,6 @@ hardware/
 *.env.production
 # Grafo de contexto del agente (contiene hallazgos de seguridad abiertos)
 .contexto/
+
+# Respaldos de base para migración a producción
+respaldos-db/
