@@ -12,6 +12,11 @@ export async function list(db: Queryable, isInternal: boolean, orgId?: string) {
   return rows
 }
 
+export async function orgType(db: Queryable, orgId: string): Promise<string | null> {
+  const { rows: [org] } = await db.query<{ type: string | null }>('SELECT type FROM organizations WHERE id = $1', [orgId])
+  return org?.type ?? null
+}
+
 export async function create(db: Queryable, params: {
   orgId: string
   deviceName: string
