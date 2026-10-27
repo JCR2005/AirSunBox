@@ -43,11 +43,18 @@ echo "== 1/5 Cifrado EBS por defecto en $REGION"
 aws ec2 enable-ebs-encryption-by-default --query EbsEncryptionByDefault --output text | sed 's/^/   activado: /'
 
 echo "== 2/5 Deteniendo Docker (los contenedores vuelven solos al reiniciar)"
+# Si el script se corta antes del reemplazo, Docker se vuelve a levantar: la
+# web no queda caída por un error a mitad de camino.
+levantar_docker() {
+  echo "   Error: volviendo a levantar Docker…" >&2
+  ssh -n "$H" "sudo systemctl start docker" && echo "   Docker levantado; no se cambió el disco." >&2
+}
+trap levantar_docker ERR
 ssh -n "$H" "sudo systemctl stop docker.socket docker && sync && echo '   Docker detenido'"
 
 echo "== 3/5 Snapshot del disco"
 snap=$(aws ec2 create-snapshot --volume-id "$vol" \
-  --description "AirSunBox: disco raíz antes de cifrar ($(date -u +%F))" \
+  --description "AirSunBox root volume before encryption ($(date -u +%F))" \
   --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=airsunbox-raiz-antes-de-cifrar}]' \
   --query SnapshotId --output text)
 echo "   $snap creado; esperando a que termine…"
@@ -61,6 +68,7 @@ echo "== 4/5 Reemplazando el disco raíz (reinicio, sin detener la instancia)"
 task=$(aws ec2 create-replace-root-volume-task --instance-id "$INSTANCE_ID" --snapshot-id "$snap" \
   --no-delete-replaced-root-volume --query ReplaceRootVolumeTask.ReplaceRootVolumeTaskId --output text)
 echo "   tarea $task"
+trap - ERR
 while :; do
   st=$(aws ec2 describe-replace-root-volume-tasks --replace-root-volume-task-ids "$task" \
     --query 'ReplaceRootVolumeTasks[0].TaskState' --output text)
