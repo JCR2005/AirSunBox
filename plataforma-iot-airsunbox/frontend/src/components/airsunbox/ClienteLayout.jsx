@@ -84,7 +84,10 @@ export default function ClienteLayout({ children }) {
         <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto">
           {/* Independientes (B): gestionan por Espacios (devices dentro de cada espacio).
               Dependientes (A): gestionan Estaciones directas, sin apartado de Espacios. */}
-          {(org?.type === 'B' ? CLIENT_NAV.filter(i => i.path !== '/dispositivos') : CLIENT_NAV.filter(i => i.path !== '/espacios')).map(({ label, icon: Icon, path }) => {
+          {/* B (independiente): espacios y sin solicitudes; A (dependiente): estaciones y solicitudes */}
+          {(org?.type === 'B'
+            ? CLIENT_NAV.filter(i => i.path !== '/dispositivos' && i.path !== '/solicitudes')
+            : CLIENT_NAV.filter(i => i.path !== '/espacios')).map(({ label, icon: Icon, path }) => {
             const active = isActive(path);
             return (
               <Link 
