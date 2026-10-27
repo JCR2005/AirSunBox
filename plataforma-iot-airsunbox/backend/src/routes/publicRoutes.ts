@@ -3,6 +3,7 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as devicesRepo from '../repositories/devices.js'
 import * as reportsRepo from '../repositories/reports.js'
+import { ONLINE_WINDOW } from '../lib/deviceStatus.js'
 
 const AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'h2s', 'o3', 'so2', 'pm25', 'pm10']
 const CLIMA_VARS = ['temperatura', 'temperature', 'humedad', 'humidity', 'co2', 'co']
@@ -34,7 +35,7 @@ export default async function publicRoutes(app: FastifyInstance) {
       const { rows: latestDots } = await app.db.query<{ variable: string; value: string | number; time: Date | string }>(
         `SELECT DISTINCT ON (variable) variable, value, time
          FROM dots
-         WHERE device_id = $1::uuid AND variable = ANY($2) AND time > NOW() - INTERVAL '1 minute'
+         WHERE device_id = $1::uuid AND variable = ANY($2) AND time > NOW() - INTERVAL '${ONLINE_WINDOW}'
          ORDER BY variable, time DESC`,
         [req.params.id, ALL_VARS]
       )
