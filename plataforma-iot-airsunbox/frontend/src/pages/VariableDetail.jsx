@@ -151,13 +151,16 @@ export default function VariableDetail() {
           console.warn("No se pudieron cargar los rangos, la gráfica se mostrará sin fondo de colores.", err)
         }
 
-        // 2. Ejecutar petición de datos para la línea de la gráfica
+        // 2. Ejecutar petición de datos para la línea de la gráfica. Los rangos
+        // rápidos (últimos 7 días, 6 meses…) se envían como fechas exactas: el
+        // backend solo conoce algunos preajustes y con el resto usaba 24 h.
+        const { start, end } = resolveRange()
         const result = await dotsApi.get(
-          deviceId, cleanVariable, 
-          activeTimeFilter.range || '', 
+          deviceId, cleanVariable,
+          '',
           aggregation, samplePeriod,
           undefined,
-          activeTimeFilter.start, activeTimeFilter.end
+          start, end
         )
 
         if (active && Array.isArray(result)) {
