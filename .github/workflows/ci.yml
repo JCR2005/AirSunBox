@@ -17,8 +17,10 @@ jobs:
         image: timescale/timescaledb:latest-pg16
         env:
           POSTGRES_USER: iot_user
-          POSTGRES_PASSWORD: iot_password
           POSTGRES_DB: iot_platform
+          # Base efímera del job, solo accesible desde el runner: sin
+          # contraseña. Ninguna credencial queda escrita en el repositorio.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         # Sin volúmenes: los servicios arrancan antes del checkout y montar el
@@ -42,12 +44,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Credenciales de un solo uso para esta corrida, ocultas en los logs.
+      # El backend exige DB_PASSWORD (no tiene valor por defecto); con la base
+      # en modo trust cualquier valor es aceptado.
+      - name: Generate ephemeral credentials
+        run: |
+          for name in DB_PASSWORD JWT_SECRET; do
+            value=$(openssl rand -hex 32)
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
       - name: Apply database schema and migrations
         env:
           AIRSUNBOX_DB_DIR: plataforma-iot-airsunbox/database
           PGHOST: 127.0.0.1
           PGPORT: 5432
-          PGPASSWORD: iot_password
           POSTGRES_USER: iot_user
           POSTGRES_DB: iot_platform
         run: sh plataforma-iot-airsunbox/database/initdb/00-schema.sh
@@ -78,7 +90,6 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_USER: iot_user
-          DB_PASSWORD: iot_password
           DB_NAME: iot_platform
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
