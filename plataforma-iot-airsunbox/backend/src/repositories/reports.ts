@@ -56,10 +56,6 @@ export async function heatmap(db: Queryable, orgId?: string, start?: string, end
   return rows
 }
 
-export async function heatmapGlobal(db: Queryable, start?: string, end?: string) {
-  return heatmap(db, undefined, start, end)
-}
-
 function buildRespiratoryQuery(orgId?: string, start?: string, end?: string): { text: string; params: unknown[] } {
   const targetVars = ['pm25', 'pm10', 'so2', 'nox', 'o3', 'temperatura', 'temperature', 'humedad', 'humidity']
   let query = `
@@ -98,10 +94,6 @@ export async function respiratoryData(db: Queryable, orgId?: string, start?: str
   return rows
 }
 
-export async function respiratoryDataGlobal(db: Queryable, start?: string, end?: string) {
-  return respiratoryData(db, undefined, start, end)
-}
-
 function buildEnvironmentalQuery(start?: string, end?: string): { text: string; params: unknown[] } {
   const targetVars = ['pm25', 'pm10', 'co', 'o3', 'so2', 'nox', 'h2s']
   let query = `
@@ -126,10 +118,4 @@ function buildEnvironmentalQuery(start?: string, end?: string): { text: string; 
 
   query += ` GROUP BY d.id, d.name, d.lat, d.lng, dot.variable`
   return { text: query, params }
-}
-
-export async function environmentalData(db: Queryable, start?: string, end?: string) {
-  const { text, params } = buildEnvironmentalQuery(start, end)
-  const { rows } = await db.query<{ id: string; name: string; lat: number | null; lng: number | null; variable: string; avg_value: string }>(text, params)
-  return rows
 }
