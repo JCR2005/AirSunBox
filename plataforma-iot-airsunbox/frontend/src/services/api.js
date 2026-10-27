@@ -152,13 +152,7 @@ export const spaces = {
 export const reports = {
   getHeatmapData: (orgId, startDate, endDate) => request(`/reports/heatmap?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
   getRespiratoryRisk: (orgId, startDate, endDate) => request(`/reports/respiratory-risk?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
-  getGlobalStats: () => request('/reports/stats'),
-
-  // Public/Global reports (no orgId required/used)
-  getGlobalHeatmap: (startDate, endDate) => request(`/public/reports/heatmap?start=${startDate || ''}&end=${endDate || ''}`),
-  getGlobalRespiratoryRisk: (startDate, endDate) => request(`/public/reports/respiratory-risk?start=${startDate || ''}&end=${endDate || ''}`),
-  getGlobalEnvironmentalReport: (startDate, endDate) => request(`/public/reports/environmental?start=${startDate || ''}&end=${endDate || ''}`),
-  getGlobalPublicStats: () => request('/public/reports/stats')
+  getGlobalStats: () => request('/reports/stats')
 }
 export const requests = {
   list: () => request('/requests'),
