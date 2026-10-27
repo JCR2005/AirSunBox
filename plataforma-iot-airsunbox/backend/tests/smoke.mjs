@@ -43,3 +43,8 @@ test('rutas autenticadas devuelven 401 sin token', async () => {
   assert.equal(status, 401)
   assert.ok(body.error)
 })
+
+test('incidencias exigen sesión', async () => {
+  const { status } = await j('/api/incidents')
+  assert.equal(status, 401)
+})

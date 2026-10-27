@@ -18,6 +18,13 @@ const useAuthStore = create((set, get) => ({
     set({ token, user, org })
   },
 
+  // Refleja en la sesión los cambios del propio perfil (nombre en el menú)
+  updateUser: (changes) => {
+    const user = { ...get().user, ...changes }
+    localStorage.setItem('airsunbox_user', JSON.stringify(user))
+    set({ user })
+  },
+
   logout: () => {
     // Invalida el token también en el servidor. No se espera la respuesta:
     // la sesión local se cierra igual aunque no haya conexión.

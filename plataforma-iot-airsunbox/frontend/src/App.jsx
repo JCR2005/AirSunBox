@@ -9,6 +9,7 @@ import Devices from './pages/Devices'
 import Dashboard from './pages/Dashboard'
 import Alerts from './pages/Alerts'
 import ClientRequests from './pages/ClientRequests'
+import ClientIncidents from './pages/ClientIncidents'
 import Profile from './pages/Profile'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminClients from './pages/admin/Clients'
@@ -17,6 +18,7 @@ import AdminDeviceDetail from './pages/admin/DeviceDetail'
 import AdminTeam from './pages/admin/Team'
 import AdminVariables from './pages/admin/Variables'
 import AdminRequests from './pages/admin/Requests'
+import AdminIncidents from './pages/admin/Incidents'
 import ClientDeviceDetail from './pages/DeviceDetail'
 import Reports from './pages/Reports'
 import VariableDetail from './pages/VariableDetail'
@@ -116,6 +118,8 @@ export default function App() {
         <Route path="/alerts/:deviceId" element={<ProtectedRoute allowedRoles={['client']}><Alerts /></ProtectedRoute>} />
         {/* Solo organizaciones dependientes (A): las independientes crean sus estaciones */}
         <Route path="/solicitudes" element={<ClientScopeRoute><ClientRequests /></ClientScopeRoute>} />
+        {/* Incidencias: las reportan tanto dependientes como independientes */}
+        <Route path="/incidencias" element={<ProtectedRoute allowedRoles={['client']}><ClientIncidents /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* Rutas de Administración (Admin, Superadmin, Worker) */}
@@ -158,6 +162,12 @@ export default function App() {
         <Route path="/admin/solicitudes" element={
           <ProtectedRoute allowedRoles={ADMIN_ROLES}>
             <AdminRequests />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/incidencias" element={
+          <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+            <AdminIncidents />
           </ProtectedRoute>
         } />
 

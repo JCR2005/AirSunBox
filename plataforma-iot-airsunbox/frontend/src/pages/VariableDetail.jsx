@@ -13,37 +13,37 @@ import { exportStationRecordsPDF, exportStationRecordsExcel, exportStationWeekly
 
 // Modificadores estructurales de funciones matemáticas de Ubidots
 const AGGREGATIONS = [
-  { value: 'avg', label: 'Average' },
-  { value: 'sum', label: 'Sum' },
-  { value: 'min', label: 'Minimum' },
-  { value: 'max', label: 'Maximum' },
-  { value: 'count', label: 'Count' },
-  { value: 'raw', label: 'Raw (Crudo)' }
+  { value: 'avg', label: 'Promedio' },
+  { value: 'sum', label: 'Suma' },
+  { value: 'min', label: 'Mínimo' },
+  { value: 'max', label: 'Máximo' },
+  { value: 'count', label: 'Cantidad' },
+  { value: 'raw', label: 'Sin agrupar' }
 ]
 
 // Intervalos válidos del Sample Period
 const SAMPLE_PERIODS = [
-  { value: '1 minute', label: '1 minute' },
-  { value: '5 minutes', label: '5 minutes' },
-  { value: '15 minutes', label: '15 minutes' },
-  { value: '30 minutes', label: '30 minutes' },
-  { value: '1 hour', label: '1 hour' },
-  { value: '6 hours', label: '6 hours' }
+  { value: '1 minute', label: '1 minuto' },
+  { value: '5 minutes', label: '5 minutos' },
+  { value: '15 minutes', label: '15 minutos' },
+  { value: '30 minutes', label: '30 minutos' },
+  { value: '1 hour', label: '1 hora' },
+  { value: '6 hours', label: '6 horas' }
 ]
 
 // Mapeado estructurado de los Quick Ranges
 const QUICK_RANGES = [
-  { id: 'last_1_hour', label: 'Last 1 hour' },
-  { id: 'today', label: 'Today' },
-  { id: 'yesterday', label: 'Yesterday' },
-  { id: 'last_24_hours', label: 'Last 24 hours' },
-  { id: 'this_week', label: 'This week' },
-  { id: 'last_7_days', label: 'Last 7 days' },
-  { id: 'this_month', label: 'This month' },
-  { id: 'last_30_days', label: 'Last 30 days' },
-  { id: 'last_3_months', label: 'Last 3 months' },
-  { id: 'last_6_months', label: 'Last 6 months' },
-  { id: 'this_year', label: 'This year' }
+  { id: 'last_1_hour', label: 'Última hora' },
+  { id: 'today', label: 'Hoy' },
+  { id: 'yesterday', label: 'Ayer' },
+  { id: 'last_24_hours', label: 'Últimas 24 horas' },
+  { id: 'this_week', label: 'Esta semana' },
+  { id: 'last_7_days', label: 'Últimos 7 días' },
+  { id: 'this_month', label: 'Este mes' },
+  { id: 'last_30_days', label: 'Últimos 30 días' },
+  { id: 'last_3_months', label: 'Últimos 3 meses' },
+  { id: 'last_6_months', label: 'Últimos 6 meses' },
+  { id: 'this_year', label: 'Este año' }
 ]
 
 // DICCIONARIO DE COLORES PARA EL ICA
@@ -98,7 +98,7 @@ export default function VariableDetail() {
   
   // Filtro de tiempo definitivo aplicado
   const [activeTimeFilter, setActiveTimeFilter] = useState({
-    range: 'last_24_hours', start: null, end: null, label: 'Last 24 hours'
+    range: 'last_24_hours', start: null, end: null, label: 'Últimas 24 horas'
   })
 
   // Estados de la tabla paginada de datos históricos
@@ -251,7 +251,7 @@ export default function VariableDetail() {
         range: null,
         start: customStartDate,
         end: customEndDate,
-        label: `${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`
+        label: `${new Date(customStartDate).toLocaleDateString('es-GT')} - ${new Date(customEndDate).toLocaleDateString('es-GT')}`
       })
     } else {
       const target = QUICK_RANGES.find(r => r.id === selectedRange)
@@ -259,7 +259,7 @@ export default function VariableDetail() {
         range: selectedRange,
         start: null,
         end: null,
-        label: target ? target.label : 'Rango Activo'
+        label: target ? target.label : 'Rango activo'
       })
     }
     setShowTimeDropdown(false)
@@ -397,7 +397,7 @@ export default function VariableDetail() {
                   
                   {/* Columna A: Quick Ranges */}
                   <div className="p-3 border-r max-h-[380px] overflow-y-auto space-y-0.5" style={{ borderColor: 'var(--border)' }}>
-                    <div className="text-[10px] font-bold text-gray-400 uppercase px-2 mb-2 tracking-wider">Quick ranges</div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase px-2 mb-2 tracking-wider">Rangos rápidos</div>
                     {QUICK_RANGES.map(qr => (
                       <button
                         key={qr.id}
@@ -417,13 +417,13 @@ export default function VariableDetail() {
                         onClick={() => setSelectedRange('custom')}
                         className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-colors ${selectedRange === 'custom' ? 'bg-[#1D9E75]/10 text-[#1D9E75]' : 'text-gray-400 font-normal'}`}
                       >
-                        <span>Custom range</span>
+                        <span>Rango personalizado</span>
                         {selectedRange === 'custom' && <Check size={12} />}
                       </button>
 
                       <div className={`space-y-3 transition-all duration-200 ${selectedRange === 'custom' ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Start Date</label>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Desde</label>
                           <input 
                             type="datetime-local" 
                             value={customStartDate}
@@ -432,7 +432,7 @@ export default function VariableDetail() {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">End Date</label>
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Hasta</label>
                           <input 
                             type="datetime-local" 
                             value={customEndDate}
@@ -448,13 +448,13 @@ export default function VariableDetail() {
                         onClick={() => setShowTimeDropdown(false)}
                         className="px-3 py-1.5 text-xs font-bold text-gray-400 hover:text-gray-600 transition-colors"
                       >
-                        CANCEL
+                        Cancelar
                       </button>
                       <button 
                         onClick={handleApplyTimeFilter}
                         className="px-4 py-1.5 text-xs font-black bg-[#1D9E75] text-white rounded-xl shadow-md hover:bg-[#157858] transition-all"
                       >
-                        UPDATE
+                        Aplicar
                       </button>
                     </div>
                   </div>
@@ -467,7 +467,7 @@ export default function VariableDetail() {
             <div className="flex items-center justify-between w-full md:w-auto gap-3 md:border-l md:pl-4" style={{ borderColor: 'var(--border)' }}>
               <div className="flex items-center gap-2 text-xs font-bold text-var(--text2)" style={{ color: 'var(--text2)' }}>
                 <BarChart2 size={14} className="text-[#67B7E8]" />
-                Aggregation
+                Agregación
               </div>
               <select
                 value={aggregation}
@@ -485,7 +485,7 @@ export default function VariableDetail() {
             <div className={`flex items-center justify-between w-full md:w-auto gap-3 md:border-l md:pl-4 transition-all duration-300 ${isRawMode ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
               <div className="flex items-center gap-2 text-xs font-bold text-var(--text2)" style={{ color: 'var(--text2)' }}>
                 <Clock size={14} className="text-[#67B7E8]" />
-                Sample period
+                Intervalo
               </div>
               <select
                 disabled={isRawMode}
@@ -602,7 +602,7 @@ export default function VariableDetail() {
             {loadingChart && (
               <div className="absolute inset-0 bg-white/60 dark:bg-black/60 rounded-[2.5rem] z-20 flex items-center justify-center backdrop-blur-sm">
                 <div className="text-xs font-bold text-[#1D9E75] animate-pulse">
-                  {isRawMode ? 'Consultando telemetría cruda...' : `Procesando agregación (${samplePeriod})...`}
+                  {isRawMode ? 'Consultando telemetría cruda...' : `Procesando agregación (${SAMPLE_PERIODS.find(sp => sp.value === samplePeriod)?.label || samplePeriod})...`}
                 </div>
               </div>
             )}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { KeyRound, Mail, Check, Loader2 } from 'lucide-react'
+import { KeyRound, Mail, Check, Loader2, Pencil } from 'lucide-react'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import AdminLayout from '../components/admin/AdminLayout'
 import TwoFactorSection from '../components/security/TwoFactorSection'
@@ -93,10 +93,62 @@ function PasswordRow({ email }) {
   )
 }
 
+const FIELD = 'w-full border rounded-xl px-3 py-2 text-sm font-normal outline-none transition-all focus:ring-2 focus:ring-[#67B7E8]/20 focus:border-[#67B7E8]'
+const fieldStyle = { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }
+
+// Nombre y teléfono editables; el resto de la cuenta lo gestiona AirSunBox.
+function AccountEditor({ me, currentName, onCancel, onSaved }) {
+  const [name, setName] = useState(currentName || '')
+  const [phone, setPhone] = useState(me?.phone || '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const save = async (e) => {
+    e.preventDefault()
+    if (!name.trim()) { setError('Escribí tu nombre.'); return }
+    if (phone.trim() && !/^\+?[0-9\s()-]{7,30}$/.test(phone.trim())) {
+      setError('Teléfono inválido: usá solo números, espacios, guiones o +.'); return
+    }
+    setSaving(true); setError('')
+    try {
+      onSaved(await auth.updateMe({ name: name.trim(), phone: phone.trim() || null }))
+    } catch (err) {
+      setError(err.message || 'No se pudieron guardar los cambios')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={save} noValidate>
+      <Row label={<label htmlFor="perfil-nombre">Nombre</label>}>
+        <input id="perfil-nombre" className={FIELD} style={fieldStyle} value={name} maxLength={120}
+               autoFocus autoComplete="name" onChange={e => { setName(e.target.value); setError('') }} />
+      </Row>
+      <Row label={<label htmlFor="perfil-telefono">Teléfono</label>}>
+        <input id="perfil-telefono" className={FIELD} style={fieldStyle} value={phone} maxLength={30}
+               type="tel" autoComplete="tel" placeholder="Ej.: +502 5555 1234"
+               onChange={e => { setPhone(e.target.value); setError('') }} />
+      </Row>
+      {error && <p role="alert" className="text-sm pt-3" style={{ color: '#E5484D' }}>{error}</p>}
+      <div className="flex gap-2 justify-end py-4">
+        <button type="button" onClick={onCancel} className="px-4 py-2 rounded-xl text-sm font-semibold border" style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-white bg-[#67B7E8] hover:bg-[#52A8E0] disabled:opacity-60">
+          {saving && <Loader2 size={14} className="animate-spin" />} Guardar cambios
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export default function Profile() {
-  const { user, org, twoFactorStatus } = useAuthStore()
+  const { user, org, twoFactorStatus, updateUser } = useAuthStore()
   const location = useLocation()
   const [me, setMe] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     // El estado del 2FA lo carga TwoFactorSection
@@ -141,9 +193,38 @@ export default function Profile() {
 
         {/* Cuenta */}
         <section className="mt-12">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Cuenta</h2>
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Cuenta</h2>
+            {!editing && me && (
+              <button type="button" onClick={() => { setEditing(true); setSaved(false) }}
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg transition-colors hover:bg-[#67B7E8]/10"
+                      style={{ color: SKY }}>
+                <Pencil size={14} /> Editar
+              </button>
+            )}
+          </div>
+          {saved && (
+            <p role="status" className="mt-2 text-sm inline-flex items-center gap-1.5" style={{ color: SKY }}>
+              <Check size={14} /> Cambios guardados
+            </p>
+          )}
           <dl className="mt-2 rounded-2xl border px-5 sm:px-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-            <Row label="Nombre">{name || 'Sin nombre registrado'}</Row>
+            {editing ? (
+              <AccountEditor
+                me={me}
+                currentName={name}
+                onCancel={() => setEditing(false)}
+                onSaved={(updated) => {
+                  setMe(updated); setEditing(false); setSaved(true)
+                  updateUser({ name: updated.name })
+                }}
+              />
+            ) : (
+              <>
+                <Row label="Nombre">{name || 'Sin nombre registrado'}</Row>
+                <Row label="Teléfono">{me?.phone || 'Sin teléfono registrado'}</Row>
+              </>
+            )}
             <Row label="Correo">{email}</Row>
             <Row label="Rol">{roleLabel(user?.role)}</Row>
             <Row label="Organización">{me?.org_name || org?.name || 'Sin organización'}</Row>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth'
 import UserMenu from '../UserMenu'
-import { LayoutDashboard, Cpu, FileText, ChevronRight, Bell, Menu, X, Layers } from 'lucide-react'
+import { LayoutDashboard, Cpu, FileText, ChevronRight, Bell, Menu, X, Layers, LifeBuoy } from 'lucide-react'
 
 
 import logoImg from "../../assets/logo2.svg";
@@ -31,6 +31,7 @@ const CLIENT_NAV = [
   { label: 'Reportes',     icon: FileText,        path: '/reportes' },
   { label: 'Alertas',      icon: Bell,            path: '/alerts' },
   { label: 'Solicitudes',  icon: FileText,        path: '/solicitudes' },
+  { label: 'Incidencias',  icon: LifeBuoy,        path: '/incidencias' },
 ]
 
 export default function ClienteLayout({ children }) {

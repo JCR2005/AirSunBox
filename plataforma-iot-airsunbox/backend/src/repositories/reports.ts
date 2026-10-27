@@ -1,4 +1,5 @@
 import type { Queryable } from '../types/index.js'
+import { ONLINE_WINDOW } from '../lib/deviceStatus.js'
 
 export interface GlobalStatsRow {
   total_clients: string
@@ -12,7 +13,7 @@ export async function globalStats(db: Queryable): Promise<GlobalStatsRow> {
     SELECT
       (SELECT COUNT(*) FROM organizations WHERE slug != 'airsunbox-internal') as total_clients,
       (SELECT COUNT(*) FROM devices) as total_devices,
-      (SELECT COUNT(*) FROM devices WHERE last_seen > NOW() - INTERVAL '5 minutes') as active_devices,
+      (SELECT COUNT(*) FROM devices WHERE last_seen > NOW() - INTERVAL '${ONLINE_WINDOW}') as active_devices,
       (SELECT COUNT(*) FROM requests WHERE status = 'pending') as pending_requests
   `)
   return stats
