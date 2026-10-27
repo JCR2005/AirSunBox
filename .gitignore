@@ -31,3 +31,12 @@ node_modules/
 
 # Archivos compilados
 dist/
+
+# Documentación (manuales, runbook, plantillas, capturas y sus generadores):
+# se gestiona fuera del repositorio
+docs/
+screenshots/
+MANUAL_INDEPENDIENTES.*
+build_manual.cjs
+**/build_manual.cjs
+infra/seguridad/README.md
