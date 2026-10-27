@@ -1,4 +1,5 @@
 import type { Queryable } from '../types/index.js'
+import { ONLINE_WINDOW } from '../lib/deviceStatus.js'
 
 export interface DeviceRow {
   id: string
@@ -46,7 +47,7 @@ export async function listByOrg(db: Queryable, orgId: string) {
     `SELECT d.*,
             s.name AS space_name,
             COUNT(dv.variable_label) as variable_count,
-            CASE WHEN d.last_seen > NOW() - INTERVAL '5 minutes'
+            CASE WHEN d.last_seen > NOW() - INTERVAL '${ONLINE_WINDOW}'
                  THEN 'online' ELSE 'offline' END as status
      FROM devices d
      LEFT JOIN spaces s ON s.id = d.space_id
@@ -87,7 +88,7 @@ export async function findByIdAndOrg(db: Queryable, id: string, orgId: string): 
   const { rows } = await db.query<DeviceRow>(
     `SELECT d.*,
             o.type AS org_type,
-            CASE WHEN d.last_seen > NOW() - INTERVAL '5 minutes'
+            CASE WHEN d.last_seen > NOW() - INTERVAL '${ONLINE_WINDOW}'
                  THEN 'online' ELSE 'offline' END as status
      FROM devices d
      LEFT JOIN organizations o ON o.id = d.org_id
@@ -225,7 +226,7 @@ const PUBLIC_MAP_FROM_WHERE = `
 export async function publicMapDevices(db: Queryable) {
   const { rows } = await db.query<DeviceRow>(
     `SELECT d.id, d.name, d.lat, d.lng, d.description,
-            CASE WHEN d.last_seen > NOW() - INTERVAL '10 minutes'
+            CASE WHEN d.last_seen > NOW() - INTERVAL '${ONLINE_WINDOW}'
                  THEN 'online' ELSE 'offline' END as status
      ${PUBLIC_MAP_FROM_WHERE}
      ORDER BY d.name ASC`

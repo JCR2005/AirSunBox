@@ -1,4 +1,5 @@
 import type { Queryable } from '../types/index.js'
+import { ONLINE_WINDOW } from '../lib/deviceStatus.js'
 
 export interface SpaceRow {
   id: string
@@ -66,7 +67,7 @@ export async function listDevices(db: Queryable, spaceId: string) {
   const { rows } = await db.query(
     `SELECT d.*,
             COUNT(dv.variable_label)::int as variable_count,
-            CASE WHEN d.last_seen > NOW() - INTERVAL '5 minutes'
+            CASE WHEN d.last_seen > NOW() - INTERVAL '${ONLINE_WINDOW}'
                  THEN 'online' ELSE 'offline' END as status
      FROM devices d
      LEFT JOIN device_variables dv ON dv.device_id = d.id
