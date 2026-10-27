@@ -156,6 +156,7 @@ export const reports = {
 }
 export const requests = {
   list: () => request('/requests'),
+  create: (data) => request('/requests', { method: 'POST', body: JSON.stringify(data) }),
   updateStatus: (id, status) => request(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
 }
 

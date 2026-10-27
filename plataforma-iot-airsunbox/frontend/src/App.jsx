@@ -8,6 +8,7 @@ import ResetPassword from './pages/ResetPassword'
 import Devices from './pages/Devices'
 import Dashboard from './pages/Dashboard'
 import Alerts from './pages/Alerts'
+import ClientRequests from './pages/ClientRequests'
 import Profile from './pages/Profile'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminClients from './pages/admin/Clients'
@@ -113,6 +114,8 @@ export default function App() {
 
         <Route path="/alerts" element={<ProtectedRoute allowedRoles={['client']}><Alerts /></ProtectedRoute>} />
         <Route path="/alerts/:deviceId" element={<ProtectedRoute allowedRoles={['client']}><Alerts /></ProtectedRoute>} />
+        {/* Solo organizaciones dependientes (A): las independientes crean sus estaciones */}
+        <Route path="/solicitudes" element={<ClientScopeRoute><ClientRequests /></ClientScopeRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
         {/* Rutas de Administración (Admin, Superadmin, Worker) */}

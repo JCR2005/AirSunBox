@@ -18,19 +18,26 @@ export default async function requestsRoutes(app: FastifyInstance) {
   api.post('/', {
     schema: {
       body: Type.Object({
-        deviceName: Type.Optional(Type.String()),
-        location: Type.Optional(Type.String()),
-        quantity: Type.Optional(Type.Number()),
+        deviceName: Type.String({ minLength: 1, maxLength: 120 }),
+        location: Type.String({ minLength: 1, maxLength: 200 }),
+        quantity: Type.Optional(Type.Integer({ minimum: 1, maximum: 50 })),
         note: Type.Optional(Type.String()),
         paymentPhoto: Type.Optional(Type.String())
       })
     }
   }, async (req, reply) => {
+    // Las solicitudes las hace el cliente para su propia organización
+    if (isInternalRole(req.user.role))
+      return reply.code(403).send({ error: 'Las solicitudes las crea el cliente' })
+    // Solo las organizaciones dependientes piden estaciones; las independientes
+    // las crean ellas mismas desde sus espacios
+    if (await requestsRepo.orgType(app.db, req.user.orgId) !== 'A')
+      return reply.code(403).send({ error: 'Las organizaciones independientes crean sus estaciones desde sus espacios' })
     const { deviceName, location, quantity, note, paymentPhoto } = req.body
     const request = await requestsRepo.create(app.db, {
       orgId: req.user.orgId,
-      deviceName: deviceName ?? '',
-      location: location ?? '',
+      deviceName: deviceName.trim(),
+      location: location.trim(),
       quantity: quantity || 1,
       note: note ?? null,
       paymentPhoto: paymentPhoto ?? null
