@@ -101,6 +101,11 @@ export async function findMe(db: Queryable, userId: string): Promise<MeUserRow[]
   return rows
 }
 
+// Datos que cada usuario puede editar de su propia cuenta (RF05)
+export async function updateProfile(db: Queryable, userId: string, name: string, phone: string | null): Promise<void> {
+  await db.query('UPDATE users SET name = $1, phone = $2 WHERE id = $3', [name, phone, userId])
+}
+
 export async function existsByEmail(db: Queryable, email: string): Promise<boolean> {
   const { rows } = await db.query<IdRow>('SELECT id FROM users WHERE email = $1', [email])
   return rows.length > 0

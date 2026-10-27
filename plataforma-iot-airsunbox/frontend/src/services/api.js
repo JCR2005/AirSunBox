@@ -51,7 +51,8 @@ export const auth = {
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
   checkResetToken: (token) => request('/auth/reset-password/check', { method: 'POST', body: JSON.stringify({ token }) }),
-  me: () => request('/auth/me')
+  me: () => request('/auth/me'),
+  updateMe: (data) => request('/auth/me', { method: 'PATCH', body: JSON.stringify(data) })
 }
 
 export const devices = {

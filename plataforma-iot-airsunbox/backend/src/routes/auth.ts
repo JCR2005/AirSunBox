@@ -119,6 +119,28 @@ export default async function authRoutes(app: FastifyInstance) {
     return rows[0]
   })
 
+  // ── Editar el propio perfil ────────────────────
+  // Solo nombre y teléfono: el correo identifica la cuenta y el rol lo asigna
+  // un administrador.
+  api.patch('/me', {
+    onRequest: [app.authenticate],
+    schema: {
+      body: Type.Object({
+        name: Type.String({ minLength: 1, maxLength: 120 }),
+        phone: Type.Optional(Type.Union([Type.String({ maxLength: 30 }), Type.Null()]))
+      })
+    }
+  }, async (req, reply) => {
+    const name = req.body.name.trim()
+    const phone = req.body.phone?.trim() || null
+    if (!name) return reply.code(400).send({ error: 'El nombre no puede quedar vacío' })
+    if (phone && !/^\+?[0-9\s()-]{7,30}$/.test(phone))
+      return reply.code(400).send({ error: 'Teléfono inválido: usá solo números, espacios, guiones o +' })
+    await usersRepo.updateProfile(app.db, req.user.userId, name, phone)
+    const rows = await usersRepo.findMe(app.db, req.user.userId)
+    return rows[0]
+  })
+
   // ── Crear usuario (solo admin/superadmin de AirSunBox) ──
   // Solo el superadmin crea admin/superadmin. Los roles internos quedan en la
   // organización de AirSunBox de quien los crea; un cliente va a la org indicada.
