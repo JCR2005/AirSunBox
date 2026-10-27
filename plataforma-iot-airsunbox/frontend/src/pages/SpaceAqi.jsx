@@ -372,7 +372,7 @@ export default function SpaceAqi() {
           continue
         }
         // Variable nueva → crearla como variable local del espacio
-        const created = await variablesApi.create({ name, unit, space_id: id })
+        const created = await variablesApi.create({ name, unit, label: generateLabel(name), space_id: id })
         nextCatalog.push(created)
         remap[v.label] = created.label
         v.catalogLabel = created.label
@@ -384,6 +384,10 @@ export default function SpaceAqi() {
       const configRanges = ranges.map(r => ({ ...r, variable_label: remap[r.variable_label] || r.variable_label }))
       const res = await spacesApi.saveConfig(id, toConfig(cats, configVars, configRanges))
       setSpace(res)
+      // El backend puede haber asignado otro identificador (p. ej. temperatura-2):
+      // la pantalla muestra el real, que es el que se programa en la estación.
+      setVars(configVars)
+      setRanges(configRanges)
       setBaseline(stateKeyRef.current)
       setMsg('Configuración guardada correctamente.')
     } catch (e) {
@@ -410,7 +414,7 @@ export default function SpaceAqi() {
   const stateKey = JSON.stringify({
     c: cats.map(({ name, color, phrases }) => ({ name, color, phrases })),
     v: vars.map(v => [v.name, v.unit]),
-    r: ranges.map(r => [r.variable_label, r.cat_order, r.max_value])
+    r: ranges.map(r => [vars.findIndex(v => v.label === r.variable_label), r.cat_order, r.max_value])
   })
   const stateKeyRef = useRef(stateKey)
   stateKeyRef.current = stateKey
@@ -674,7 +678,9 @@ export default function SpaceAqi() {
                                 <p className="text-xs mt-2 sm:pl-11" style={{ color: dup ? '#EF4444' : 'var(--text2)' }}>
                                   {dup
                                     ? 'Otra variable ya usa este nombre. Cambiá uno de los dos.'
-                                    : <>Identificador: <span className="font-mono">{v.label}</span></>}
+                                    : v.catalogLabel
+                                      ? <>Identificador para la estación: <span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{v.catalogLabel}</span></>
+                                      : <>Identificador sugerido: <span className="font-mono">{v.label}</span> · si ya existe, al guardar se le agrega un número</>}
                                 </p>
                               )}
                             </div>
