@@ -3,8 +3,6 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as devicesRepo from '../repositories/devices.js'
 import * as reportsRepo from '../repositories/reports.js'
-import { calculateRespiratoryRisk } from '../services/reportCalculationsService.js'
-import { analyzeEnvironmentalImpact } from '../services/environmentalAnalysisService.js'
 
 const AQI_VARS = ['co', 'co2', 'nh3', 'nox', 'h2s', 'o3', 'so2', 'pm25', 'pm10']
 const CLIMA_VARS = ['temperatura', 'temperature', 'humedad', 'humidity', 'co2', 'co']
@@ -89,54 +87,12 @@ export default async function publicRoutes(app: FastifyInstance) {
     }
   })
 
-  const timesQuerySchema = {
-    querystring: Type.Object({
-      start: Type.Optional(Type.String()),
-      end: Type.Optional(Type.String())
-    })
-  }
 
-  // ── 3. REPORTES GLOBALES PÚBLICOS ──
-
-  // Estadísticas globales
+  // ── 3. ESTADÍSTICAS GLOBALES PÚBLICAS (solo conteos) ──
+  // Los reportes con datos de las estaciones son del cliente (/api/reports),
+  // no públicos.
   api.get('/reports/stats', async () => {
     return reportsRepo.globalStats(app.db)
-  })
-
-  // Heatmap global
-  api.get('/reports/heatmap', { schema: timesQuerySchema }, async (req) => {
-    return reportsRepo.heatmapGlobal(app.db, req.query.start, req.query.end)
-  })
-
-  // Riesgo respiratorio global
-  api.get('/reports/respiratory-risk', { schema: timesQuerySchema }, async (req) => {
-    const rows = await reportsRepo.respiratoryDataGlobal(app.db, req.query.start, req.query.end)
-    const devices: Record<string, { id: string; name: string; variables: Record<string, { avg: number; max: number }> }> = {}
-    for (const row of rows) {
-      if (!devices[row.id]) {
-        devices[row.id] = { id: row.id, name: row.name, variables: {} }
-      }
-      devices[row.id].variables[row.variable] = {
-        avg: parseFloat(row.avg_value),
-        max: parseFloat(row.max_value)
-      }
-    }
-    return calculateRespiratoryRisk(devices)
-  })
-
-  // Reporte de contaminación ambiental global
-  api.get('/reports/environmental', { schema: timesQuerySchema }, async (req) => {
-    const rows = await reportsRepo.environmentalData(app.db, req.query.start, req.query.end)
-    const devices: Record<string, { id: string; name: string; lat: number | null; lng: number | null; variables: Record<string, { avg: number }> }> = {}
-    for (const row of rows) {
-      if (!devices[row.id]) {
-        devices[row.id] = { id: row.id, name: row.name, lat: row.lat, lng: row.lng, variables: {} }
-      }
-      devices[row.id].variables[row.variable] = {
-        avg: parseFloat(row.avg_value)
-      }
-    }
-    return analyzeEnvironmentalImpact(devices)
   })
 
   // ── 4. RESUMEN COMPLETO DE UNA ZONA ──
