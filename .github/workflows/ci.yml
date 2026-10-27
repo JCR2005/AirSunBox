@@ -132,3 +132,148 @@ jobs:
       - name: Build frontend
         working-directory: plataforma-iot-airsunbox/frontend
         run: npm run build
+
+  deploy:
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: airsunbox-production-deploy
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-2
+
+      - name: Deploy tested main commit through SSM
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
+          EC2_INSTANCE_ID: i-07a637df8369c3f6c
+          AWS_REGION: us-east-2
+        run: |
+          set -euo pipefail
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+
+          remote_command=$(cat <<EOF
+          set -eu
+          repo=/home/ubuntu/apps/airsunbox
+          compose_dir=\$repo/plataforma-iot-airsunbox
+          deploy_sha=$DEPLOY_SHA
+
+          test "\$(sudo -u ubuntu -H git -C "\$repo" branch --show-current)" = main
+          test -z "\$(sudo -u ubuntu -H git -C "\$repo" status --porcelain)"
+          sudo -u ubuntu -H git -C "\$repo" fetch --no-tags origin main
+          test "\$(sudo -u ubuntu -H git -C "\$repo" rev-parse refs/remotes/origin/main)" = "\$deploy_sha"
+          sudo -u ubuntu -H git -C "\$repo" merge --ff-only "\$deploy_sha"
+
+          cd "\$compose_dir"
+          docker compose -p airsunbox -f docker-compose.yml build --quiet backend frontend
+          docker compose -p airsunbox -f docker-compose.yml up -d --no-deps backend frontend
+
+          for attempt in \$(seq 1 60); do
+            backend_health=\$(docker inspect --format '{{.State.Health.Status}}' iot_backend 2>/dev/null || true)
+            frontend_state=\$(docker inspect --format '{{.State.Status}}' iot_frontend 2>/dev/null || true)
+            if [ "\$backend_health" = healthy ] && [ "\$frontend_state" = running ]; then
+              break
+            fi
+            sleep 2
+          done
+          if [ "\$backend_health" != healthy ]; then
+            echo "Backend health check failed: expected healthy, got \${backend_health:-unavailable}." >&2
+            exit 1
+          fi
+          if [ "\$frontend_state" != running ]; then
+            echo "Frontend health check failed: expected running, got \${frontend_state:-unavailable}." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --output /dev/null --resolve 18.223.121.208:443:127.0.0.1 https://18.223.121.208/
+          printf 'DEPLOYED_SHA=%s\\n' "\$deploy_sha"
+          docker compose -p airsunbox -f docker-compose.yml ps --format 'table {{.Service}} {{.State}} {{.Health}}'
+          EOF
+          )
+
+          parameters=$(jq -cn --arg command "$remote_command" '{commands: [$command], executionTimeout: ["900"]}')
+          command_id=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "AirSunBox deploy $DEPLOY_SHA" \
+            --timeout-seconds 120 \
+            --parameters "$parameters" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          poll_error_file=$(mktemp)
+          trap 'rm -f "$poll_error_file"' EXIT
+          redact_ssm_output() {
+            python3 -c 'import re,sys; s=sys.stdin.read(); s=re.sub(r"""(?im)(["\x27]?\w*(?:password|passwd|token|secret|api[_-]?key|access[_-]?key|credential|private[_-]?key|authorization)\w*["\x27]?\s*[:=]\s*)(?:"[^"]*"|\x27[^\x27]*\x27|[^\r\n]+)""", r"\1[REDACTED]", s); s=re.sub(r"(?i)(https?://)[^/@\s:]+:[^/@\s]+@", r"\1[REDACTED]@", s); s=re.sub(r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----", "[REDACTED PRIVATE KEY]", s, flags=re.S); s=re.sub(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b", "[REDACTED AWS KEY ID]", s); s=re.sub(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b", "[REDACTED TOKEN]", s); sys.stdout.write(s)'
+          }
+          for attempt in $(seq 1 240); do
+            if status=$(aws ssm get-command-invocation \
+                --region "$AWS_REGION" \
+                --command-id "$command_id" \
+                --instance-id "$EC2_INSTANCE_ID" \
+                --query Status \
+                --output text 2>"$poll_error_file"); then
+              :
+            elif grep -q 'InvocationDoesNotExist' "$poll_error_file" && [ "$attempt" -le 6 ]; then
+              echo "SSM invocation is not visible yet; retrying ($attempt/6)." >&2
+              sleep 5
+              continue
+            else
+              echo "Unable to poll SSM command $command_id:" >&2
+              cat "$poll_error_file" >&2
+              exit 1
+            fi
+
+            case "$status" in
+              Success)
+                aws ssm get-command-invocation \
+                  --region "$AWS_REGION" \
+                  --command-id "$command_id" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query StandardOutputContent \
+                  --output text
+                exit 0
+                ;;
+              Failed|Cancelled|TimedOut|Cancelling|DeliveryTimedOut|ExecutionTimedOut|Undeliverable|Terminated|InvalidPlatform|AccessDenied|"Delivery Timed Out"|"Execution Timed Out"|"Invalid Platform"|"Access Denied")
+                if details=$(aws ssm get-command-invocation \
+                  --region "$AWS_REGION" \
+                  --command-id "$command_id" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --query '{ResponseCode:ResponseCode,StandardErrorContent:StandardErrorContent,StandardOutputContent:StandardOutputContent}' \
+                  --output json 2>"$poll_error_file"); then
+                  response_code=$(jq -r '.ResponseCode // "unavailable"' <<< "$details")
+                  echo "SSM deployment failed with status: $status (response code: $response_code)." >&2
+                  for output_field in StandardErrorContent StandardOutputContent; do
+                    output=$(jq -r --arg field "$output_field" '.[$field] // ""' <<< "$details")
+                    if [ -n "$output" ]; then
+                      echo "Remote $output_field (credential patterns redacted):" >&2
+                      printf '%s\n' "$output" | redact_ssm_output >&2
+                    else
+                      echo "Remote $output_field: (empty)" >&2
+                    fi
+                  done
+                else
+                  echo "SSM deployment failed with status: $status; response details could not be retrieved." >&2
+                  redact_ssm_output < "$poll_error_file" >&2
+                fi
+                exit 1
+                ;;
+              Pending|InProgress|Delayed)
+                sleep 5
+                ;;
+              *)
+                echo "SSM returned unexpected deployment status: $status" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "Timed out waiting for SSM deployment command $command_id" >&2
+          exit 1
