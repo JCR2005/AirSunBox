@@ -1,0 +1,20 @@
+// GitFlow + CI/CD
+digraph cicd {
+  graph [rankdir=LR, fontname="DejaVu Sans", fontsize=11, nodesep=0.3, ranksep=0.4, pad=0.3]
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, fillcolor="#F1F7FC", color="#67B7E8"]
+  edge  [fontname="DejaVu Sans", fontsize=8, color="#5B6B7A"]
+
+  feat   [label="Rama feature/* · fix/*\n(desde develop)", fillcolor="white"]
+  prdev  [label="PR → develop\nCI: backend + frontend"]
+  dev    [label="develop", shape=cylinder, fillcolor="white"]
+  prmain [label="PR de release\ndevelop → main\nCI + regla 'Proteger main'"]
+  main   [label="main", shape=cylinder, fillcolor="white"]
+  deploy [label="Job deploy\nOIDC → rol IAM\nSSM SendCommand"]
+  ec2    [label="EC2: git ff a main\ndocker compose build/up\nbackend + frontend"]
+  check  [label="Verificación\nbackend healthy\nfrontend running\nHTTPS 200"]
+
+  feat -> prdev -> dev -> prmain -> main -> deploy -> ec2 -> check
+  ci [label="Job backend: migraciones (00-schema.sh)\ntypecheck · build · smoke tests\nJob frontend: npm ci · build", shape=note, fillcolor="#FFF8E7", color="#E0A23B"]
+  ci -> prdev [style=dotted, arrowhead=none]
+  ci -> prmain [style=dotted, arrowhead=none]
+}

@@ -1,0 +1,26 @@
+// Flujo de una lectura: del sensor al panel en tiempo real y a las alertas
+digraph flujo {
+  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=11, nodesep=0.3, ranksep=0.35, pad=0.3]
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, fillcolor="#F1F7FC", color="#67B7E8"]
+  edge  [fontname="DejaVu Sans", fontsize=8, color="#5B6B7A"]
+
+  esp   [label="ESP32\nlectura JSON\n{pm25, co2, …}", fillcolor="white"]
+  http  [label="POST /api/dots/{token}\n(nginx → backend)"]
+  mqtt  [label="EMQX\n$share/airsunbox-ingest/…"]
+  val   [label="Validación\ntoken → estación\nvariables habilitadas"]
+  qin   [label="Cola BullMQ\n'ingest' (Redis)"]
+  wrk   [label="Worker de ingesta\n(concurrencia 4)"]
+  dots  [label="TimescaleDB\nINSERT en dots\n+ devices.last_seen", shape=cylinder]
+  pub   [label="Redis pub/sub\ncanal de la estación"]
+  ws    [label="WebSocket /ws\n(token de sesión)"]
+  ui    [label="Panel web\n(tiempo real)", fillcolor="white"]
+  qal   [label="Cola BullMQ\n'alerts'"]
+  disp  [label="Despachador de alertas\numbral + cooldown"]
+  canal [label="Correo · Telegram · Webhook\n+ alert_logs", fillcolor="white"]
+
+  esp -> http; esp -> mqtt [style=dashed]
+  http -> val; mqtt -> val
+  val -> qin -> wrk -> dots
+  wrk -> pub -> ws -> ui
+  wrk -> qal -> disp -> canal
+}
