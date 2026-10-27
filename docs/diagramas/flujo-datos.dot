@@ -1,26 +1,33 @@
 // Flujo de una lectura: del sensor al panel en tiempo real y a las alertas
 digraph flujo {
-  graph [rankdir=TB, fontname="DejaVu Sans", fontsize=11, nodesep=0.3, ranksep=0.35, pad=0.3]
-  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, fillcolor="#F1F7FC", color="#67B7E8"]
-  edge  [fontname="DejaVu Sans", fontsize=8, color="#5B6B7A"]
+  graph [rankdir=TB, fontname="Liberation Sans", fontsize=12, nodesep=0.3, ranksep=0.35, pad=0.3, newrank=true]
+  node  [shape=box, style="filled", fontname="Liberation Sans", fontsize=11, fillcolor="#E1D5E7", color="#9673A6"]
+  edge  [fontname="Liberation Sans", fontsize=9, color="#333333"]
 
-  esp   [label="ESP32\nlectura JSON\n{pm25, co2, …}", fillcolor="white"]
-  http  [label="POST /api/dots/{token}\n(nginx → backend)"]
-  mqtt  [label="EMQX\n$share/airsunbox-ingest/…"]
-  val   [label="Validación\ntoken → estación\nvariables habilitadas"]
-  qin   [label="Cola BullMQ\n'ingest' (Redis)"]
-  wrk   [label="Worker de ingesta\n(concurrencia 4)"]
-  dots  [label="TimescaleDB\nINSERT en dots\n+ devices.last_seen", shape=cylinder]
-  pub   [label="Redis pub/sub\ncanal de la estación"]
-  ws    [label="WebSocket /ws\n(token de sesión)"]
-  ui    [label="Panel web\n(tiempo real)", fillcolor="white"]
-  qal   [label="Cola BullMQ\n'alerts'"]
-  disp  [label="Despachador de alertas\numbral + cooldown"]
-  canal [label="Correo · Telegram · Webhook\n+ alert_logs", fillcolor="white"]
+  subgraph cluster_iot { label="Capa física (IoT)"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    esp [label="ESP32\nlectura JSON {pm25, co2, …}"] }
+  subgraph cluster_entrada { label="Entrada"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    http [label="POST /api/dots/{token}\n(nginx → backend)"]
+    mqtt [label="EMQX\n$share/airsunbox-ingest/…"] }
+  subgraph cluster_backend { label="Backend (Fastify) — ingesta asíncrona"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    val [label="Validación\ntoken → estación · variables habilitadas"]
+    qin [label="Cola BullMQ 'ingest' (Redis)"]
+    wrk [label="Worker de ingesta (concurrencia 4)"]
+    qal [label="Cola BullMQ 'alerts'"]
+    disp[label="Despachador de alertas\numbral + cooldown"] }
+  subgraph cluster_persist { label="Persistencia"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    dots [label="TimescaleDB\nINSERT en dots + devices.last_seen", shape=cylinder] }
+  subgraph cluster_rt { label="Tiempo real"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    pub [label="Redis pub/sub\ncanal de la estación"]
+    ws  [label="WebSocket /ws\n(token de sesión)"]
+    ui  [label="Panel web"] }
+  subgraph cluster_notif { label="Notificaciones"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    canal [label="Correo · Telegram · Webhook\n+ alert_logs"] }
 
-  esp -> http; esp -> mqtt [style=dashed]
+  esp -> http [label="HTTPS"]; esp -> mqtt [label="MQTT", style=dashed]
   http -> val; mqtt -> val
-  val -> qin -> wrk -> dots
+  val -> qin -> wrk
+  wrk -> dots
   wrk -> pub -> ws -> ui
   wrk -> qal -> disp -> canal
 }
