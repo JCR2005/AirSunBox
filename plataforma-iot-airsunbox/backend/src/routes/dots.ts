@@ -6,6 +6,9 @@ import * as dotsRepo from '../repositories/dots.js'
 import { processDevicePayload } from '../services/datalinkService.js'
 import { isInternalRole } from '../services/authService.js'
 
+// Intervalos de muestreo que acepta la gráfica (lista cerrada: van a SQL como interval)
+const SAMPLE_PERIODS = new Set(['1 minute', '5 minutes', '15 minutes', '30 minutes', '1 hour', '6 hours', '12 hours', '1 day'])
+
 export default async function dotsRoutes(app: FastifyInstance) {
   const api = app.withTypeProvider<TypeBoxTypeProvider>()
 
@@ -32,6 +35,7 @@ export default async function dotsRoutes(app: FastifyInstance) {
       querystring: Type.Object({
         range: Type.Optional(Type.String()),
         aggregation: Type.Optional(Type.String()),
+        bucket: Type.Optional(Type.String()),
         start: Type.Optional(Type.String()),
         end: Type.Optional(Type.String())
       })
@@ -72,7 +76,10 @@ export default async function dotsRoutes(app: FastifyInstance) {
     if (aggLower === 'max') sqlFunction = 'MAX(value)'
     if (aggLower === 'count') sqlFunction = 'COUNT(value)'
 
-    return dotsRepo.seriesAggregated(app.db, deviceId, variable, sqlFunction, selected.bucket, selected.sqlInterval, windowStart, windowEnd)
+    // "Sample period" elegido en la gráfica; el repositorio lo agranda si el
+    // rango daría demasiados puntos
+    const bucket = req.query.bucket && SAMPLE_PERIODS.has(req.query.bucket) ? req.query.bucket : selected.bucket
+    return dotsRepo.seriesAggregated(app.db, deviceId, variable, sqlFunction, bucket, selected.sqlInterval, windowStart, windowEnd)
   })
 
   // ── 2. DATOS CRUDOS PAGINADOS ──
