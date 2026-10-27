@@ -3,6 +3,7 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as requestsRepo from '../repositories/requests.js'
 import { isInternalRole } from '../services/authService.js'
+import { notifyTeam, orgName } from '../services/teamNotifier.js'
 
 export default async function requestsRoutes(app: FastifyInstance) {
   const api = app.withTypeProvider<TypeBoxTypeProvider>()
@@ -42,6 +43,13 @@ export default async function requestsRoutes(app: FastifyInstance) {
       note: note ?? null,
       paymentPhoto: paymentPhoto ?? null
     })
+    const org = await orgName(app, req.user.orgId)
+    notifyTeam(app, `Nueva solicitud: ${org}`, [
+      `${org} solicitó estaciones.`,
+      `Estación: ${request.device_name} (cantidad: ${request.quantity})`,
+      `Ubicación: ${request.location}`,
+      ...(request.note ? [`Nota: ${request.note}`] : [])
+    ], '/admin/solicitudes')
     return reply.code(201).send(request)
   })
 

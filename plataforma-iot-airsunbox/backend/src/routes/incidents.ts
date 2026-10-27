@@ -3,6 +3,7 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as incidentsRepo from '../repositories/incidents.js'
 import { isInternalRole } from '../services/authService.js'
+import { notifyTeam } from '../services/teamNotifier.js'
 
 const UUID = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const IdParams = Type.Object({ id: Type.String({ pattern: UUID }) })
@@ -42,6 +43,11 @@ export default async function incidentsRoutes(app: FastifyInstance) {
       orgId: req.user.orgId,
       reason: reason.trim()
     })
+    notifyTeam(app, `Nueva incidencia: ${incident.org_name}`, [
+      `${incident.org_name} reportó una incidencia.`,
+      `Estación: ${incident.device_name ?? 'general (sin estación)'}`,
+      `Problema: ${incident.reason}`
+    ], '/admin/incidencias')
     return reply.code(201).send(incident)
   })
 

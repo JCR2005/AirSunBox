@@ -20,7 +20,11 @@ export interface Mailer {
   sendPasswordReset(email: string, token: string): Promise<void>
   sendAlert(to: string, subject: string, text: string): Promise<void>
   sendOtp(email: string, code: string): Promise<void>
+  sendTeamNotice(to: string[], subject: string, lines: string[], link: string): Promise<void>
 }
+
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 
 export function createMailer(log?: FastifyBaseLogger): Mailer {
   const host = process.env.SMTP_HOST
@@ -89,6 +93,19 @@ export function createMailer(log?: FastifyBaseLogger): Mailer {
         `<p>— AirSunBox</p>`
 
       await transport.sendMail({ from, to: email, subject: 'Tu código de verificación AirSunBox', text, html })
+    },
+
+    // Aviso interno al equipo AirSunBox. Las líneas pueden traer texto escrito
+    // por el cliente, así que se escapan antes de armar el HTML.
+    async sendTeamNotice(to, subject, lines, link) {
+      const url = `${process.env.FRONTEND_URL || 'http://localhost:80'}${link}`
+      const text = `${lines.join('\n')}\n\nRevisalo en: ${url}\n\n— AirSunBox`
+      const html =
+        `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6;">` +
+        lines.map(l => `<p style="margin:0 0 6px;">${escapeHtml(l).replace(/\n/g, '<br/>')}</p>`).join('') +
+        `<p style="margin-top:16px;"><a href="${url}" style="display:inline-block;padding:10px 18px;background:#67B7E8;color:#fff;border-radius:8px;text-decoration:none;">Abrir en AirSunBox</a></p>` +
+        `<p>— AirSunBox</p></div>`
+      await transport.sendMail({ from, to: to.join(', '), subject, text, html })
     }
   }
 }
