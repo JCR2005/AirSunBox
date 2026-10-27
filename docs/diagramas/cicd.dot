@@ -1,20 +1,22 @@
 // GitFlow + CI/CD
 digraph cicd {
-  graph [rankdir=LR, fontname="DejaVu Sans", fontsize=11, nodesep=0.3, ranksep=0.4, pad=0.3]
-  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, fillcolor="#F1F7FC", color="#67B7E8"]
-  edge  [fontname="DejaVu Sans", fontsize=8, color="#5B6B7A"]
+  graph [rankdir=LR, fontname="Liberation Sans", fontsize=12, nodesep=0.3, ranksep=0.35, pad=0.3]
+  node  [shape=box, style="filled", fontname="Liberation Sans", fontsize=11, fillcolor="#E1D5E7", color="#9673A6"]
+  edge  [fontname="Liberation Sans", fontsize=9, color="#333333"]
 
-  feat   [label="Rama feature/* · fix/*\n(desde develop)", fillcolor="white"]
-  prdev  [label="PR → develop\nCI: backend + frontend"]
-  dev    [label="develop", shape=cylinder, fillcolor="white"]
-  prmain [label="PR de release\ndevelop → main\nCI + regla 'Proteger main'"]
-  main   [label="main", shape=cylinder, fillcolor="white"]
-  deploy [label="Job deploy\nOIDC → rol IAM\nSSM SendCommand"]
-  ec2    [label="EC2: git ff a main\ndocker compose build/up\nbackend + frontend"]
-  check  [label="Verificación\nbackend healthy\nfrontend running\nHTTPS 200"]
-
-  feat -> prdev -> dev -> prmain -> main -> deploy -> ec2 -> check
-  ci [label="Job backend: migraciones (00-schema.sh)\ntypecheck · build · smoke tests\nJob frontend: npm ci · build", shape=note, fillcolor="#FFF8E7", color="#E0A23B"]
+  subgraph cluster_gh { label="GitHub (GitFlow + Actions)"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    feat   [label="feature/* · fix/*\n(desde develop)"]
+    prdev  [label="PR → develop\nCI: backend + frontend"]
+    prmain [label="PR de release\ndevelop → main\nCI + regla 'Proteger main'"]
+    deploy [label="Job deploy\nOIDC → rol IAM"]
+    feat -> prdev -> prmain -> deploy
+  }
+  subgraph cluster_aws { label="AWS us-east-2"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    ec2   [label="EC2 vía SSM Run Command\ngit ff a main\ndocker compose build/up"]
+    check [label="Verificación\nbackend healthy · frontend running\nHTTPS 200"]
+    ec2 -> check
+  }
+  deploy -> ec2 [label="SSM SendCommand"]
+  ci [label="Job backend: migraciones · typecheck ·\nbuild · smoke tests\nJob frontend: npm ci · build", shape=note, fillcolor="#FFF2CC", color="#D6B656"]
   ci -> prdev [style=dotted, arrowhead=none]
-  ci -> prmain [style=dotted, arrowhead=none]
 }
