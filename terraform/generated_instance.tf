@@ -64,7 +64,10 @@ resource "aws_instance" "sanik_iot_prod" {
   }
   root_block_device {
     delete_on_termination = true
-    encrypted             = false
+    # Cifrado en reposo (2026-10-27): el disco raíz se reemplazó por uno cifrado
+    # con la clave administrada aws/ebs (infra/seguridad/3-cifrar-disco.sh).
+    # Con false, Terraform querría reemplazar la instancia.
+    encrypted             = true
     iops                  = 3000
     tags                  = {}
     tags_all              = {}
