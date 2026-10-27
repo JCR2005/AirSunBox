@@ -71,24 +71,32 @@ export default async function variablesRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Faltan campos obligatorios (nombre o unidad).' })
     }
 
-    try {
-      const row = await variablesRepo.create(app.db, {
-        label: cleanLabel,
-        name: String(name).trim(),
-        unit: String(unit).trim(),
-        icon,
-        description,
-        dataType: data_type,
-        spaceId
-      })
-      return reply.code(201).send(row)
-    } catch (err) {
-      if ((err as { code?: string }).code === '23505') {
-        return reply.code(400).send({ error: `El identificador "${cleanLabel}" ya está en uso en el catálogo. Elegí otro nombre.` })
+    // El identificador es único en todo el catálogo (es lo que envía la
+    // estación). Una variable privada de un espacio no debe fallar porque otra
+    // organización o la plantilla global ya usen el nombre: toma el siguiente
+    // libre (temperatura-2, temperatura-3…). Las globales sí exigen uno único.
+    const intentos = spaceId ? 20 : 1
+    for (let n = 1; n <= intentos; n++) {
+      const candidate = n === 1 ? cleanLabel : `${cleanLabel}-${n}`
+      try {
+        const row = await variablesRepo.create(app.db, {
+          label: candidate,
+          name: String(name).trim(),
+          unit: String(unit).trim(),
+          icon,
+          description,
+          dataType: data_type,
+          spaceId
+        })
+        return reply.code(201).send(row)
+      } catch (err) {
+        if ((err as { code?: string }).code !== '23505') {
+          app.log.error(err)
+          return reply.code(500).send({ error: 'Error interno al guardar la variable.' })
+        }
       }
-      app.log.error(err)
-      return reply.code(500).send({ error: 'Error interno al guardar la variable.' })
     }
+    return reply.code(400).send({ error: `El identificador "${cleanLabel}" ya está en uso en el catálogo. Elegí otro nombre.` })
   })
 
   // ── 2.5 ACTUALIZAR VARIABLE DEL CATÁLOGO ──
