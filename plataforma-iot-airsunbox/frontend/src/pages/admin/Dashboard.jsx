@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import AdminLayout from '../../components/admin/AdminLayout'
-import { Users, Cpu, Activity, TrendingUp, FileText, CalendarClock } from 'lucide-react'
+import { Users, Cpu, Activity, TrendingUp, FileText, CalendarClock, LifeBuoy } from 'lucide-react'
 import useAuthStore from '../../store/auth'
-import { reports, requests as requestsApi, organizations as orgsApi } from '../../services/api'
+import { reports, requests as requestsApi, organizations as orgsApi, incidents as incidentsApi } from '../../services/api'
+import { INCIDENT_STATUS } from '../ClientIncidents'
 
 const STATUS_LABEL = {
   pending: { label: 'Pendiente', color: '#F59E0B' },
@@ -44,6 +45,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [recentRequests, setRecentRequests] = useState(null)
   const [dueOrgs, setDueOrgs] = useState(null)
+  const [openIncidents, setOpenIncidents] = useState(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -56,6 +58,9 @@ export default function AdminDashboard() {
     requestsApi.list()
       .then(r => active && setRecentRequests((r || []).slice(0, 5)))
       .catch(() => active && setRecentRequests([]))
+    incidentsApi.list()
+      .then(i => active && setOpenIncidents((i || []).filter(x => x.status !== 'resolved')))
+      .catch(() => active && setOpenIncidents([]))
     orgsApi.list()
       .then(orgs => {
         if (!active) return
@@ -138,6 +143,30 @@ export default function AdminDashboard() {
                           <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>{timeAgo(r.created_at)}</p>
                         </div>
                         <span className="text-xs font-bold" style={{ color: st.color }}>{st.label}</span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
+          </Panel>
+
+          <Panel title={`Incidencias pendientes${openIncidents?.length ? ` (${openIncidents.length})` : ''}`} Icon={LifeBuoy}>
+            {openIncidents === null ? <Empty>Cargando…</Empty>
+              : openIncidents.length === 0 ? <Empty>No hay incidencias pendientes.</Empty>
+              : (
+                <div className="space-y-1">
+                  {openIncidents.slice(0, 5).map(i => {
+                    const st = INCIDENT_STATUS[i.status] || { label: i.status }
+                    return (
+                      <Link key={i.id} to="/admin/incidencias" className="flex items-center gap-4 py-4 border-b last:border-0 -mx-4 px-4 rounded-xl transition-colors hover:bg-black/[0.02]" style={{ borderColor: 'var(--border)' }}>
+                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: i.status === 'open' ? '#F59E0B' : '#67B7E8' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>
+                            {i.org_name} · {i.device_name || 'General'}
+                          </p>
+                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text2)' }}>{timeAgo(i.created_at)} · {i.reason}</p>
+                        </div>
+                        <span className="text-xs font-bold" style={{ color: i.status === 'open' ? '#F59E0B' : '#67B7E8' }}>{st.label}</span>
                       </Link>
                     )
                   })}

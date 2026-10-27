@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import useAuthStore from '../../store/auth'
 import UserMenu from '../UserMenu'
-import { LayoutDashboard, Users, Settings, Shield, FileText, ChevronRight, Menu, X } from 'lucide-react'
+import { LayoutDashboard, Users, Settings, Shield, FileText, ChevronRight, Menu, X, LifeBuoy } from 'lucide-react'
 
 
 import logoImg from "../../assets/logo2.svg";
@@ -31,6 +31,7 @@ const NAV = [
   { label: 'Dashboard',   icon: LayoutDashboard, path: '/admin', roles: ['superadmin', 'admin', 'worker'] },
   { label: 'Clientes',    icon: Users,           path: '/admin/clientes', roles: ['superadmin', 'admin'] },
   { label: 'Solicitudes', icon: FileText,        path: '/admin/solicitudes', roles: ['superadmin', 'admin', 'worker'] },
+  { label: 'Incidencias', icon: LifeBuoy,        path: '/admin/incidencias', roles: ['superadmin', 'admin', 'worker'] },
   { label: 'Variables',   icon: Settings,        path: '/admin/variables', roles: ['superadmin', 'admin'] },
   { label: 'Equipo',      icon: Shield,          path: '/admin/equipo', roles: ['superadmin'] },
 ]

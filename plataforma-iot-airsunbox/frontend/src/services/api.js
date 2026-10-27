@@ -160,6 +160,13 @@ export const requests = {
   updateStatus: (id, status) => request(`/requests/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
 }
 
+export const incidents = {
+  list: () => request('/incidents'),
+  create: (data) => request('/incidents', { method: 'POST', body: JSON.stringify(data) }),
+  review: (id) => request(`/incidents/${id}/review`, { method: 'PATCH', body: '{}' }),
+  resolve: (id, notes) => request(`/incidents/${id}/resolve`, { method: 'PATCH', body: JSON.stringify({ notes }) })
+}
+
 // Equipo interno de AirSunBox (superadmin, admin, worker)
 export const team = {
   list: () => request('/auth/team'),
