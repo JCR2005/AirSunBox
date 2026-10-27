@@ -10,9 +10,18 @@
 Los diagramas están en [`diagramas/`](diagramas) como código Graphviz (`.dot`).
 `modelo-datos.dot` se generó desde la base con todas las migraciones aplicadas.
 
+## Formato
+
+Los entregables usan el **formato oficial de AirSunBox**: la plantilla
+[`plantilla/plantilla-oficial.odt`](plantilla/plantilla-oficial.odt) aporta
+la página Carta, el encabezado con el logo, la portada, las fuentes
+(Tlwg Typist / Tlwg Typo) y los colores; los diagramas siguen el estilo de los
+diagramas oficiales.
+
 ## Regenerar los entregables
 
-Requiere `python3-markdown`, Graphviz y LibreOffice:
+Requiere `python3-markdown`, Graphviz y LibreOffice con `python3-uno` (actualiza
+el índice y exporta el PDF):
 
 ```bash
 python3 docs/build.py

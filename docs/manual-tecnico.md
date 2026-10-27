@@ -380,32 +380,88 @@ sección 4).
 
 # 10. Trazabilidad
 
-Requisitos funcionales (RF) y no funcionales (RNF), con la pantalla, el
-endpoint, el código que los implementa y cómo se verifican.
+Trazabilidad de los requisitos oficiales del documento *Requisitos funcionales
+y no funcionales* (RF01–RF50, RNF01–RNF09) hacia la pantalla, el endpoint, el
+código que los implementa y su estado en la versión desplegada.
 
-| ID | Requisito | Pantalla | Endpoint(s) | Código | Verificación |
-|---|---|---|---|---|---|
-| RF-01 | Iniciar sesión | `/login` | `POST /api/auth/login` | `services/authService.ts` (`login`) | Manual; smoke: rutas protegidas devuelven 401 sin token |
-| RF-02 | 2FA por correo | `/login`, `/profile` | `POST /api/auth/otp/verify`, `/2fa/*` | `services/otpService.ts`, `authService.ts` | Manual en producción con código real |
-| RF-03 | Recuperar contraseña | `/forgot-password`, `/reset-password` | `/api/auth/forgot-password`, `/reset-password/check`, `/reset-password` | `authService.ts`, `repositories/users.ts` | Local: uso doble simultáneo → 200/400; vencido → 400 |
-| RF-04 | Cerrar sesión en todos lados | Menú de usuario | `POST /api/auth/logout` | `services/sessionRevocation.ts` | Local: `/me` 200 → logout 204 → `/me` 401 |
-| RF-05 | Registro self-service | `/login` (registro) | `POST /api/auth/register` | `authService.ts` (`register`) | Manual |
-| RF-06 | Gestionar clientes | `/admin/clientes` | `/api/organizations/*` | `services/organizationsService.ts` | Manual |
-| RF-07 | Gestionar equipo interno | `/admin/equipo` | `GET /api/auth/team`, `POST /users`, `PATCH /users/:id` | `routes/auth.ts`, `repositories/users.ts` | Local: alta, suspensión y rol persisten |
-| RF-08 | Solicitudes de estaciones | `/admin/solicitudes` | `/api/requests` | `routes/requests.ts` | Manual |
-| RF-09 | Espacios y AQI por espacio | `/espacios`, `/espacios/:id/aqi` | `/api/spaces/*` | `routes/spaces.ts`, `services/aqiService.ts` | Manual |
-| RF-10 | Estaciones y variables | `/espacios/:id`, `/devices/:id` | `/api/devices/*`, `/api/variables/*` | `routes/devices.ts`, `routes/variables.ts` | Manual |
-| RF-11 | Ingesta de lecturas | — (ESP32) | `POST /api/dots/:deviceToken`, MQTT | `services/ingestQueue.ts`, `plugins/mqtt.ts` | Estaciones reales; 560 000+ lecturas cargadas |
-| RF-12 | Tiempo real | Panel del espacio | `GET /ws` | `plugins/realtime.ts` | Manual |
-| RF-13 | Alertas | `/alerts` | `/api/alerts/*` | `services/alertingService.ts`, `alertDispatcher.ts` | Manual |
-| RF-14 | Reportes PDF | `/reportes`, detalle de variable | `/api/reports/*`, `/api/dots/:id/records` | `utils/exportUtils.js` | Manual con datos de producción |
-| RF-15 | Reportes Excel | `/reportes`, detalle de variable | Ídem | `utils/exportUtils.js` | Manual con datos de producción |
-| RF-16 | Mapa y reportes públicos | `/mapa`, `/reportes-globales` | `/api/public/*` | `routes/publicRoutes.ts` | Smoke: `/api/public/devices`, `/reports/stats`, AQI |
-| RNF-01 | HTTPS en todo | — | — | `frontend/nginx.conf`, `security-headers.conf` | `curl -I`: 301 a HTTPS, HSTS presente |
-| RNF-02 | Secretos fuera del código | — | — | `lib/secrets.ts`, `infra/seguridad/` | Log “Secretos cargados desde SSM”; búsqueda en el repo |
-| RNF-03 | Cifrado en reposo | — | — | `infra/seguridad/3-cifrar-disco.sh`, Terraform | `aws ec2 describe-volumes`: `Encrypted = true` |
-| RNF-04 | CI/CD automático | — | — | `.github/workflows/ci.yml` | Historial de Actions: CI y `deploy` en verde |
-| RNF-05 | Disponibilidad | — | `GET /health` | `app.ts`, healthchecks de compose | Job `deploy` y `docker ps` |
+Estado: **Hecho** (implementado y desplegado), **Parcial** (implementado en
+parte; se indica qué falta) o **Pendiente**.
+
+## 10.1 Requisitos funcionales
+
+| RF | Requisito | Pantalla / Endpoint | Código | Estado |
+|---|---|---|---|---|
+| RF01 | Inicio de sesión (JWT) | `/login` · `POST /api/auth/login` | `services/authService.ts` | Hecho |
+| RF02 | Recuperación de contraseña propia | `/forgot-password`, `/reset-password` · `/api/auth/forgot-password`, `/reset-password/check`, `/reset-password` | `authService.ts`, `repositories/users.ts` | Hecho |
+| RF03 | Autenticación de dos factores (2FA) | `/login`, `/profile` · `/api/auth/otp/verify`, `/api/auth/2fa/*` | `services/otpService.ts` | Hecho |
+| RF04 | Visualización del perfil | `/profile` · `GET /api/auth/me` | `routes/auth.ts`, `pages/Profile.jsx` | Hecho |
+| RF05 | Edición del perfil personal y de la organización | — | — | Pendiente (el perfil es de solo lectura; la organización la edita el equipo interno, RF12) |
+| RF06 | Solicitud de contacto con soporte | Landing, sección *Contacto* | `pages/Landing.jsx` | Parcial (datos de contacto, sin formulario) |
+| RF07 | Dashboard administrativo | `/admin` · `GET /api/reports/stats`, `/api/requests`, `/api/organizations` | `pages/admin/Dashboard.jsx` | Hecho |
+| RF08 | Búsqueda de organizaciones | `/admin/clientes` (buscador) | `pages/admin/Clients.jsx` | Hecho |
+| RF09 | Listado de organizaciones | `/admin/clientes` · `GET /api/organizations` | `routes/organizations.ts` | Hecho |
+| RF10 | Registro de organización (tipo dependiente / control total) | `/admin/clientes` · `POST /api/organizations`; autoregistro `POST /api/auth/register` | `services/organizationsService.ts` | Hecho |
+| RF11 | Detalle de organización | `/admin/clientes/:id` · `GET /api/organizations/:id` | `pages/admin/ClientDetail.jsx` | Hecho |
+| RF12 | Edición de datos de organización | `/admin/clientes/:id` · `PUT /api/organizations/:id` | `routes/organizations.ts` | Hecho |
+| RF13 | Suspensión y reactivación de organización | `PATCH /api/organizations/:id/status` | `routes/organizations.ts` | Hecho |
+| RF14 | Restablecimiento de contraseña de organización | `POST /api/organizations/:id/reset-client-password` | `organizationsService.ts` (revoca sesiones) | Hecho |
+| RF15 | Revelación de credenciales de organización | `POST /api/organizations/:id/reveal-credentials` (exige la contraseña del admin) | `organizationsService.ts` | Hecho |
+| RF16 | Creación directa de estación por el administrador | `/admin/clientes/:id` · `POST /api/devices` | `routes/devices.ts` | Hecho |
+| RF17 | Token único por estación | `devices.token` (24 bytes aleatorios) | `routes/devices.ts` | Hecho |
+| RF18 | Dashboard de estaciones (resumen, mapa, estado) | `/dashboard`, `/espacios/:id` · `GET /api/devices` | `pages/Dashboard.jsx` | Hecho |
+| RF19 | Detalle de estación | `/devices/:id` · `GET /api/devices/:id`, `/last-values` | `pages/DeviceDetail.jsx` | Hecho |
+| RF20 | Visualización del catálogo de variables | `/admin/variables` · `GET /api/variables/catalog` | `routes/variables.ts` | Hecho |
+| RF21 | Alta de variable en el catálogo | `POST /api/variables/catalog` | `routes/variables.ts` | Hecho |
+| RF22 | Eliminación de variable del catálogo | `DELETE /api/variables/catalog/:label` | `routes/variables.ts` | Hecho |
+| RF23 | Cálculo automático del índice de calidad | `GET /api/devices/:id/aqi`, `POST /api/spaces/:id/aqi/calculate` | `services/aqiService.ts` | Hecho |
+| RF24 | Configuración editable del AQI general (administrador) | `/espacios/:id/aqi` · `PUT /api/spaces/:id/aqi` | `routes/spaces.ts` | Parcial (el AQI se configura por espacio; los rangos generales de `air_quality_ranges` no se editan desde la interfaz) |
+| RF25 | Recepción de datos vía MQTT | Tópico `/v1/devices/{token}/data` (y `POST /api/dots/:deviceToken`) | `plugins/mqtt.ts`, `services/ingestQueue.ts` | Hecho |
+| RF26 | Almacenamiento histórico (series de tiempo) | Hypertable `dots` (TimescaleDB, comprimida) | `database/v19-dots-compression.sql` | Hecho |
+| RF27 | Actualización en tiempo real | WebSocket `/ws` | `plugins/realtime.ts` | Hecho |
+| RF28 | Gráfica histórica con filtros y agregación | `/variableDetail/...` · `GET /api/dots/:deviceId/:variable` | `repositories/dots.ts` (`time_bucket`) | Hecho |
+| RF29 | Exportación del historial de una variable | `/variableDetail/...` · `GET /api/dots/:deviceId/records` (PDF y Excel) | `utils/exportUtils.js` | Hecho |
+| RF30 | Configuración de alertas por variable y estación | `/alerts` · `POST /api/alerts` | `routes/alerts.ts` | Hecho |
+| RF31 | Activación y desactivación de alertas | `PATCH /api/alerts/:id` | `routes/alerts.ts` | Hecho |
+| RF32 | Notificación automática al superar umbral (correo/webhook) | Cola `alerts`; correo, Telegram y webhook | `services/alertDispatcher.ts`, `lib/safeUrl.ts` | Hecho |
+| RF33 | Registro de incidencia | `POST /api/incidents` | `routes/incidents.ts` | Parcial (API sin pantalla) |
+| RF34 | Visualización de incidencias | `GET /api/incidents` | `routes/incidents.ts` | Parcial (API sin pantalla) |
+| RF35 | Resolución de incidencias | `PATCH /api/incidents/:id/resolve` | `routes/incidents.ts` | Parcial (API sin pantalla) |
+| RF36 | Registro de solicitud de nueva estación | `POST /api/requests` | `routes/requests.ts` | Parcial (API lista; falta la pantalla del cliente) |
+| RF37 | Visualización de solicitudes | `/admin/solicitudes` · `GET /api/requests` | `pages/admin/Requests.jsx` | Hecho |
+| RF38 | Revisión, aprobación o rechazo de solicitudes | `/admin/solicitudes` · `PATCH /api/requests/:id` | `pages/admin/Requests.jsx` | Hecho |
+| RF39 | Notificación al equipo sobre solicitudes e incidencias pendientes | Solicitudes pendientes en `/admin` | `pages/admin/Dashboard.jsx` | Parcial (solo solicitudes, en el panel; sin aviso por correo ni para incidencias) |
+| RF40 | Estadísticas generales | `/admin`, `/reportes-globales` · `GET /api/reports/stats` | `repositories/reports.ts` | Hecho |
+| RF41 | Mapas de calor ambientales | `/reportes` · `GET /api/reports/heatmap` | `repositories/reports.ts` | Hecho |
+| RF42 | Análisis de riesgo respiratorio | `/reportes` · `GET /api/reports/respiratory-risk` | `services/reportCalculationsService.ts` | Hecho |
+| RF43 | Generación de reportes por organización | `/reportes` (filtrado por la organización de la sesión) | `routes/reports.ts` | Hecho |
+| RF44 | Exportación de reportes en Excel (.xlsx) y PDF | `/reportes`, `/reportes-globales`, detalle de variable | `utils/exportUtils.js` (jsPDF, SheetJS) | Hecho |
+| RF45 | Listado de equipo | `/admin/equipo` · `GET /api/auth/team` | `pages/admin/Team.jsx` | Hecho |
+| RF46 | Alta de miembro del equipo | `POST /api/auth/users` | `routes/auth.ts` | Hecho |
+| RF47 | Cambio de rol de miembro | `PATCH /api/auth/users/:id` | `routes/auth.ts` | Hecho |
+| RF48 | Activación y suspensión de miembro | `PATCH /api/auth/users/:id` | `routes/auth.ts` | Hecho |
+| RF49 | Consulta pública de calidad del aire | `/mapa` · `GET /api/public/devices`, `/zones/aqi` | `routes/publicRoutes.ts` | Hecho |
+| RF50 | Recomendaciones según nivel de riesgo | `/mapa` (recomendación por categoría) | `pages/PublicMap.jsx` | Hecho |
+
+Requisitos planteados “a futuro” en la fase 1 que ya están implementados:
+espacios de monitoreo por organización, filtrado por espacio, estaciones
+dentro de un espacio, variables destacadas por estación, variables
+personalizadas por organización y configuración del AQI por espacio
+(`routes/spaces.ts`, `routes/variables.ts`, `pages/Spaces.jsx`,
+`pages/SpaceAqi.jsx`).
+
+## 10.2 Requisitos no funcionales
+
+| RNF | Requisito | Cómo se cumple | Verificación |
+|---|---|---|---|
+| RNF01 | Seguridad | bcrypt, 2FA, JWT con revocación, HTTPS + HSTS, secretos en SSM/KMS, disco cifrado, límite de peticiones (sección 8) | Encabezados con `curl -I`; `Encrypted = true` en el volumen; log “Secretos cargados desde SSM” |
+| RNF02 | Rendimiento | Ingesta asíncrona con colas; agregación con `time_bucket`; compresión de `dots` | Paneles sobre más de 560 000 lecturas |
+| RNF03 | Escalabilidad | Backend sin estado (sesión en JWT, tiempo real por Redis pub/sub, suscripción MQTT compartida): admite varias réplicas | Diseño (sección 3.3) |
+| RNF04 | Compatibilidad | SPA responsive (React + Tailwind) para navegadores modernos | Diseño responsive (Tailwind) |
+| RNF05 | Usabilidad | Estados vacíos, validaciones en línea, confirmaciones, tema claro y oscuro | Revisión de pantallas |
+| RNF06 | Disponibilidad | Nube (AWS), `restart: unless-stopped`, *healthchecks*, despliegue con verificación, runbook | Job `deploy`; `docker ps` |
+| RNF07 | Confiabilidad en la ingesta | Cola persistente en Redis (BullMQ), QoS 1 en MQTT, validación por token | Estaciones reales enviando a producción |
+| RNF08 | Aislamiento multi-organización | Cada consulta filtra por `org_id` de la sesión; rutas protegidas por rol | Revisión de código: filtros por `org_id` en repositorios y rutas |
+| RNF09 | Extensibilidad | Monolito modular por capas; migraciones versionadas; catálogo de variables configurable | Estructura del código (sección 3.2) |
 
 # 11. Configuración
 
