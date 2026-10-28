@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { FileText, FileSpreadsheet, RefreshCw, Layers, AlertCircle } from 'lucide-react'
+import { ComposedChart, Area, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { FileText, FileSpreadsheet, RefreshCw, Layers, AlertCircle, Bell, LifeBuoy } from 'lucide-react'
 import ClienteLayout from '../../components/airsunbox/ClienteLayout'
 import { spaces as spacesApi, reports as reportsApi } from '../../services/api'
 import { exportSpaceReportPDF, exportSpaceReportExcel } from '../../utils/exportUtils'
@@ -17,6 +17,8 @@ const PRESETS = [
 const fmt = (v, d = 1) => (v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toLocaleString('es-GT', { maximumFractionDigits: d, minimumFractionDigits: Math.abs(v) >= 100 ? 0 : d }))
 // `d` llega como 'YYYY-MM-DD' (día de Guatemala): se lee sin convertir zona
 const dayLabel = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('es-GT', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+const when = (t) => new Date(t).toLocaleString('es-GT', { dateStyle: 'medium', timeStyle: 'short' })
+const pct = (x) => `${Math.round((x || 0) * 100)} %`
 const dateInput = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 
 // Horas que pasó la variable en cada nivel del índice (barra apilada + leyenda)
@@ -58,6 +60,108 @@ function TrendTooltip({ active, payload, unit }) {
   )
 }
 
+function HourTooltip({ active, payload, unit }) {
+  if (!active || !payload?.length) return null
+  const d = payload[0].payload
+  return (
+    <div className="rounded-xl border px-3 py-2 text-xs shadow-lg" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+      <p className="font-semibold">{String(d.h).padStart(2, '0')}:00 – {String(d.h).padStart(2, '0')}:59</p>
+      <p>Promedio <span className="font-semibold tabular-nums">{fmt(d.avg)}</span> {unit}</p>
+    </div>
+  )
+}
+
+// Promedio por hora del día: muestra a qué horas sube o baja la variable
+function HourProfile({ byHour, color, unit }) {
+  const data = byHour.map((avg, h) => ({ h, avg }))
+  if (!data.some(d => d.avg != null)) return <p className="text-sm" style={{ color: 'var(--text2)' }}>Sin datos suficientes.</p>
+  return (
+    <div className="h-[130px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: -18 }} barCategoryGap={2}>
+          <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 3" />
+          <XAxis dataKey="h" tickFormatter={h => `${h}h`} interval={5} tick={{ fontSize: 10, fill: 'var(--text2)' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 10, fill: 'var(--text2)' }} axisLine={false} tickLine={false} width={40} />
+          <Tooltip content={<HourTooltip unit={unit} />} cursor={{ fill: 'var(--border)', opacity: 0.35 }} />
+          <Bar dataKey="avg" fill={color} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SummaryTiles({ report }) {
+  const s = report.summary
+  const tiles = [
+    { label: report.deviceId ? 'Estación' : 'Estaciones', value: report.deviceId ? report.stations[0]?.name : s.stations },
+    { label: 'Lecturas', value: s.readings.toLocaleString('es-GT') },
+    { label: 'Cobertura de datos', value: pct(s.coverage), hint: 'Horas del periodo con al menos una lectura' },
+    { label: 'Última lectura', value: s.last ? when(s.last) : '—' },
+  ]
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {tiles.map(t => (
+        <div key={t.label} className="rounded-2xl border px-5 py-4" style={{ background: 'var(--card)', borderColor: 'var(--border)' }} title={t.hint}>
+          <p className="text-xs" style={{ color: 'var(--text2)' }}>{t.label}</p>
+          <p className="text-xl font-bold mt-1 truncate tabular-nums" style={{ color: 'var(--text)' }}>{t.value}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Card({ title, icon: Icon, count, children }) {
+  return (
+    <section className="rounded-3xl border p-6" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+      <h3 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>
+        {Icon && <Icon size={18} style={{ color: ACCENT }} />} {title}
+        {count != null && <span className="text-sm font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--bg)', color: 'var(--text2)' }}>{count}</span>}
+      </h3>
+      {children}
+    </section>
+  )
+}
+
+function StationStatus({ stations }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm min-w-[520px]">
+        <thead>
+          <tr style={{ color: 'var(--text2)' }}>
+            <th className="text-left font-semibold pb-2">Estación</th>
+            <th className="text-left font-semibold pb-2 w-[38%]">Cobertura de datos</th>
+            <th className="text-right font-semibold pb-2 px-3">Lecturas</th>
+            <th className="text-right font-semibold pb-2">Última lectura</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stations.map(st => {
+            const c = st.coverage
+            const col = c >= 0.9 ? '#1D9E75' : c >= 0.5 ? '#F59E0B' : '#E5484D'
+            return (
+              <tr key={st.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                <td className="py-2.5" style={{ color: 'var(--text)' }}>{st.name}</td>
+                <td className="py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg)' }}>
+                      <div className="h-full rounded-full" style={{ width: pct(c).replace(' ', ''), background: col }} />
+                    </div>
+                    <span className="tabular-nums text-xs w-10 text-right" style={{ color: 'var(--text)' }}>{pct(c)}</span>
+                  </div>
+                </td>
+                <td className="py-2.5 px-3 text-right tabular-nums" style={{ color: 'var(--text)' }}>{st.readings.toLocaleString('es-GT')}</td>
+                <td className="py-2.5 text-right" style={{ color: st.last ? 'var(--text)' : 'var(--text2)' }}>{st.last ? when(st.last) : 'Sin lecturas'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+const STATUS_INC = { open: 'Abierta', in_review: 'En atención', resolved: 'Resuelta' }
+
 function VariableSection({ v }) {
   const level = v.level != null && v.levels ? v.levels[v.level] : null
   const color = level?.color || ACCENT
@@ -94,6 +198,15 @@ function VariableSection({ v }) {
               <dt className="text-xs" style={{ color: 'var(--text2)' }}>Lecturas</dt>
               <dd className="text-base font-semibold tabular-nums" style={{ color: 'var(--text)' }}>{v.stats.count.toLocaleString('es-GT')}</dd>
             </div>
+            {v.peak && (
+              <div className="col-span-3 lg:col-span-1">
+                <dt className="text-xs" style={{ color: 'var(--text2)' }}>Máximo registrado</dt>
+                <dd className="text-sm" style={{ color: 'var(--text)' }}>
+                  <span className="font-semibold tabular-nums">{fmt(v.peak.value)}</span> el {when(v.peak.time)}
+                  {v.peak.device && <span style={{ color: 'var(--text2)' }}> en {v.peak.device}</span>}
+                </dd>
+              </div>
+            )}
           </dl>
 
           <div className="min-w-0">
@@ -115,9 +228,15 @@ function VariableSection({ v }) {
       )}
 
       {v.stats.count > 0 && (
-        <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--border)' }}>
-          <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text)' }}>Horas en cada nivel</p>
-          <LevelHours levels={v.levels} hours={v.hoursByLevel} total={v.totalHours} />
+        <div className="mt-6 pt-5 border-t grid lg:grid-cols-2 gap-8" style={{ borderColor: 'var(--border)' }}>
+          <div>
+            <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text)' }}>Horas en cada nivel</p>
+            <LevelHours levels={v.levels} hours={v.hoursByLevel} total={v.totalHours} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text)' }}>Promedio por hora del día</p>
+            <HourProfile byHour={v.byHour || []} color={color} unit={v.unit} />
+          </div>
         </div>
       )}
     </section>
@@ -127,6 +246,8 @@ function VariableSection({ v }) {
 export default function SpaceReport() {
   const [spaces, setSpaces] = useState(null)
   const [spaceId, setSpaceId] = useState('')
+  const [stations, setStations] = useState([])
+  const [stationId, setStationId] = useState('')   // '' = todas las estaciones
   const [preset, setPreset] = useState('7')
   const [custom, setCustom] = useState(() => {
     const end = new Date()
@@ -155,11 +276,19 @@ export default function SpaceReport() {
     return { start: new Date(end.getTime() - days * 86400000).toISOString(), end: end.toISOString() }
   }, [preset, custom])
 
+  // Estaciones del espacio elegido (para el filtro)
+  useEffect(() => {
+    setStationId('')
+    setStations([])
+    if (!spaceId) return
+    spacesApi.devices(spaceId).then(list => setStations(list || [])).catch(() => {})
+  }, [spaceId])
+
   const load = async () => {
     if (!spaceId || !range) return
     setLoading(true); setError('')
     try {
-      setReport(await reportsApi.space(spaceId, range.start, range.end))
+      setReport(await reportsApi.space(spaceId, range.start, range.end, stationId || undefined))
     } catch (e) {
       setError(e.message || 'No se pudo generar el reporte')
       setReport(null)
@@ -169,7 +298,7 @@ export default function SpaceReport() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { load() }, [spaceId, preset, preset === 'custom' ? `${custom.start}|${custom.end}` : ''])
+  useEffect(() => { load() }, [spaceId, stationId, preset, preset === 'custom' ? `${custom.start}|${custom.end}` : ''])
 
   const current = spaces?.find(s => s.id === spaceId)
   const totalReadings = report?.variables?.reduce((a, v) => a + (v.stats?.count || 0), 0) || 0
@@ -233,6 +362,16 @@ export default function SpaceReport() {
                   )
                 })}
               </div>
+              {stations.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="rep-estacion" className="text-sm" style={{ color: 'var(--text2)' }}>Estación</label>
+                  <select id="rep-estacion" value={stationId} onChange={e => setStationId(e.target.value)}
+                          className="rounded-xl border px-3 py-2 text-sm font-semibold" style={{ background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                    <option value="">Todas ({stations.length})</option>
+                    {stations.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="flex p-1 rounded-xl border" style={{ background: 'var(--card)', borderColor: 'var(--border)' }} role="radiogroup" aria-label="Periodo">
                   {PRESETS.map(p => (
@@ -267,6 +406,7 @@ export default function SpaceReport() {
               <p className="text-sm flex items-center gap-2" style={{ color: 'var(--text2)' }}><RefreshCw size={14} className="animate-spin" /> Generando reporte…</p>
             ) : report && (
               <div className={`space-y-6 transition-opacity ${loading ? 'opacity-60' : ''}`}>
+                <SummaryTiles report={report} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>
                   <span className="font-semibold" style={{ color: 'var(--text)' }}>{current?.name}</span>
                   {' '}— {report.devices.length} {report.devices.length === 1 ? 'estación' : 'estaciones'}, {totalReadings.toLocaleString('es-GT')} lecturas,
@@ -283,6 +423,10 @@ export default function SpaceReport() {
                 ) : (
                   <>
                     {report.variables.map(v => <VariableSection key={v.label} v={v} />)}
+
+                    <Card title="Estado de las estaciones">
+                      <StationStatus stations={report.stations} />
+                    </Card>
 
                     {report.devices.length > 1 && (
                       <section className="rounded-3xl border p-6 overflow-x-auto" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
@@ -320,6 +464,62 @@ export default function SpaceReport() {
                         </table>
                       </section>
                     )}
+
+                    <Card title="Alertas disparadas" icon={Bell} count={report.alerts.total}>
+                      {report.alerts.total === 0 ? (
+                        <p className="text-sm" style={{ color: 'var(--text2)' }}>No se disparó ninguna alerta en el periodo.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm min-w-[560px]">
+                            <thead>
+                              <tr style={{ color: 'var(--text2)' }}>
+                                {['Fecha', 'Estación', 'Variable', 'Valor', 'Nivel', 'Canal'].map(h => <th key={h} className="text-left font-semibold pb-2 pr-3">{h}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {report.alerts.items.map((a, i) => (
+                                <tr key={i} className="border-t" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
+                                  <td className="py-2.5 pr-3 whitespace-nowrap">{when(a.time)}</td>
+                                  <td className="py-2.5 pr-3">{a.device}</td>
+                                  <td className="py-2.5 pr-3 first-letter:uppercase">{a.variable}</td>
+                                  <td className="py-2.5 pr-3 tabular-nums">{fmt(a.value)}</td>
+                                  <td className="py-2.5 pr-3">{a.category || '—'}</td>
+                                  <td className="py-2.5 pr-3 capitalize">{a.channel || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {report.alerts.total > report.alerts.items.length && (
+                            <p className="text-xs mt-2" style={{ color: 'var(--text2)' }}>Se muestran las {report.alerts.items.length} más recientes de {report.alerts.total}.</p>
+                          )}
+                        </div>
+                      )}
+                    </Card>
+
+                    <Card title="Incidencias" icon={LifeBuoy} count={report.incidents.total}>
+                      {report.incidents.total === 0 ? (
+                        <p className="text-sm" style={{ color: 'var(--text2)' }}>No se reportaron incidencias de estas estaciones en el periodo.</p>
+                      ) : (
+                        <ul className="space-y-3">
+                          {report.incidents.items.map((inc, i) => (
+                            <li key={i} className="rounded-2xl border px-4 py-3" style={{ borderColor: 'var(--border)' }}>
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{inc.device}</span>
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                                      style={inc.status === 'resolved' ? { background: 'rgba(29,158,117,0.12)', color: '#1D9E75' } : { background: 'rgba(245,158,11,0.14)', color: '#B7791F' }}>
+                                  {STATUS_INC[inc.status] || inc.status}
+                                </span>
+                              </div>
+                              <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>{inc.reason}</p>
+                              <p className="text-xs mt-1" style={{ color: 'var(--text2)' }}>
+                                Reportada el {when(inc.time)}{inc.resolved_at ? ` · resuelta el ${when(inc.resolved_at)}` : ''}
+                                {inc.notes ? ` · ${inc.notes}` : ''}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </Card>
                   </>
                 )}
               </div>
