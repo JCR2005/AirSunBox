@@ -235,7 +235,7 @@ function SpecModal({ device, onClose, onSaved }) {
   // Portal al <body>: dentro de la columna lateral el modal quedaba atrapado en
   // su contexto de apilado y el gauge del AQI se dibujaba encima.
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm" onClick={onClose}>
+    <div className="app-shell font-sans fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="ficha-titulo"
            className="w-full max-w-lg rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200"
            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}

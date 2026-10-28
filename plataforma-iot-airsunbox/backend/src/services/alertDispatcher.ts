@@ -20,7 +20,11 @@ export interface AlertRow {
   active: boolean
   device_name?: string | null
   space_name?: string | null
+  variable_name?: string | null
+  variable_unit?: string | null
 }
+
+export interface ChannelResult { channel: string; ok: boolean; error?: string }
 
 export interface AlertContext {
   rawValue: number | null
@@ -60,6 +64,7 @@ function renderMessage(template: string | null, ctx: AlertContext): string {
     variable: ctx.variable === 'aqi' ? 'AQI' : (ctx.variable || 'valor'),
     valor: ctx.formattedValue,
     unit: ctx.unit || '',
+    unidad: ctx.unit || '',
     aqi: String(ctx.aqi ?? '--'),
     categoria: ctx.category || '—',
     hora: ctx.time
@@ -68,8 +73,10 @@ function renderMessage(template: string | null, ctx: AlertContext): string {
   return String(template).replace(/\{(\w+)\}/g, (m, k) => (replacers[k] != null ? replacers[k] : m))
 }
 
-export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: AlertContext): Promise<void> {
-  const messageText = renderMessage(alert.message, ctx)
+// test: envía igual pero sin registrar el disparo ni sumar al contador.
+export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: AlertContext, opts: { test?: boolean } = {}): Promise<ChannelResult[]> {
+  const results: ChannelResult[] = []
+  const messageText = (opts.test ? '[PRUEBA] ' : '') + renderMessage(alert.message, ctx)
   const subject = `Alerta AirSunBox · ${ctx.stationName || 'Estación'}`
 
   const channels: string[] = []
@@ -89,8 +96,10 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
   if (emailTo) {
     try {
       await mailer(app).sendAlert(emailTo, subject, messageText)
+      results.push({ channel: 'email', ok: true })
     } catch (err) {
       app.log.error(`Alerta ${alert.id} — error email: ${(err as Error).message}`)
+      results.push({ channel: 'email', ok: false, error: 'No se pudo enviar el correo' })
     }
   }
 
@@ -110,8 +119,10 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
       if (!data.ok) {
         throw new Error(data.description || 'Telegram rechazó el mensaje')
       }
+      results.push({ channel: 'telegram', ok: true })
     } catch (err) {
       app.log.error(`Alerta ${alert.id} — error Telegram: ${(err as Error).message}`)
+      results.push({ channel: 'telegram', ok: false, error: (err as Error).message })
     }
   }
 
@@ -142,10 +153,14 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
           triggeredAt: ctx.time
         })
       })
+      results.push({ channel: 'webhook', ok: true })
     } catch (err) {
       app.log.error(`Alerta ${alert.id} — error webhook: ${(err as Error).message}`)
+      results.push({ channel: 'webhook', ok: false, error: (err as Error).message })
     }
   }
+
+  if (opts.test) return results
 
   await app.db.query(
     `INSERT INTO alert_logs (alert_id, device_id, variable, value, aqi, category, channel, status, message)
@@ -157,4 +172,5 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
     'UPDATE alerts SET last_triggered_at = $1, trigger_count = trigger_count + 1 WHERE id = $2',
     [new Date(), alert.id]
   )
+  return results
 }

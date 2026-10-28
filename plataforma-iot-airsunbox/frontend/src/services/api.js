@@ -126,7 +126,8 @@ export const alerts = {
   logs: (deviceId) => request(`/alerts/${deviceId}/logs`),
   create: (data) => request('/alerts', { method: 'POST', body: JSON.stringify(data) }),
   toggle: (id, active) => request(`/alerts/${id}`, { method: 'PATCH', body: JSON.stringify({ active }) }),
-  delete: (id) => request(`/alerts/${id}`, { method: 'DELETE' })
+  delete: (id) => request(`/alerts/${id}`, { method: 'DELETE' }),
+  test: (id) => request(`/alerts/${id}/test`, { method: 'POST', body: '{}' })
 }
 
 export const organizations = {

@@ -4,6 +4,7 @@ import { TypeBoxTypeProvider } from '@fastify/type-provider-typebox'
 import { Type } from '@sinclair/typebox'
 import * as alertsRepo from '../repositories/alerts.js'
 import * as devicesRepo from '../repositories/devices.js'
+import { dispatch, type AlertRow } from '../services/alertDispatcher.js'
 
 export default async function alertsRoutes(app: FastifyInstance) {
   const api = app.withTypeProvider<TypeBoxTypeProvider>()
@@ -63,6 +64,15 @@ export default async function alertsRoutes(app: FastifyInstance) {
     } = req.body
 
     if (!deviceId) return reply.code(400).send({ error: 'deviceId es obligatorio' })
+    if (condition && !['>', '<', '=', '>=', '<='].includes(condition))
+      return reply.code(400).send({ error: 'Condición inválida' })
+    if (!Number.isFinite(threshold)) return reply.code(400).send({ error: 'El umbral debe ser un número' })
+    if (emailTo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo))
+      return reply.code(400).send({ error: 'El correo de destino no es válido' })
+    if ((botToken && !chatId) || (!botToken && chatId))
+      return reply.code(400).send({ error: 'Para Telegram hacen falta el token del bot y el chat' })
+    if (!emailTo && !webhookUrl && !botToken && !destination)
+      return reply.code(400).send({ error: 'Elegí al menos un canal de aviso con su destino' })
 
     if (!(await devicesRepo.deviceBelongsToOrg(app.db, deviceId, orgId))) {
       return reply.code(403).send({ error: 'Sin acceso' })
@@ -101,6 +111,43 @@ export default async function alertsRoutes(app: FastifyInstance) {
     })
 
     return reply.code(201).send(rows[0])
+  })
+
+  // ── Enviar una prueba por los canales de la alerta ──
+  // No registra el disparo ni suma al contador. Una prueba cada 30 s por alerta.
+  api.post('/:id/test', {
+    schema: { params: Type.Object({ id: Type.String({ pattern: '^[0-9a-fA-F-]{36}$' }) }) }
+  }, async (req, reply) => {
+    const { rows: [alert] } = await app.db.query<AlertRow>(
+      `SELECT a.*, d.name AS device_name, s.name AS space_name,
+              vc.name AS variable_name, vc.unit AS variable_unit
+       FROM alerts a
+       JOIN devices d ON d.id = a.device_id
+       LEFT JOIN spaces s ON s.id = d.space_id
+       LEFT JOIN variable_catalog vc ON vc.label = a.variable
+       WHERE a.id = $1 AND d.org_id = $2`,
+      [req.params.id, req.user.orgId]
+    )
+    if (!alert) return reply.code(404).send({ error: 'Alerta no encontrada' })
+
+    const gate = await app.redis.set(`alert:test:${alert.id}`, '1', { EX: 30, NX: true })
+    if (gate !== 'OK') return reply.code(429).send({ error: 'Esperá unos segundos antes de enviar otra prueba' })
+
+    const isAqi = alert.variable === 'aqi'
+    const value = Number(alert.threshold)
+    const results = await dispatch(app, alert, {
+      rawValue: value,
+      formattedValue: String(value),
+      aqi: isAqi ? value : null,
+      category: isAqi ? 'Prueba' : null,
+      stationName: alert.device_name ?? null,
+      spaceName: alert.space_name ?? null,
+      variable: isAqi ? 'aqi' : (alert.variable_name || alert.variable),
+      unit: isAqi ? '' : (alert.variable_unit || ''),
+      time: new Date().toLocaleString('es-GT')
+    }, { test: true })
+    if (!results.length) return reply.code(400).send({ error: 'La alerta no tiene canales configurados' })
+    return { results }
   })
 
   // ── Activar / desactivar alerta ────────────────

@@ -17,10 +17,12 @@ export async function evaluateDeviceAlerts(app: FastifyInstance, deviceId: strin
   const fired: string[] = []
   try {
     const { rows: alerts } = await app.db.query<AlertRow>(
-      `SELECT a.*, d.name AS device_name, s.name AS space_name
+      `SELECT a.*, d.name AS device_name, s.name AS space_name,
+              vc.name AS variable_name, vc.unit AS variable_unit
        FROM alerts a
        JOIN devices d ON d.id = a.device_id
        LEFT JOIN spaces s ON s.id = d.space_id
+       LEFT JOIN variable_catalog vc ON vc.label = a.variable
        WHERE a.device_id = $1 AND a.active = true`,
       [deviceId]
     )
@@ -86,8 +88,9 @@ export async function evaluateDeviceAlerts(app: FastifyInstance, deviceId: strin
         category: isAqi ? (aqiRes?.category || null) : null,
         stationName: alert.device_name ?? null,
         spaceName: alert.space_name ?? null,
-        variable: alert.variable,
-        unit: '',
+        // Nombre que ve el usuario (no la clave interna, p. ej. temperatura-2)
+        variable: isAqi ? 'aqi' : (alert.variable_name || alert.variable),
+        unit: isAqi ? '' : (alert.variable_unit || ''),
         time: new Date().toLocaleString('es-GT')
       }
 
