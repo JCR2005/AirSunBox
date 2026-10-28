@@ -209,6 +209,79 @@ export default async function devicesRoutes(app: FastifyInstance) {
     return rows[0]
   })
 
+  // ── Ficha técnica: número de serie y datos del equipo ──
+  const text = (max: number) => Type.Optional(Type.String({ maxLength: max }))
+  api.put('/:id/spec', {
+    schema: {
+      params: Type.Object({ id: Type.String() }),
+      querystring: Type.Object({ orgId: Type.Optional(Type.String()) }),
+      body: Type.Object({
+        serial: Type.Optional(Type.Union([Type.String({ maxLength: 80 }), Type.Null()])),
+        hardware: Type.Optional(Type.Object({
+          model: text(120),
+          firmware: text(60),
+          installed_at: Type.Optional(Type.String({ pattern: '^(\\d{4}-\\d{2}-\\d{2})?$' })),
+          sensors: text(400),
+          notes: text(1000)
+        }, { additionalProperties: false }))
+      })
+    }
+  }, async (req, reply) => {
+    const serial = req.body.serial?.trim() || null
+    const hw = req.body.hardware || {}
+    const hardware: devicesRepo.DeviceHardware = {}
+    for (const k of ['model', 'firmware', 'installed_at', 'sensors', 'notes'] as const) {
+      const v = hw[k]?.trim()
+      if (v) hardware[k] = v
+    }
+    try {
+      const row = await devicesRepo.updateSpec(app.db, req.params.id, targetOrgId(req), serial, hardware)
+      if (!row) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+      return row
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505')
+        return reply.code(409).send({ error: `El número de serie «${serial}» ya está registrado en otra estación.` })
+      throw err
+    }
+  })
+
+  // ── Foto del equipo ────────────────────────────
+  // Se guarda como data URL (el navegador la reduce y comprime antes de subirla).
+  const PHOTO_RE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/
+  const MAX_PHOTO = 700_000
+
+  api.get('/:id/photo', {
+    schema: {
+      params: Type.Object({ id: Type.String() }),
+      querystring: Type.Object({ orgId: Type.Optional(Type.String()) })
+    }
+  }, async (req) => {
+    const photo = await devicesRepo.getPhoto(app.db, req.params.id, targetOrgId(req))
+    return { image: photo?.image ?? null, updated_at: photo?.updated_at ?? null }
+  })
+
+  api.put('/:id/photo', {
+    bodyLimit: 1_048_576,
+    schema: {
+      params: Type.Object({ id: Type.String() }),
+      querystring: Type.Object({ orgId: Type.Optional(Type.String()) }),
+      body: Type.Object({ image: Type.Union([Type.Null(), Type.String({ maxLength: MAX_PHOTO })]) })
+    }
+  }, async (req, reply) => {
+    const rows = await devicesRepo.findByIdAndOrg(app.db, req.params.id, targetOrgId(req))
+    if (!rows.length) return reply.code(404).send({ error: 'Dispositivo no encontrado' })
+    const { image } = req.body
+    // null (o "" si el validador lo convierte) quita la foto
+    if (!image) {
+      await devicesRepo.deletePhoto(app.db, req.params.id)
+      return { image: null }
+    }
+    if (!PHOTO_RE.test(image))
+      return reply.code(400).send({ error: 'La foto debe ser una imagen JPG, PNG o WebP.' })
+    await devicesRepo.setPhoto(app.db, req.params.id, image)
+    return { image }
+  })
+
   // ── Eliminar dispositivo ───────────────────────
   api.delete('/:id', {
     schema: {
