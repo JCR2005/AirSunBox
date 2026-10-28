@@ -34,7 +34,8 @@ for f in \
   v20-align-with-production.sql \
   v21-airsunbox-internal-org.sql \
   v22-password-changed-at.sql \
-  v23-variable-station-key.sql
+  v23-variable-station-key.sql \
+  v24-device-hardware-photo.sql
 do
   echo "→ $f"
   psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" -q -f "$DIR/$f"
