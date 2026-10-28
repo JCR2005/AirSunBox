@@ -14,6 +14,7 @@ export interface AqiVariableRow {
   space_id: string
   variable_label: string
   priority: number
+  station_key?: string | null
 }
 
 export interface AqiRangeRow {
@@ -83,10 +84,11 @@ export async function getSpaceConfig(db: Queryable, spaceId: string): Promise<Sp
       [spaceId]
     ),
     db.query<AqiVariableRow>(
-      `SELECT variable_label, priority
-       FROM space_aqi_variables
-       WHERE space_id = $1
-       ORDER BY priority ASC`,
+      `SELECT sav.variable_label, sav.priority, COALESCE(vc.station_key, sav.variable_label) AS station_key
+       FROM space_aqi_variables sav
+       LEFT JOIN variable_catalog vc ON vc.label = sav.variable_label
+       WHERE sav.space_id = $1
+       ORDER BY sav.priority ASC`,
       [spaceId]
     ),
     db.query<AqiRangeRow>(
