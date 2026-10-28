@@ -58,6 +58,7 @@ function NewMemberModal({ isCentral, onClose, onCreated }) {
             <select className={INPUT} style={inputStyle} value={role} onChange={e => setRole(e.target.value)}>
               <option value="worker">Trabajador</option>
               {isCentral && <option value="admin">Administrador</option>}
+              {isCentral && <option value="superadmin">Superadministrador</option>}
             </select>
           </div>
           {error && <p role="alert" className="text-sm font-medium text-red-500">{error}</p>}
@@ -97,9 +98,9 @@ export default function AdminTeam() {
 
   useEffect(() => { load() }, [])
 
-  // Mismas reglas que el servidor: nadie se cambia a sí mismo, el superadmin
-  // no se toca, y a los administradores solo los maneja el superadmin.
-  const canManage = (m) => m.id !== user?.id && m.role !== 'superadmin' && (isCentral || m.role === 'worker')
+  // Mismas reglas que el servidor: nadie se cambia a sí mismo, y a los
+  // administradores y superadmins solo los maneja un superadmin.
+  const canManage = (m) => m.id !== user?.id && (isCentral || m.role === 'worker')
 
   const update = async (m, data) => {
     setBusyId(m.id)
@@ -171,11 +172,22 @@ export default function AdminTeam() {
                 {canManage(m) && (
                   <div className="flex gap-2">
                     {isCentral && (
-                      <button disabled={busy} onClick={() => update(m, { role: m.role === 'worker' ? 'admin' : 'worker' })}
-                        className="p-2 rounded-lg transition-colors hover:bg-black/5 disabled:opacity-50" style={{ color: 'var(--text2)' }}
-                        title={m.role === 'worker' ? 'Hacer administrador' : 'Pasar a trabajador'}>
-                        <Crown size={14} />
-                      </button>
+                      <label className="flex items-center gap-1.5" title="Cambiar rol">
+                        <Crown size={14} style={{ color: 'var(--text2)' }} />
+                        <span className="sr-only">Rol de {m.name || m.email}</span>
+                        <select disabled={busy} value={m.role}
+                          onChange={e => {
+                            const role = e.target.value
+                            if (role === 'superadmin' && !window.confirm(`¿Dar control total de AirSunBox a ${m.name || m.email}? Podrá gestionar todo el equipo, incluidos otros superadmins.`)) return
+                            update(m, { role })
+                          }}
+                          className="text-xs rounded-lg border px-2 py-1.5 disabled:opacity-50"
+                          style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}>
+                          <option value="worker">Trabajador</option>
+                          <option value="admin">Administrador</option>
+                          <option value="superadmin">Superadministrador</option>
+                        </select>
+                      </label>
                     )}
                     <button disabled={busy} onClick={() => update(m, { status: m.status === 'active' ? 'suspended' : 'active' })}
                       className="p-2 rounded-lg transition-colors hover:text-amber-500 hover:bg-black/5 disabled:opacity-50" style={{ color: 'var(--text2)' }}
