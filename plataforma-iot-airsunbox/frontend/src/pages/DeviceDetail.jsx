@@ -33,15 +33,20 @@ function agoText(ts) {
 
 // Genera el código ESP8266/ESP32 con la estructura del POST
 // que envía las variables REALES de la estación.
+// Nombre con el que la estación envía la variable (único en su espacio) y un
+// nombre de variable válido en C para el sketch (pm2.5 → pm2_5).
+const sentKey = (v) => v.station_key || v.label
+const cName = (v) => sentKey(v).replace(/[^A-Za-z0-9_]/g, '_').replace(/^(\d)/, '_$1')
+
 function generateEspSketch(vars, host, token, deviceLabel) {
-  const declarations = vars.map(v => `float ${v.label};   // ${v.name} (${v.unit || 'sin unidad'})`).join('\n')
+  const declarations = vars.map(v => `float ${cName(v)};   // ${v.name} (${v.unit || 'sin unidad'})`).join('\n')
   const reads = vars.map((v, i) => {
     const u = (v.unit || '').toLowerCase()
     const start = u.includes('°c') ? '25.0' : u.includes('ppb') ? '300.0' : u.includes('%') ? '60.0' : '1.0'
-    return `  ${v.label} = ${start};   // TODO: reemplaza por la lectura de tu sensor (${v.name})`
+    return `  ${cName(v)} = ${start};   // TODO: reemplaza por la lectura de tu sensor (${v.name})`
   }).join('\n')
-  const fmtEntries = vars.map((v, i) => `    "${v.label}":%g${i < vars.length - 1 ? ',' : ''}`).join('\n')
-  const fmtArgs = vars.map(v => `    ${v.label}`).join(',\n')
+  const fmtEntries = vars.map((v, i) => `    "${sentKey(v)}":%g${i < vars.length - 1 ? ',' : ''}`).join('\n')
+  const fmtArgs = vars.map(v => `    ${cName(v)}`).join(',\n')
 
   return `// ============================================================
 // ESTACIÓN: ${deviceLabel || ''} — POST /api/dots/<TOKEN>
@@ -869,7 +874,7 @@ export default function ClientDeviceDetail() {
                       </div>
                       <pre className="text-[11px] px-3 py-2 rounded-xl border overflow-x-auto font-mono max-h-[360px] overflow-y-auto" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }}>{esp32Sketch}</pre>
                       <p className="text-[10px] mt-1.5" style={{ color: 'var(--text2)' }}>
-                        Pega en tu Arduino IDE, pon tu WiFi y reemplaza los valores TODO por tus sensores. El POST solo incluye: <span className="font-mono">{sampleVars.map(v => v.label).join(', ')}</span>.
+                        Pega en tu Arduino IDE, pon tu WiFi y reemplaza los valores TODO por tus sensores. El POST solo incluye: <span className="font-mono">{sampleVars.map(v => v.station_key || v.label).join(', ')}</span>.
                       </p>
                     </div>
                   </div>
@@ -1029,7 +1034,7 @@ export default function ClientDeviceDetail() {
                     <div className="flex items-center justify-center gap-1.5 mt-3 w-full">
                       {aqiData.dominantPollutant && (
                         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                          Contaminante dominante: <span className="text-[#67B7E8]">{aqiData.dominantPollutant}</span>
+                          Contaminante dominante: <span className="text-[#67B7E8]">{variables.find(v => v.label === aqiData.dominantPollutant)?.name || aqiData.dominantPollutant}</span>
                         </span>
                       )}
                       <span className="relative flex w-2 h-2">
@@ -1407,7 +1412,7 @@ export default function ClientDeviceDetail() {
                         <div className="flex items-center gap-3">
                           <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black" style={{ background: '#67B7E81A', color: '#67B7E8' }}>{i + 1}</span>
                           <div>
-                            <span className="font-semibold" style={{ color: 'var(--text)' }}>{v.variable_label}</span>
+                            <span className="font-semibold" style={{ color: 'var(--text)' }}>{v.station_key || v.variable_label}</span>
                             <span className="text-[10px] ml-2 opacity-60" style={{ color: 'var(--text2)' }}>prioridad {v.priority}</span>
                           </div>
                         </div>
@@ -1476,7 +1481,7 @@ export default function ClientDeviceDetail() {
                         />
                         <div className="min-w-0">
                           <span className="font-semibold block truncate" style={{ color: 'var(--text)' }}>{v.name}</span>
-                          <span className="text-[10px] font-mono" style={{ color: 'var(--text2)' }}>{v.label} · {v.unit}</span>
+                          <span className="text-[10px] font-mono" style={{ color: 'var(--text2)' }}>{v.station_key || v.label} · {v.unit}</span>
                         </div>
                       </div>
                       {isSelected && (

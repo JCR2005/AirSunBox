@@ -1,7 +1,9 @@
 import type { Queryable } from '../types/index.js'
 
 export interface DeviceVariableScope {
-  allowed: Set<string> | null
+  // Nombre que envía la estación → clave interna del catálogo. null = sin
+  // restricción (organizaciones dependientes o estaciones fuera de un espacio).
+  allowed: Map<string, string> | null
 }
 
 export async function getDeviceVariableScope(db: Queryable, deviceId: string): Promise<DeviceVariableScope> {
@@ -15,15 +17,22 @@ export async function getDeviceVariableScope(db: Queryable, deviceId: string): P
 
   if (!d || !d.space_id || d.org_type !== 'B') return { allowed: null }
 
-  const { rows } = await db.query<{ label: string }>(
-    `SELECT label FROM variable_catalog WHERE space_id = $1`,
+  const { rows } = await db.query<{ label: string; station_key: string }>(
+    `SELECT label, COALESCE(station_key, label) AS station_key FROM variable_catalog WHERE space_id = $1`,
     [d.space_id]
   )
 
-  return { allowed: new Set(rows.map(r => r.label)) }
+  const allowed = new Map<string, string>()
+  // La clave interna también se acepta, por compatibilidad con estaciones
+  // que ya la envían; el nombre de la estación tiene prioridad.
+  for (const r of rows) allowed.set(r.label, r.label)
+  for (const r of rows) allowed.set(r.station_key, r.label)
+  return { allowed }
 }
 
-export function isLabelAllowed(scope: DeviceVariableScope, label: string): boolean {
-  if (!scope?.allowed) return true
-  return scope.allowed.has(label)
+// Clave interna con la que se guarda la lectura, o null si la variable no
+// pertenece al espacio de la estación.
+export function resolveVariable(scope: DeviceVariableScope, sent: string): string | null {
+  if (!scope?.allowed) return sent
+  return scope.allowed.get(sent) ?? null
 }
