@@ -8,6 +8,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { exportStationWeeklyPDF } from '../utils/exportUtils'
 import StationSheet from '../components/station/StationSheet'
 import EspConnect from '../components/station/EspConnect'
+import ReadingTile, { variableLevels } from '../components/station/ReadingTile'
 
 import { 
   ArrowLeft, Wifi, WifiOff, MapPin, Bell, Tag, Info,
@@ -138,58 +139,6 @@ const AVAILABLE_ICONS = {
   'shield': Shield, 'activity': Activity
 }
 
-function SensorKPI({ name, unit, value, iconName, color = '#67B7E8' }) {
-  const IconComponent = AVAILABLE_ICONS[iconName?.toLowerCase()] || Activity
-  const has = value != null
-  return (
-    <div className="h-full rounded-2xl border p-4 flex flex-col min-h-[140px] transition-shadow hover:shadow-md" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: color + '1A', color }}>
-          <IconComponent size={16} />
-        </span>
-        <span className="text-sm font-medium truncate" style={{ color: 'var(--text2)' }}>{name}</span>
-      </div>
-      <div className="mt-auto pt-4 leading-none">
-        {has ? (
-          <>
-            <span className="text-3xl font-bold tracking-tight tabular-nums" style={{ color: 'var(--text)' }}>{Number(value).toFixed(1)}</span>
-            {unit && <span className="text-base font-semibold ml-1.5" style={{ color }}>{unit}</span>}
-          </>
-        ) : (
-          <span className="text-sm" style={{ color: 'var(--text2)' }}>Sin lecturas{unit ? ` · ${unit}` : ''}</span>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// Mini sparkline (última hora) para las variables de la vista rápida
-function Sparkline({ points, color, height = 34 }) {
-  if (!points || points.length < 2) return null
-  const w = 120
-  const vals = points.map(p => Number(p))
-  const mn = Math.min(...vals)
-  const mx = Math.max(...vals)
-  const range = mx - mn || 1
-  const pts = vals.map((v, i) =>
-    `${(i / (vals.length - 1)) * w},${(height - 4) - ((v - mn) / range) * (height - 6)}`
-  ).join(' ')
-  const pathPts = pts
-  return (
-    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ width: '100%', height }}>
-      <polyline
-        points={pathPts}
-        fill="none"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.9"
-      />
-    </svg>
-  )
-}
-
 export default function ClientDeviceDetail() {
   const { id: deviceId } = useParams() 
   const navigate = useNavigate()
@@ -221,7 +170,6 @@ export default function ClientDeviceDetail() {
   const [editDraft, setEditDraft] = useState({ name: '', label: '', description: '', icon: 'map-pin', tagsText: '', lat: '', lng: '', serial: '' })
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState('')
-  const [sparks, setSparks] = useState({})
   const [copiedKey, setCopiedKey] = useState(null)
   const [nowTick, setNowTick] = useState(Date.now()) 
 
@@ -264,24 +212,6 @@ export default function ClientDeviceDetail() {
     .filter(Boolean)
     .slice(0, 4)
   const quickHasData = quickViewVars.some(v => lastValues[v.label] != null)
-
-  // Sparklines (última hora) para las variables de la vista rápida
-  const quickKey = quickViewVars.map(v => v.label).join(',')
-  useEffect(() => {
-    if (!deviceId || !quickKey) return
-    let ok = true
-    dotsApi.getMultiple(deviceId, quickKey.split(','), '1h').then(res => {
-      if (!ok) return
-      const out = {}
-      for (const [label, pts] of Object.entries(res || {})) {
-        if (!Array.isArray(pts) || !pts.length) continue
-        const every = Math.max(1, Math.ceil(pts.length / 28))
-        out[label] = pts.filter((_, i) => i % every === 0).map(p => p.value)
-      }
-      setSparks(out)
-    }).catch(() => {})
-    return () => { ok = false }
-  }, [deviceId, quickKey])
 
   useEffect(() => {
     let active = true
@@ -632,7 +562,7 @@ export default function ClientDeviceDetail() {
             <section className="flex flex-col min-w-0">
 
               <div className="flex flex-col">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 w-full items-center">
+                <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 w-full items-stretch">
                   
                   <div className="border rounded-[3rem] p-10 flex flex-col items-center justify-between shadow-lg relative overflow-visible min-h-[450px]" style={{ background: `radial-gradient(circle at 50% 30%, ${aqiData.color}1A, transparent 65%), var(--card)`, borderColor: 'var(--border)' }}>
                     {device?.status === 'online' && (
@@ -798,7 +728,7 @@ export default function ClientDeviceDetail() {
                   </div>
 
                   {variables.length > 0 ? (
-                    <div className="border rounded-[3rem] p-7 md:p-8 flex flex-col shadow-lg min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                    <div className="border rounded-[3rem] p-7 md:p-8 flex flex-col shadow-lg 2xl:min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
                       <div className="flex items-start justify-between gap-3 mb-5">
                         <div>
                           <h2 className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Lecturas actuales</h2>
@@ -830,52 +760,26 @@ export default function ClientDeviceDetail() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-4 flex-1 content-start">
-                        {quickViewVars.map((v, i) => {
-                          const value = lastValues[v.label]
-                          const has = value != null
-                          const IconComponent = AVAILABLE_ICONS[v.icon?.toLowerCase()] || Activity
-                          const col = COLORS[i % COLORS.length]
-                          return (
-                            <Link
-                              key={v.label}
-                              to={`/variableDetail/${deviceId}/${v.label}`}
-                              className="group rounded-2xl border p-4 flex flex-col min-h-[156px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#67B7E8]"
-                              style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = col + '80' }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: col + '1A', color: col }}>
-                                  <IconComponent size={16} />
-                                </span>
-                                <span className="text-sm font-medium truncate" style={{ color: 'var(--text2)' }}>{v.name}</span>
-                              </div>
-                              <div className="mt-auto pt-4 leading-none">
-                                {has ? (
-                                  <>
-                                    <span className="text-4xl font-bold tracking-tight tabular-nums" style={{ color: 'var(--text)' }}>{Number(value).toFixed(1)}</span>
-                                    {v.unit && <span className="text-base font-semibold ml-1.5" style={{ color: col }}>{v.unit}</span>}
-                                  </>
-                                ) : (
-                                  <span className="text-sm" style={{ color: 'var(--text2)' }}>Sin lecturas{v.unit ? ` · ${v.unit}` : ''}</span>
-                                )}
-                              </div>
-                              <div className="h-9 mt-3">
-                                {has && sparks[v.label]?.length > 1
-                                  ? <Sparkline points={sparks[v.label]} color={col} />
-                                  : <div className="h-full flex items-end"><div className="w-full border-t border-dashed" style={{ borderColor: 'var(--border)' }} /></div>}
-                              </div>
-                            </Link>
-                          )
-                        })}
+                      <div className={`grid gap-4 2xl:flex-1 auto-rows-fr ${quickViewVars.length === 1 ? 'grid-cols-1' : `grid-cols-2 ${quickViewVars.length === 3 ? 'lg:grid-cols-3 2xl:grid-cols-2' : quickViewVars.length >= 4 ? 'lg:grid-cols-4 2xl:grid-cols-2' : ''}`}`}>
+                        {quickViewVars.map((v, i) => (
+                          <div key={v.label} className={quickViewVars.length % 2 === 1 && i === quickViewVars.length - 1 && quickViewVars.length > 1 ? 'col-span-2 lg:col-span-1 2xl:col-span-2' : ''}>
+                          <ReadingTile
+                            to={`/variableDetail/${deviceId}/${v.label}`}
+                            name={v.name}
+                            unit={v.unit}
+                            value={lastValues[v.label]}
+                            levels={variableLevels(spaceAqiConfig, v.label)}
+                            size={quickViewVars.length <= 2 ? 'lg' : 'md'}
+                          />
+                          </div>
+                        ))}
                       </div>
                       {variables.length > quickViewVars.length && (
                         <div className="flex justify-center mt-6">
                           <button
                             onClick={() => { setActiveView('variables'); scrollToDetails() }}
                             className="text-xs font-bold px-3 py-1.5 rounded-full hover:scale-105 transition-all" style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                            +{variables.length - quickViewVars.length} más en Métricas Detalladas
+                            +{variables.length - quickViewVars.length} más en Métricas
                           </button>
                         </div>
                       )}
@@ -898,27 +802,27 @@ export default function ClientDeviceDetail() {
               </div>
 
               <div id="detalles-view" className="flex justify-center mt-8 mb-8 scroll-mt-8">
-                <div className="inline-flex flex-wrap justify-center gap-1 p-2 rounded-[2rem] shadow-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+                <div role="tablist" aria-label="Vista de la estación" className="w-full max-w-2xl grid grid-cols-3 gap-1 p-1.5 rounded-[2rem] shadow-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                   <button
                     onClick={() => { setActiveView('variables'); scrollToDetails(); }}
-                    className={`flex items-center gap-2 px-5 sm:px-8 py-3.5 rounded-3xl text-sm font-black tracking-wide transition-all duration-300 ${activeView === 'variables' ? 'bg-[#1D9E75] text-white shadow-lg scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'variables' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     style={activeView !== 'variables' ? { color: 'var(--text2)' } : {}}
                   >
-                    <Gauge size={17} /> Métricas Detalladas
+                    <Gauge size={17} className="hidden sm:block shrink-0" /> Métricas
                   </button>
                   <button
                     onClick={() => { setActiveView('grafica'); scrollToDetails(); }}
-                    className={`flex items-center gap-2 px-5 sm:px-8 py-3.5 rounded-3xl text-sm font-black tracking-wide transition-all duration-300 ${activeView === 'grafica' ? 'bg-[#1D9E75] text-white shadow-lg scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'grafica' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     style={activeView !== 'grafica' ? { color: 'var(--text2)' } : {}}
                   >
-                    <Activity size={17} /> Gráfica Histórica
+                    <Activity size={17} className="hidden sm:block shrink-0" /> Gráfica
                   </button>
                   <button
                     onClick={() => { setActiveView('conexion'); scrollToDetails(); }}
-                    className={`flex items-center gap-2 px-5 sm:px-8 py-3.5 rounded-3xl text-sm font-black tracking-wide transition-all duration-300 ${activeView === 'conexion' ? 'bg-[#1D9E75] text-white shadow-lg scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'conexion' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     style={activeView !== 'conexion' ? { color: 'var(--text2)' } : {}}
                   >
-                    <Cpu size={17} /> Conectar ESP32
+                    <Cpu size={17} className="hidden sm:block shrink-0" /> Conectar ESP32
                   </button>
                 </div>
               </div>
@@ -938,22 +842,17 @@ export default function ClientDeviceDetail() {
                     />
                   </div>
                 ) : activeView === 'variables' ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Enlace al detalle de la variable */}
-                    {variables.map((v, i) => (
-                      <Link 
-                        to={`/variableDetail/${deviceId}/${v.label}`} 
-                        key={v.label} 
-                        className="block"
-                      >
-                        <SensorKPI 
-                          name={v.name} 
-                          unit={v.unit} 
-                          value={lastValues[v.label]} 
-                          iconName={v.icon} 
-                          color={COLORS[i % COLORS.length]} 
+                  <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(175px,1fr))] animate-in fade-in duration-300">
+                    {variables.map(v => (
+                      <div key={v.label} className="min-h-[170px]">
+                        <ReadingTile
+                          to={`/variableDetail/${deviceId}/${v.label}`}
+                          name={v.name}
+                          unit={v.unit}
+                          value={lastValues[v.label]}
+                          levels={variableLevels(spaceAqiConfig, v.label)}
                         />
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 ) : (

@@ -10,6 +10,13 @@ import MapPicker from '../MapPicker'
 const ACCENT = '#67B7E8'
 const MAX_PHOTO_CHARS = 680_000
 
+// Los errores genéricos del servidor («Not Found», «Error del servidor») no
+// le dicen nada al usuario: se reemplazan por uno que sí.
+const friendly = (err, fallback) => {
+  const m = err?.message || ''
+  return !m || /^(not found|error del servidor|internal server error)$/i.test(m) ? fallback : m
+}
+
 // Reduce y comprime la foto en el navegador antes de subirla (JPEG, lado
 // mayor ≤ 1280 px). Si aún pesa mucho, baja calidad y tamaño una vez más.
 async function compressImage(file) {
@@ -116,7 +123,7 @@ function PhotoPlate({ deviceId, name, icon: Icon }) {
       await devicesApi.setPhoto(deviceId, data)
       setImage(data)
     } catch (e) {
-      setError(e.message || 'No se pudo subir la foto')
+      setError(friendly(e, 'No se pudo subir la foto. Intentá de nuevo en un momento.'))
     } finally {
       setBusy(false)
       if (inputRef.current) inputRef.current.value = ''
@@ -129,7 +136,7 @@ function PhotoPlate({ deviceId, name, icon: Icon }) {
       await devicesApi.setPhoto(deviceId, null)
       setImage(null)
     } catch (e) {
-      setError(e.message || 'No se pudo quitar la foto')
+      setError(friendly(e, 'No se pudo quitar la foto. Intentá de nuevo en un momento.'))
     } finally {
       setBusy(false)
     }
@@ -211,7 +218,7 @@ function SpecModal({ device, onClose, onSaved }) {
       const updated = await devicesApi.spec(device.id, { serial: serial.trim() || null, hardware })
       onSaved(updated)
     } catch (err) {
-      setError(err.message || 'No se pudo guardar la ficha')
+      setError(friendly(err, 'No se pudo guardar la ficha. Intentá de nuevo en un momento.'))
     } finally {
       setSaving(false)
     }
