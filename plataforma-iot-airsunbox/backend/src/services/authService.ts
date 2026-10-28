@@ -365,7 +365,8 @@ export async function verifyOtpLogin(
       ok: true,
       token,
       redirect,
-      user: { id: decoded.userId, email: '', role: decoded.role, name: null },
+      // Datos reales de la cuenta: antes iban vacíos y el menú mostraba «Usuario ?»
+      user: { id: decoded.userId, email: current.email, role: decoded.role, name: current.name ?? null },
       org: org ? {
         id: org.id,
         name: org.name,
