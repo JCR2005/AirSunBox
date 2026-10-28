@@ -462,9 +462,11 @@ export async function ensureDeviceVariable(db: Queryable, deviceId: string, vari
 
 export async function registerDeviceVariables(db: Queryable, deviceId: string, labels: string[]): Promise<void> {
   if (labels.length === 0) return
+  // Una fila por variable: pasar el arreglo como valor único lo insertaba
+  // como texto ('{a,b}') y violaba la clave foránea del catálogo.
   await db.query(
     `INSERT INTO device_variables (device_id, variable_label)
-     VALUES ($1, $2)
+     SELECT $1, unnest($2::text[])
      ON CONFLICT DO NOTHING`,
     [deviceId, labels]
   )
