@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronsUpDown, User, ShieldCheck, Sun, Moon, LogOut } from 'lucide-react'
 import useAuthStore from '../store/auth'
 import useThemeStore from '../store/theme'
+import { auth } from '../services/api'
 
 const ROLE_LABEL = {
   superadmin: 'Superadministrador',
@@ -30,6 +31,14 @@ export default function UserMenu({ onNavigate }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
   const firstItemRef = useRef(null)
+
+  // Sesiones guardadas sin nombre ni correo (p. ej. tras la verificación en
+  // dos pasos): se completan con /auth/me para no mostrar «Usuario ?».
+  const updateUser = useAuthStore(st => st.updateUser)
+  useEffect(() => {
+    if (!user || user.email) return
+    auth.me().then(me => { if (me?.email) updateUser({ email: me.email, name: me.name ?? user.name }) }).catch(() => {})
+  }, [user?.email]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return

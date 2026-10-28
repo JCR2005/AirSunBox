@@ -24,10 +24,11 @@ export interface AlertWithSpace extends AlertRow {
 
 export async function listByDevice(db: Queryable, deviceId: string, orgId: string) {
   const { rows } = await db.query<AlertWithSpace>(
-    `SELECT a.*, s.name AS space_name
+    `SELECT a.*, s.name AS space_name, vc.name AS variable_name, vc.unit AS variable_unit
      FROM alerts a
      LEFT JOIN devices d ON d.id = a.device_id
      LEFT JOIN spaces s ON s.id = d.space_id
+     LEFT JOIN variable_catalog vc ON vc.label = a.variable
      WHERE a.device_id = $1 AND d.org_id = $2
      ORDER BY a.created_at DESC`,
     [deviceId, orgId]

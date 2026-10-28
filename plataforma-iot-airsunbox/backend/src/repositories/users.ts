@@ -54,6 +54,7 @@ export interface ResetTokenRow {
 }
 
 export interface OtpUserRow {
+  name: string | null
   id: string
   email: string
   status: string
@@ -262,7 +263,7 @@ export async function setClientEmail(db: Queryable, orgId: string, email: string
 
 export async function findById(db: Queryable, userId: string): Promise<OtpUserRow[]> {
   const { rows } = await db.query<OtpUserRow>(
-    `SELECT id, email, status, two_fa_enabled, otp_code_hash, otp_expires_at, backup_codes, otp_failed_attempts, otp_locked_until FROM users WHERE id = $1`,
+    `SELECT id, email, name, status, two_fa_enabled, otp_code_hash, otp_expires_at, backup_codes, otp_failed_attempts, otp_locked_until FROM users WHERE id = $1`,
     [userId]
   )
   return rows
