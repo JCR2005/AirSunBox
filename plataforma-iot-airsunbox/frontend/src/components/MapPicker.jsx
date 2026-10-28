@@ -27,6 +27,8 @@ function ClickHandler({ onPick }) {
 export default function MapPicker({ lat, lng, onChange, height = 220 }) {
   const center = [lat ?? 14.8347, lng ?? -91.5181]
   const hasCoords = lat != null && lng != null
+  // Sin onChange el mapa solo muestra la ubicación (no se puede mover el marcador)
+  const readOnly = typeof onChange !== 'function'
 
   const handleGeoLocate = () => {
     if (!navigator.geolocation) return
@@ -39,9 +41,11 @@ export default function MapPicker({ lat, lng, onChange, height = 220 }) {
     <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between px-3 py-2 text-xs" style={{ background: 'var(--bg)', color: 'var(--text2)' }}>
         <span>{hasCoords ? `${lat.toFixed(6)}, ${lng.toFixed(6)}` : 'Seleccioná una ubicación'}</span>
-        <button type="button" onClick={handleGeoLocate} className="text-xs" style={{ color: 'var(--green)' }}>
-          Usar mi ubicación
-        </button>
+        {!readOnly && (
+          <button type="button" onClick={handleGeoLocate} className="text-xs" style={{ color: 'var(--green)' }}>
+            Usar mi ubicación
+          </button>
+        )}
       </div>
       <MapContainer center={center} zoom={hasCoords ? 15 : 12} style={{ height }}>
         <Recenter center={center} />
@@ -49,13 +53,13 @@ export default function MapPicker({ lat, lng, onChange, height = 220 }) {
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <ClickHandler onPick={(pos) => onChange({ lat: pos.lat, lng: pos.lng })} />
+        {!readOnly && <ClickHandler onPick={(pos) => onChange({ lat: pos.lat, lng: pos.lng })} />}
         {hasCoords && (
           <Marker
             position={[lat, lng]}
             icon={markerIcon}
-            draggable
-            eventHandlers={{
+            draggable={!readOnly}
+            eventHandlers={readOnly ? undefined : {
               dragend: (e) => {
                 const next = e.target.getLatLng()
                 onChange({ lat: next.lat, lng: next.lng })

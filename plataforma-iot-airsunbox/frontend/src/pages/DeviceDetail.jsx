@@ -6,7 +6,9 @@ import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import { devices as devicesApi, dots as dotsApi, spaces as spacesApi } from '../services/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { exportStationWeeklyPDF } from '../utils/exportUtils'
-import MapPicker from '../components/MapPicker'
+import StationSheet from '../components/station/StationSheet'
+import EspConnect from '../components/station/EspConnect'
+import ReadingTile, { variableLevels } from '../components/station/ReadingTile'
 
 import { 
   ArrowLeft, Wifi, WifiOff, MapPin, Bell, Tag, Info,
@@ -38,82 +40,94 @@ function agoText(ts) {
 const sentKey = (v) => v.station_key || v.label
 const cName = (v) => sentKey(v).replace(/[^A-Za-z0-9_]/g, '_').replace(/^(\d)/, '_$1')
 
-function generateEspSketch(vars, host, token, deviceLabel) {
+function generateEspSketch(vars, url, deviceLabel) {
+  const https = url.startsWith('https://')
   const declarations = vars.map(v => `float ${cName(v)};   // ${v.name} (${v.unit || 'sin unidad'})`).join('\n')
-  const reads = vars.map((v, i) => {
+  const reads = vars.map(v => {
     const u = (v.unit || '').toLowerCase()
     const start = u.includes('°c') ? '25.0' : u.includes('ppb') ? '300.0' : u.includes('%') ? '60.0' : '1.0'
-    return `  ${cName(v)} = ${start};   // TODO: reemplaza por la lectura de tu sensor (${v.name})`
+    return `  ${cName(v)} = ${start};   // TODO: lectura real de tu sensor (${v.name})`
   }).join('\n')
-  const fmtEntries = vars.map((v, i) => `    "${sentKey(v)}":%g${i < vars.length - 1 ? ',' : ''}`).join('\n')
+  const fmtEntries = vars.map((v, i) => `    "\\"${sentKey(v)}\\":%g${i < vars.length - 1 ? ',' : ''}"`).join('\n')
   const fmtArgs = vars.map(v => `    ${cName(v)}`).join(',\n')
+  const client = https
+    ? `#if defined(ESP32)
+  WiFiClientSecure client;
+#else
+  BearSSL::WiFiClientSecure client;
+#endif
+  // Cifra la conexión sin validar el certificado. Para validarlo, cargá el
+  // certificado raíz con client.setCACert(...) en lugar de setInsecure().
+  client.setInsecure();`
+    : `  WiFiClient client;`
 
   return `// ============================================================
-// ESTACIÓN: ${deviceLabel || ''} — POST /api/dots/<TOKEN>
-// Estructura de la petición HTTP que envía las variables
+// Estación: ${deviceLabel || ''}
+// Envía las lecturas a AirSunBox con un POST en formato JSON.
+// Funciona en ESP32 y ESP8266 (Arduino IDE).
 // ============================================================
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <WiFiClient.h>
+#if defined(ESP32)
+  #include <WiFi.h>
+  #include <HTTPClient.h>
+  #include <WiFiClientSecure.h>
+#else
+  #include <ESP8266WiFi.h>
+  #include <ESP8266HTTPClient.h>
+  #include <WiFiClientSecureBearSSL.h>
+#endif
 
 #define WIFI_SSID "TU_WIFI"
 #define WIFI_PASS "TU_PASS"
 
-// Cambia la URL por la de tu servidor (o túnel tipo loca.lt)
-// Usa el token de ESTA estación
-const char* API_URL = "http://${host}:3000/api/dots/${token}";
+// Dirección de envío con el token de ESTA estación
+const char* API_URL = "${url}";
 
-// --------------------------------------------------
-// VARIABLES QUE TRABAJA LA ESTACIÓN
-// --------------------------------------------------
+// Cada cuánto envía (ms). La estación figura «en línea» si envió en los
+// últimos 15 minutos.
+const unsigned long INTERVALO_MS = 60000;
+
+// Variables que mide la estación
 ${declarations}
 
-// --------------------------------------------------
-// WIFI
-// --------------------------------------------------
 void connectWiFi() {
-  Serial.begin(115200);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
   int intentos = 0;
   while (WiFi.status() != WL_CONNECTED && intentos < 20) {
     delay(500); Serial.print("."); intentos++;
   }
-  Serial.println(WiFi.status() == WL_CONNECTED ? " WiFi OK" : " ERROR WiFi");
+  Serial.println(WiFi.status() == WL_CONNECTED ? " WiFi OK" : " Sin WiFi");
 }
 
-// --------------------------------------------------
-// POST (estructura de la petición)
-// --------------------------------------------------
-bool sendDataHTTP() {
-  WiFiClient client;
+bool enviarLecturas() {
+${client}
   HTTPClient http;
-
   if (!http.begin(client, API_URL)) return false;
   http.addHeader("Content-Type", "application/json");
 
-  char payload[512]; // ajusta si son muchas variables
-
-  snprintf(
-    payload,
-    sizeof(payload),
+  char payload[512];   // ampliar si la estación tiene muchas variables
+  snprintf(payload, sizeof(payload),
     "{"
 ${fmtEntries}
     "}",
 ${fmtArgs}
   );
 
-  int httpCode = http.POST(payload);
+  int code = http.POST(payload);
+  Serial.printf("POST %d\\n", code);   // 201 = lecturas guardadas
   http.end();
-  return (httpCode >= 200 && httpCode < 300);
+  return code >= 200 && code < 300;
 }
 
-void setup() { connectWiFi(); }
+void setup() {
+  Serial.begin(115200);
+  connectWiFi();
+}
 
 void loop() {
   if (WiFi.status() != WL_CONNECTED) connectWiFi();
 ${reads}
-  if (sendDataHTTP()) Serial.println("POST OK");
-  delay(5000);
+  enviarLecturas();
+  delay(INTERVALO_MS);
 }`
 }
 
@@ -123,55 +137,6 @@ const AVAILABLE_ICONS = {
   'cpu': Cpu, 'gauge': Gauge, 'battery': Battery, 'zap': Zap,
   'factory': Factory, 'waves': Waves, 'flame': Flame, 'trees': Trees,
   'shield': Shield, 'activity': Activity
-}
-
-function SensorKPI({ name, unit, value, iconName, color = '#67B7E8' }) {
-  const IconComponent = AVAILABLE_ICONS[iconName?.toLowerCase()] || Activity
-  return (
-    <div className="border rounded-2xl overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full group" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-      <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${color}00, ${color}, ${color}00)` }} />
-      <div className="p-5 flex flex-col items-center text-center relative">
-        <div className="absolute top-3 right-3 w-6 h-6 rounded-full flex items-center justify-center" style={{ background: color + '18', color }}>
-          <span className={`w-1.5 h-1.5 rounded-full ${value != null ? 'animate-pulse' : ''}`} style={{ background: color }} />
-        </div>
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110" style={{ background: color + '15', color }}>
-          <IconComponent size={22} />
-        </div>
-        <span className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text2)' }}>{name}</span>
-        <div className="text-3xl font-black" style={{ color: 'var(--text)' }}>
-          {value != null ? Number(value).toFixed(1) : <span className="animate-pulse">—</span>}
-          <span className="text-lg font-medium ml-1" style={{ color }}>{unit}</span>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// Mini sparkline (última hora) para las variables de la vista rápida
-function Sparkline({ points, color, height = 34 }) {
-  if (!points || points.length < 2) return null
-  const w = 120
-  const vals = points.map(p => Number(p))
-  const mn = Math.min(...vals)
-  const mx = Math.max(...vals)
-  const range = mx - mn || 1
-  const pts = vals.map((v, i) =>
-    `${(i / (vals.length - 1)) * w},${(height - 4) - ((v - mn) / range) * (height - 6)}`
-  ).join(' ')
-  const pathPts = pts
-  return (
-    <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ width: '100%', height }}>
-      <polyline
-        points={pathPts}
-        fill="none"
-        stroke={color}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.9"
-      />
-    </svg>
-  )
 }
 
 export default function ClientDeviceDetail() {
@@ -201,22 +166,17 @@ export default function ClientDeviceDetail() {
   const [savingStationVars, setSavingStationVars] = useState(false)
   const [showQuickModal, setShowQuickModal] = useState(false)
   const [quickDraft, setQuickDraft] = useState([])
-  const [showEsp32, setShowEsp32] = useState(false)
-  const [showMeta, setShowMeta] = useState(true)
-  const [showGps, setShowGps] = useState(false)
-  const [showHard, setShowHard] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editDraft, setEditDraft] = useState({ name: '', label: '', description: '', icon: 'map-pin', tagsText: '', lat: '', lng: '', serial: '' })
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState('')
-  const [sparks, setSparks] = useState({})
-  const [showToken, setShowToken] = useState(false)
   const [copiedKey, setCopiedKey] = useState(null)
   const [nowTick, setNowTick] = useState(Date.now()) 
 
   const getAqiColor = (category) => {
     if (!category) return '#9CA3AF'
     const cat = category.toLowerCase()
+    if (cat.includes('sin dato')) return '#9CA3AF'   // sin lecturas: neutro, no «peligro»
     if (cat.includes('excelente')) return '#10B981'  
     if (cat.includes('buena')) return '#34D399'      
     if (cat.includes('precaución')) return '#F59E0B' 
@@ -252,24 +212,6 @@ export default function ClientDeviceDetail() {
     .filter(Boolean)
     .slice(0, 4)
   const quickHasData = quickViewVars.some(v => lastValues[v.label] != null)
-
-  // Sparklines (última hora) para las variables de la vista rápida
-  const quickKey = quickViewVars.map(v => v.label).join(',')
-  useEffect(() => {
-    if (!deviceId || !quickKey) return
-    let ok = true
-    dotsApi.getMultiple(deviceId, quickKey.split(','), '1h').then(res => {
-      if (!ok) return
-      const out = {}
-      for (const [label, pts] of Object.entries(res || {})) {
-        if (!Array.isArray(pts) || !pts.length) continue
-        const every = Math.max(1, Math.ceil(pts.length / 28))
-        out[label] = pts.filter((_, i) => i % every === 0).map(p => p.value)
-      }
-      setSparks(out)
-    }).catch(() => {})
-    return () => { ok = false }
-  }, [deviceId, quickKey])
 
   useEffect(() => {
     let active = true
@@ -461,24 +403,6 @@ export default function ClientDeviceDetail() {
       setGeneratingReport(false)
     }
   }
-  const latValue = device?.lat != null ? parseFloat(device.lat) : null
-  const lngValue = device?.lng != null ? parseFloat(device.lng) : null
-  const hasValidGPS = latValue != null && lngValue != null && !isNaN(latValue) && !isNaN(lngValue)
-
-  const temp = lastValues['temperatura'] ?? lastValues['Temperatura'] ?? lastValues['temperature'] ?? null
-  const hum = lastValues['humedad'] ?? lastValues['Humedad'] ?? lastValues['humidity'] ?? null
-  const co2 = lastValues['co2'] ?? lastValues['CO2'] ?? null
-  const co = lastValues['co'] ?? lastValues['CO'] ?? null
-
-  const varTempObj = variables.find(v => ['temperatura', 'temperature'].includes(v.label?.toLowerCase()))
-  const varHumObj = variables.find(v => ['humedad', 'humidity'].includes(v.label?.toLowerCase()))
-  const varCo2Obj = variables.find(v => ['co2'].includes(v.label?.toLowerCase()))
-  const varCoObj = variables.find(v => ['co'].includes(v.label?.toLowerCase()))
-
-  const TempIcon = AVAILABLE_ICONS[varTempObj?.icon?.toLowerCase()] || Thermometer
-  const HumIcon = AVAILABLE_ICONS[varHumObj?.icon?.toLowerCase()] || Droplets
-  const Co2Icon = AVAILABLE_ICONS[varCo2Obj?.icon?.toLowerCase()] || Cloud
-  const CoIcon = AVAILABLE_ICONS[varCoObj?.icon?.toLowerCase()] || Flame
 
   const handleToggleAllVariables = () => {
     if (areAllVarsSelected) {
@@ -564,8 +488,7 @@ export default function ClientDeviceDetail() {
       icon: device?.icon || 'map-pin',
       tagsText: (device?.tags || []).join(', '),
       lat: device?.lat ?? '',
-      lng: device?.lng ?? '',
-      serial: device?.serial || ''
+      lng: device?.lng ?? ''
     })
     setEditError('')
     setShowEditModal(true)
@@ -581,8 +504,7 @@ export default function ClientDeviceDetail() {
         label: editDraft.label.trim() || (device?.label || undefined),
         description: editDraft.description,
         icon: editDraft.icon,
-        tags,
-        serial: editDraft.serial.trim() || undefined
+        tags
       }
       const hasGps = editDraft.lat !== '' && editDraft.lng !== ''
       if (hasGps) {
@@ -601,12 +523,15 @@ export default function ClientDeviceDetail() {
   }
 
   // ── Datos de integración ESP32 (POST /api/dots) ──
-  const brokerHostSafe = typeof window !== 'undefined' ? window.location.hostname : 'localhost'
+  // Misma dirección que el sitio: en producción entra por nginx con HTTPS
+  // (el puerto 3000 del backend no está publicado).
+  const siteOrigin = typeof window !== 'undefined' ? window.location.origin : 'https://18.223.121.208'
   const dotToken = device?.token || '<TOKEN_DE_LA_ESTACION>'
-  const dotEndpoint = `http://${brokerHostSafe}:3000/api/dots/${dotToken}`
+  const dotEndpoint = `${siteOrigin}/api/dots/${dotToken}`
   const sampleVars = quickViewVars.length ? quickViewVars : variables.slice(0, 4)
-  const esp32Json = JSON.stringify(Object.fromEntries(sampleVars.map(v => [v.label, 0])), null, 2)
-  const esp32Sketch = generateEspSketch(sampleVars, brokerHostSafe, dotToken, device?.label)
+  const espVars = variables.length ? variables : sampleVars
+  const esp32Json = JSON.stringify(Object.fromEntries(espVars.map(v => [sentKey(v), 0])), null, 2)
+  const esp32Sketch = generateEspSketch(espVars, dotEndpoint, device?.label)
 
   return (
     <ClienteLayout>
@@ -618,275 +543,26 @@ export default function ClientDeviceDetail() {
             {error}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6 items-start">
 
-            <div className="space-y-6 lg:sticky lg:top-8 z-10">
-              <aside className="rounded-3xl border p-4 shadow-lg" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <div className="flex items-center gap-3 mb-4">
-                  <button
-                    onClick={() => navigate(device?.space_id ? `/espacios/${device.space_id}` : '/dispositivos')}
-                    className="p-2 rounded-xl transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex-shrink-0"
-                    style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}
-                    title={device?.space_id ? 'Volver al espacio' : 'Volver a dispositivos'}
-                  >
-                    <ArrowLeft size={15} />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2.5 mb-0.5">
-                      <span className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
-                        <DynamicIcon size={17} />
-                      </span>
-                      <h1 className="text-lg font-black truncate" style={{ color: 'var(--text)' }}>{device?.name}</h1>
-                    </div>
-                    <span className="text-xs block truncate pl-[46px]" style={{ color: 'var(--text2)' }}>{device?.label}</span>
-                  </div>
-                  <button
-                    onClick={openEditModal}
-                    className="p-2 rounded-xl transition-all hover:scale-105 flex-shrink-0"
-                    style={{ color: 'var(--text2)', border: '1px solid var(--border)', background: '#67B7E80A' }}
-                    title="Editar estación"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                </div>
+            <div className="z-10">
+              <StationSheet
+                device={device}
+                icon={DynamicIcon}
+                spaceInfo={spaceInfo}
+                spaceColor={spaceColor}
+                onBack={() => navigate(device?.space_id ? `/espacios/${device.space_id}` : '/dispositivos')}
+                onEdit={openEditModal}
+                onDeviceChange={(patch) => setDevice(prev => ({ ...prev, ...patch }))}
+                copiedKey={copiedKey}
+                onCopy={copyText}
+              />
+            </div>
 
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <span className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${device?.status === 'online' ? 'bg-[#1D9E75]/10 text-[#1D9E75]' : 'bg-[#DFF1FF] text-[#2E8ED3]'}`}>
-                    {device?.status === 'online' ? <Wifi size={10} /> : <WifiOff size={10} />}
-                    {device?.status === 'online'
-                      ? `En línea ${agoText(device?.last_seen) ? '· ' + agoText(device?.last_seen) : ''}`
-                      : 'Sin señal'}
-                  </span>
-                  {device?.space_id && spaceInfo?.name && (
-                    <Link
-                      to={`/espacios/${device.space_id}`}
-                      className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full font-semibold transition-all hover:scale-105"
-                      style={{ background: (spaceColor || '#67B7E8') + '1A', color: spaceColor || '#67B7E8' }}
-                    >
-                      <Layers size={10} /> {spaceInfo.name}
-                    </Link>
-                  )}
-                </div>
+            <section className="flex flex-col min-w-0">
 
-                <div className="rounded-2xl p-4 border space-y-3 shadow-sm" style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-                  <div className="flex items-center gap-2">
-                    <KeyRound size={12} className="text-[#67B7E8]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Token de la estación</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[11px] flex-1 truncate" title={device?.token} style={{ color: 'var(--text)' }}>
-                      {showToken ? (device?.token || 'SIN TOKEN') : (device?.token ? '•'.repeat(16) : 'SIN TOKEN')}
-                    </span>
-                    <button onClick={() => setShowToken(v => !v)} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex-shrink-0" title="Mostrar / Ocultar token">
-                      {showToken ? <EyeOff size={12} /> : <Eye size={12} />}
-                    </button>
-                    <button onClick={() => copyText(device?.token || '', 'token')} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex-shrink-0" title="Copiar token">
-                      {copiedKey === 'token' ? <Check size={12} className="text-[#1D9E75]" /> : <Copy size={12} />}
-                    </button>
-                  </div>
-                  <div className="pt-2 border-t grid grid-cols-2 gap-3" style={{ borderColor: 'var(--border)' }}>
-                    <div className="col-span-2">
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-1">ID</div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[11px] flex-1 truncate" title={device?.id} style={{ color: 'var(--text)' }}>{device?.id}</span>
-                        <button onClick={() => copyText(device?.id, 'id')} className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors flex-shrink-0" title="Copiar ID">
-                          {copiedKey === 'id' ? <Check size={12} className="text-[#1D9E75]" /> : <Copy size={12} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div title={device?.last_seen ? new Date(device.last_seen).toLocaleString('es-GT') : ''}>
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-1">Última actividad</div>
-                      <div className="truncate" style={{ color: 'var(--text)' }}>{device?.last_seen ? agoText(device.last_seen) || 'ahora' : '—'}</div>
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-black uppercase tracking-widest mb-1">Ubicación</div>
-                      <div className="truncate" style={{ color: 'var(--text)' }}>{hasValidGPS ? `${latValue.toFixed(4)}, ${lngValue.toFixed(4)}` : '—'}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Link to={`/alerts/${deviceId}`}
-                  className="flex items-center justify-center gap-2 mt-6 border px-3 py-2 rounded-lg text-sm transition-colors"
-                  style={{ borderColor: 'var(--border)', color: 'var(--text2)' }}>
-                  <Bell size={14} /> Alertas
-                </Link>
-              </aside>
-
-              <div className="border rounded-3xl shadow-lg overflow-hidden" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <button
-                  onClick={() => setShowMeta(v => !v)}
-                  className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
-                      <Info size={14} />
-                    </span>
-                    <h3 className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>Metadatos</h3>
-                  </div>
-                  <ChevronDown size={16} className={`transition-transform duration-300 ${showMeta ? 'rotate-180' : ''}`} style={{ color: 'var(--text2)' }} />
-                </button>
-                {showMeta && (
-                <div className="px-4 pb-4 space-y-3 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ borderColor: 'var(--border)' }}>
-                  <div>
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text2)' }}>Descripción</span>
-                    <p className="text-xs rounded-xl p-2.5 border min-h-[50px]" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }}>
-                      {device?.description || 'Sin descripción asignada.'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="block text-[11px] font-semibold mb-1" style={{ color: 'var(--text2)' }}>Ícono Asignado</span>
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
-                        <DynamicIcon size={16} className="text-[#67B7E8]" />
-                      </div>
-                      <span className="font-mono text-xs" style={{ color: 'var(--text)' }}>{device?.icon || 'map-pin'}</span>
-                    </div>
-                  </div>
-                  <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-                    <span className="block text-[11px] font-semibold mb-1.5" style={{ color: 'var(--text2)' }}>
-                      <Tag size={11} className="inline mr-1" /> Etiquetas
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                      {device?.tags?.length > 0 ? (
-                        device.tags.map((tag, i) => (
-                          <span key={i} className="text-[10px] font-bold px-2 py-0.5 bg-[#67B7E8]/10 text-[#67B7E8] rounded-md border border-[#67B7E8]/20">{tag}</span>
-                        ))
-                      ) : (
-                        <span className="text-xs italic" style={{ color: 'var(--text2)' }}>Sin etiquetas</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                )}
-              </div>
-
-              <div className="border rounded-3xl shadow-lg overflow-hidden" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <button
-                  onClick={() => setShowGps(v => !v)}
-                  className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#1D9E751A', color: '#1D9E75' }}>
-                      <MapPin size={14} />
-                    </span>
-                    <h3 className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>Ubicación GPS</h3>
-                  </div>
-                  <ChevronDown size={16} className={`transition-transform duration-300 ${showGps ? 'rotate-180' : ''}`} style={{ color: 'var(--text2)' }} />
-                </button>
-                {showGps && (
-                <div className="px-4 pb-4 flex flex-col border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ borderColor: 'var(--border)' }}>
-                {hasValidGPS ? (
-                  <div className="relative z-0 rounded-xl overflow-hidden border h-[180px]" style={{ borderColor: 'var(--border)' }}>
-                    <MapPicker lat={latValue} lng={lngValue} height={180} />
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center border border-dashed rounded-xl h-[150px]" style={{ borderColor: 'var(--border)' }}>
-                    <MapPin size={22} className="mb-1 opacity-20" style={{ color: 'var(--text)' }} />
-                    <span className="text-xs" style={{ color: 'var(--text2)' }}>GPS no establecido</span>
-                  </div>
-                )}
-                </div>
-                )}
-              </div>
-
-              <div className="border rounded-3xl shadow-lg overflow-hidden" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <button
-                  onClick={() => setShowHard(v => !v)}
-                  className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
-                      <Cpu size={14} />
-                    </span>
-                    <h3 className="font-bold text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>Datos del Hardware</h3>
-                  </div>
-                  <ChevronDown size={16} className={`transition-transform duration-300 ${showHard ? 'rotate-180' : ''}`} style={{ color: 'var(--text2)' }} />
-                </button>
-                {showHard && (
-                <div className="px-4 pb-4 border-t pt-3 animate-in fade-in slide-in-from-bottom-2 duration-300" style={{ borderColor: 'var(--border)' }}>
-                <div className="space-y-4">
-                  
-                  <div className="flex items-center justify-center border border-dashed rounded-xl h-[110px]" style={{ borderColor: 'var(--border)', backgroundColor: 'var(--bg)' }}>
-                    <span className="text-[13px] text-slate-500 font-medium">Sin foto del equipo</span>
-                  </div>
-
-                  {/* Número de serie */}
-                  <div>
-                    <span className="block text-[12px] font-bold mb-1.5 text-slate-700 dark:text-slate-300">Número de Serie</span>
-                    <div className="inline-block px-3 py-1.5 border rounded-lg text-xs font-mono font-medium bg-green-50/50 dark:bg-green-900/20 text-slate-800 dark:text-slate-200" style={{ borderColor: '#E2E8F0' }}>
-                      {device?.serial || 'SN-NO-ASIGNADO'}
-                    </div>
-                  </div>
-
-</div>
-
-                </div>
-                )}
-              </div>
-
-              <div className="border rounded-3xl overflow-hidden shadow-lg" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                <button
-                  onClick={() => setShowEsp32(v => !v)}
-                  className="w-full flex items-center justify-between p-4 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
-                      <Cpu size={18} />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="font-black text-sm truncate" style={{ color: 'var(--text)' }}>Integración ESP32</h3>
-                      <p className="text-[11px] truncate" style={{ color: 'var(--text2)' }}>POST con el token y las variables</p>
-                    </div>
-                  </div>
-                  <ChevronDown size={18} className={`transition-transform duration-300 flex-shrink-0 ${showEsp32 ? 'rotate-180' : ''}`} style={{ color: 'var(--text2)' }} />
-                </button>
-                {showEsp32 && (
-                  <div className="px-4 pb-4 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300 border-t pt-4" style={{ borderColor: 'var(--border)' }}>
-                    {device?.space_id && (
-                      <p className="text-[11px] px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
-                        <Info size={12} className="flex-shrink-0" /> Solo acepta las variables privadas de su espacio.
-                      </p>
-                    )}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Endpoint (POST)</span>
-                        <button onClick={() => copyText(dotEndpoint, 'endpoint')} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}>
-                          {copiedKey === 'endpoint' ? <><Check size={11} className="text-[#1D9E75]" /> Copiado</> : <><Copy size={11} /> Copiar</>}
-                        </button>
-                      </div>
-                      <div className="font-mono text-[11px] px-3 py-2 rounded-xl border break-all" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }}>{dotEndpoint}</div>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>JSON de ejemplo (payload)</span>
-                        <button onClick={() => copyText(esp32Json, 'json')} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}>
-                          {copiedKey === 'json' ? <><Check size={11} className="text-[#1D9E75]" /> Copiado</> : <><Copy size={11} /> Copiar</>}
-                        </button>
-                      </div>
-                      <pre className="text-[11px] px-3 py-2 rounded-xl border overflow-x-auto font-mono" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }}>{esp32Json}</pre>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text2)' }}>Código ESP8266/ESP32 (POST)</span>
-                        <button onClick={() => copyText(esp32Sketch, 'sketch')} className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5" style={{ color: 'var(--text2)' }}>
-                          {copiedKey === 'sketch' ? <><Check size={11} className="text-[#1D9E75]" /> Copiado</> : <><Copy size={11} /> Copiar todo</>}
-                        </button>
-                      </div>
-                      <pre className="text-[11px] px-3 py-2 rounded-xl border overflow-x-auto font-mono max-h-[360px] overflow-y-auto" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }}>{esp32Sketch}</pre>
-                      <p className="text-[10px] mt-1.5" style={{ color: 'var(--text2)' }}>
-                        Pega en tu Arduino IDE, pon tu WiFi y reemplaza los valores TODO por tus sensores. El POST solo incluye: <span className="font-mono">{sampleVars.map(v => v.station_key || v.label).join(', ')}</span>.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              </div>
-
-            <section className="flex flex-col min-h-[calc(100vh-4rem)]">
-
-              <div className="flex-1 flex flex-col justify-center min-h-[calc(100vh-4rem)] pt-2">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 w-full items-center">
+              <div className="flex flex-col">
+                <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6 w-full items-stretch">
                   
                   <div className="border rounded-[3rem] p-10 flex flex-col items-center justify-between shadow-lg relative overflow-visible min-h-[450px]" style={{ background: `radial-gradient(circle at 50% 30%, ${aqiData.color}1A, transparent 65%), var(--card)`, borderColor: 'var(--border)' }}>
                     {device?.status === 'online' && (
@@ -1004,6 +680,7 @@ export default function ClientDeviceDetail() {
                       </div>
                     </div>
 
+                    {aqiData.aqi != null && (
                     <div className="w-full px-4 text-center animate-in fade-in duration-500 mt-2">
                       <div className="inline-block px-4 py-3 rounded-2xl bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10">
                         <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
@@ -1030,6 +707,7 @@ export default function ClientDeviceDetail() {
                         </p>
                       </div>
                     </div>
+                    )}
 
                     <div className="flex items-center justify-center gap-1.5 mt-3 w-full">
                       {aqiData.dominantPollutant && (
@@ -1049,166 +727,132 @@ export default function ClientDeviceDetail() {
                     </div>
                   </div>
 
-                  {device?.space_id && variables.length > 0 ? (
-                    <div className="border rounded-[3rem] p-8 flex flex-col justify-center shadow-lg min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                      <div className="flex justify-end mb-2 relative z-20">
+                  {variables.length > 0 ? (
+                    <div className="border rounded-[3rem] p-7 md:p-8 flex flex-col shadow-lg 2xl:min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                      <div className="flex items-start justify-between gap-3 mb-5">
+                        <div>
+                          <h2 className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Lecturas actuales</h2>
+                          <p className="text-sm" style={{ color: 'var(--text2)' }}>
+                            {quickHasData && device?.last_seen ? `Última lectura ${agoText(device.last_seen) || 'ahora'}` : 'Sin lecturas todavía'}
+                          </p>
+                        </div>
                         <button
                           onClick={openQuickModal}
-                          className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full transition-all hover:scale-105"
+                          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 shrink-0"
                           style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}
                           title="Elegir qué variables se ven aquí (hasta 4)"
                         >
-                          <SlidersHorizontal size={11} /> Cambiar variables
+                          <SlidersHorizontal size={13} /> Elegir variables
                         </button>
                       </div>
-                      <div className="relative">
-                        <div className="grid grid-cols-2 gap-5 w-full h-full items-stretch">
-                          {quickViewVars.map((v, i) => {
-                            const value = lastValues[v.label]
-                            const IconComponent = AVAILABLE_ICONS[v.icon?.toLowerCase()] || Activity
-                            const col = COLORS[i % COLORS.length]
-                            return (
-                              <div key={v.label} className="rounded-[1.75rem] px-5 py-6 border flex flex-col items-center justify-center relative overflow-hidden transition-all duration-300 hover:scale-[1.04] hover:shadow-lg" style={{ background: `linear-gradient(145deg, ${col}14, transparent 70%)`, borderColor: `${col}33` }}>
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/5 h-px" style={{ background: `linear-gradient(90deg, transparent, ${col}, transparent)` }} />
-                                <div className="flex items-center justify-center gap-2 mb-3">
-                                  <span className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: col + '1A', color: col }}>
-                                    <IconComponent size={15} />
-                                  </span>
-                                  <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--text2)' }}>{v.name}</span>
-                                </div>
-                                <div className="leading-none" style={{ color: 'var(--text)' }}>
-                                  <span className="text-4xl xl:text-5xl font-black tracking-tighter">
-                                    {value != null ? Number(value).toFixed(1) : '--'}
-                                  </span>
-                                  <span className="text-lg xl:text-xl font-semibold ml-1.5" style={{ color: col }}>{v.unit}</span>
-                                </div>
-                                <div className={`w-full mt-3 ${value != null ? '' : 'opacity-20'}`}>
-                                  <Sparkline points={sparks[v.label]} color={col} />
-                                </div>
-                              </div>
-                            )
-                          })}
+
+                      {!quickHasData && (
+                        <div className="mb-5 flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: '#67B7E812', border: '1px solid #67B7E833' }}>
+                          <Cpu size={18} className="shrink-0" style={{ color: '#67B7E8' }} />
+                          <p className="text-sm flex-1" style={{ color: 'var(--text)' }}>
+                            La estación todavía no envió datos.
+                          </p>
+                          <button
+                            onClick={() => { setActiveView('conexion'); scrollToDetails() }}
+                            className="text-sm font-semibold shrink-0 hover:underline" style={{ color: '#67B7E8' }}>
+                            Ver cómo conectarla
+                          </button>
                         </div>
-                        {!quickHasData && (
-                          <div className="absolute inset-0 flex items-center justify-center rounded-[3rem] bg-white/40 dark:bg-black/40 backdrop-blur-[1px]">
-                            <span className="text-xs font-bold px-4 py-2 rounded-full animate-pulse" style={{ background: 'var(--card)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                              Esperando datos de la estación...
-                            </span>
+                      )}
+
+                      <div className={`grid gap-4 2xl:flex-1 auto-rows-fr ${quickViewVars.length === 1 ? 'grid-cols-1' : `grid-cols-2 ${quickViewVars.length === 3 ? 'lg:grid-cols-3 2xl:grid-cols-2' : quickViewVars.length >= 4 ? 'lg:grid-cols-4 2xl:grid-cols-2' : ''}`}`}>
+                        {quickViewVars.map((v, i) => (
+                          <div key={v.label} className={quickViewVars.length % 2 === 1 && i === quickViewVars.length - 1 && quickViewVars.length > 1 ? 'col-span-2 lg:col-span-1 2xl:col-span-2' : ''}>
+                          <ReadingTile
+                            to={`/variableDetail/${deviceId}/${v.label}`}
+                            name={v.name}
+                            unit={v.unit}
+                            value={lastValues[v.label]}
+                            levels={variableLevels(spaceAqiConfig, v.label)}
+                            size={quickViewVars.length <= 2 ? 'lg' : 'md'}
+                          />
                           </div>
-                        )}
+                        ))}
                       </div>
                       {variables.length > quickViewVars.length && (
                         <div className="flex justify-center mt-6">
                           <button
                             onClick={() => { setActiveView('variables'); scrollToDetails() }}
                             className="text-xs font-bold px-3 py-1.5 rounded-full hover:scale-105 transition-all" style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                            +{variables.length - quickViewVars.length} más en Métricas Detalladas
+                            +{variables.length - quickViewVars.length} más en Métricas
                           </button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="border rounded-[3rem] p-8 flex flex-col justify-center shadow-sm min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
-                      <div className="grid grid-cols-2 gap-y-12 gap-x-4 w-full h-full items-center">
-                        
-                        <div className="text-center transition-transform duration-300 hover:scale-105">
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <TempIcon size={24} className="text-rose-500" />
-                            <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Temperatura</span>
-                          </div>
-                          <div className="text-5xl xl:text-6xl font-black tracking-tighter" style={{ color: 'var(--text)' }}>
-                            {temp != null ? Number(temp).toFixed(1) : '--'}
-                            <span className="text-2xl xl:text-3xl font-medium ml-1 text-rose-500/80">°C</span>
-                          </div>
-                        </div>
-                        
-                        <div className="text-center transition-transform duration-300 hover:scale-105">
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <HumIcon size={24} className="text-blue-500" />
-                            <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Humedad</span>
-                          </div>
-                          <div className="text-5xl xl:text-6xl font-black tracking-tighter" style={{ color: 'var(--text)' }}>
-                            {hum != null ? Number(hum).toFixed(1) : '--'}
-                            <span className="text-2xl xl:text-3xl font-medium ml-1 text-blue-500/80">%</span>
-                          </div>
-                        </div>
-
-                        <div className="col-span-2 w-full h-px max-w-[80%] mx-auto" style={{ background: 'var(--border)' }}></div>
-
-                        <div className="text-center transition-transform duration-300 hover:scale-105">
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <Co2Icon size={24} className="text-[#8B5CF6]" />
-                            <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Dióxido de Carbono</span>
-                          </div>
-                          <div className="text-5xl xl:text-6xl font-black tracking-tighter" style={{ color: 'var(--text)' }}>
-                            {co2 != null ? Number(co2).toFixed(0) : '--'}
-                            <span className="text-2xl xl:text-3xl font-medium ml-1 text-[#8B5CF6]/80">ppm</span>
-                          </div>
-                        </div>
-
-                        <div className="text-center transition-transform duration-300 hover:scale-105">
-                          <div className="flex items-center justify-center gap-2 mb-3">
-                            <CoIcon size={24} className="text-orange-500" />
-                            <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Monóxido</span>
-                          </div>
-                          <div className="text-5xl xl:text-6xl font-black tracking-tighter" style={{ color: 'var(--text)' }}>
-                            {co != null ? Number(co).toFixed(1) : '--'}
-                            <span className="text-2xl xl:text-3xl font-medium ml-1 text-orange-500/80">ppm</span>
-                          </div>
-                        </div>
-
-                      </div>
+                    <div className="border rounded-[3rem] p-8 flex flex-col items-center justify-center text-center shadow-lg min-h-[450px]" style={{ background: 'var(--card)', borderColor: 'var(--border)' }}>
+                      <span className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: '#67B7E81A', color: '#67B7E8' }}>
+                        <Activity size={24} />
+                      </span>
+                      <h2 className="text-lg font-bold" style={{ color: 'var(--text)', fontFamily: "'Syne', sans-serif" }}>Sin variables asignadas</h2>
+                      <p className="text-sm mt-1 max-w-xs" style={{ color: 'var(--text2)' }}>
+                        {device?.space_id
+                          ? 'Asigná variables a esta estación desde su espacio para ver sus lecturas aquí.'
+                          : 'El equipo AirSunBox asigna las variables de esta estación. Si falta alguna, reportá una incidencia.'}
+                      </p>
                     </div>
                   )}
 
                 </div>
-                <button
-                  onClick={scrollToDetails}
-                  className="self-center flex flex-col items-center gap-1 mt-auto mb-8 group cursor-pointer"
-                  style={{ color: 'var(--text2)' }}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-[0.25em] group-hover:scale-105 transition-all">Ver métricas</span>
-                  <ChevronDown size={22} className="animate-bounce transition-colors group-hover:text-[#67B7E8]" />
-                </button>
               </div>
 
-              <div id="detalles-view" className="flex justify-center mb-8 scroll-mt-8">
-                <div className="inline-flex p-2 rounded-[2rem] shadow-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+              <div id="detalles-view" className="flex justify-center mt-8 mb-8 scroll-mt-8">
+                <div role="tablist" aria-label="Vista de la estación" className="w-full max-w-2xl grid grid-cols-3 gap-1 p-1.5 rounded-[2rem] shadow-lg" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
                   <button
                     onClick={() => { setActiveView('variables'); scrollToDetails(); }}
-                    className={`flex items-center gap-2 px-8 sm:px-10 py-4 rounded-3xl text-sm font-black tracking-wide transition-all duration-300 ${activeView === 'variables' ? 'bg-[#1D9E75] text-white shadow-lg scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'variables' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     style={activeView !== 'variables' ? { color: 'var(--text2)' } : {}}
                   >
-                    <Gauge size={17} /> Métricas Detalladas
+                    <Gauge size={17} className="hidden sm:block shrink-0" /> Métricas
                   </button>
                   <button
                     onClick={() => { setActiveView('grafica'); scrollToDetails(); }}
-                    className={`flex items-center gap-2 px-8 sm:px-10 py-4 rounded-3xl text-sm font-black tracking-wide transition-all duration-300 ${activeView === 'grafica' ? 'bg-[#1D9E75] text-white shadow-lg scale-105' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'grafica' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
                     style={activeView !== 'grafica' ? { color: 'var(--text2)' } : {}}
                   >
-                    <Activity size={17} /> Gráfica Histórica
+                    <Activity size={17} className="hidden sm:block shrink-0" /> Gráfica
+                  </button>
+                  <button
+                    onClick={() => { setActiveView('conexion'); scrollToDetails(); }}
+                    className={`flex items-center justify-center gap-2 px-2 sm:px-4 py-3 rounded-3xl text-sm font-bold whitespace-nowrap transition-all duration-300 ${activeView === 'conexion' ? 'bg-[#1D9E75] text-white shadow-md' : 'hover:bg-black/5 dark:hover:bg-white/5'}`}
+                    style={activeView !== 'conexion' ? { color: 'var(--text2)' } : {}}
+                  >
+                    <Cpu size={17} className="hidden sm:block shrink-0" /> Conectar ESP32
                   </button>
                 </div>
               </div>
 
               <div className="pb-12">
-                {activeView === 'variables' ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Enlace al detalle de la variable */}
-                    {variables.map((v, i) => (
-                      <Link 
-                        to={`/variableDetail/${deviceId}/${v.label}`} 
-                        key={v.label} 
-                        className="block"
-                      >
-                        <SensorKPI 
-                          name={v.name} 
-                          unit={v.unit} 
-                          value={lastValues[v.label]} 
-                          iconName={v.icon} 
-                          color={COLORS[i % COLORS.length]} 
+                {activeView === 'conexion' ? (
+                  <div className="animate-in fade-in duration-300">
+                    <EspConnect
+                      endpoint={dotEndpoint}
+                      hasToken={!!device?.token}
+                      vars={espVars}
+                      json={esp32Json}
+                      sketch={esp32Sketch}
+                      inSpace={!!device?.space_id}
+                      copiedKey={copiedKey}
+                      onCopy={copyText}
+                    />
+                  </div>
+                ) : activeView === 'variables' ? (
+                  <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(175px,1fr))] animate-in fade-in duration-300">
+                    {variables.map(v => (
+                      <div key={v.label} className="min-h-[170px]">
+                        <ReadingTile
+                          to={`/variableDetail/${deviceId}/${v.label}`}
+                          name={v.name}
+                          unit={v.unit}
+                          value={lastValues[v.label]}
+                          levels={variableLevels(spaceAqiConfig, v.label)}
                         />
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 ) : (
@@ -1523,7 +1167,7 @@ export default function ClientDeviceDetail() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black" style={{ color: 'var(--text)' }}>Editar estación</h3>
-                  <p className="text-sm" style={{ color: 'var(--text2)' }}>Nombre, ubicación, metadatos y hardware</p>
+                  <p className="text-sm" style={{ color: 'var(--text2)' }}>Nombre, ubicación y descripción</p>
                 </div>
               </div>
               <button onClick={() => setShowEditModal(false)} className="p-2 rounded-lg hover:bg-black/5" style={{ color: 'var(--text2)' }}>
@@ -1576,17 +1220,6 @@ export default function ClientDeviceDetail() {
                   <span className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text2)' }}>Longitud</span>
                   <input value={editDraft.lng} onChange={e => setEditDraft(d => ({ ...d, lng: e.target.value }))} inputMode="decimal"
                     className="w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#1D9E75] font-mono text-sm" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3 items-end">
-                <div>
-                  <span className="block text-[11px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text2)' }}>Número de serie</span>
-                  <input value={editDraft.serial} onChange={e => setEditDraft(d => ({ ...d, serial: e.target.value }))}
-                    className="w-full px-3 py-2.5 rounded-xl border outline-none focus:border-[#67B7E8] font-mono text-sm" style={{ color: 'var(--text)', borderColor: 'var(--border)', background: 'var(--bg)' }} />
-                </div>
-                <div className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border" style={{ borderColor: 'var(--border)', background: 'var(--bg)', color: 'var(--text2)' }}>
-                  <KeyRound size={13} className="text-[#67B7E8]" />
-                  <span className="text-[11px] font-semibold">La posición en el mapa usa estas coordenadas</span>
                 </div>
               </div>
             </div>

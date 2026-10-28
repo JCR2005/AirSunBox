@@ -64,6 +64,9 @@ export const devices = {
   variables: (id, orgId) => request(`/devices/${id}/variables${orgId ? `?orgId=${orgId}` : ''}`),
   lastValues: (id, orgId) => request(`/devices/${id}/last-values${orgId ? `?orgId=${orgId}` : ''}`),
   catalog: () => request('/devices/catalog'),
+  spec: (id, data) => request(`/devices/${id}/spec`, { method: 'PUT', body: JSON.stringify(data) }),
+  photo: (id) => request(`/devices/${id}/photo`),
+  setPhoto: (id, image) => request(`/devices/${id}/photo`, { method: 'PUT', body: JSON.stringify({ image }) }),
   aqi: (id, orgId) => request(`/devices/${id}/aqi${orgId ? `?orgId=${orgId}` : ''}`),
   
   

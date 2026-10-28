@@ -241,3 +241,45 @@ export async function isPublicMapDevice(db: Queryable, deviceId: string): Promis
   )
   return rows.length > 0
 }
+// ── Ficha técnica y foto de la estación ─────────────
+
+export interface DeviceHardware {
+  model?: string
+  firmware?: string
+  installed_at?: string
+  sensors?: string
+  notes?: string
+}
+
+// Reemplaza número de serie y datos del equipo (permite dejarlos vacíos).
+export async function updateSpec(db: Queryable, id: string, orgId: string, serial: string | null, hardware: DeviceHardware) {
+  const { rows } = await db.query<DeviceRow>(
+    `UPDATE devices SET serial = $1, hardware = $2::jsonb
+     WHERE id = $3 AND org_id = $4
+     RETURNING *`,
+    [serial, JSON.stringify(hardware), id, orgId]
+  )
+  return rows[0] ?? null
+}
+
+export async function getPhoto(db: Queryable, id: string, orgId: string): Promise<{ image: string; updated_at: string } | null> {
+  const { rows } = await db.query<{ image: string; updated_at: string }>(
+    `SELECT p.image, p.updated_at
+     FROM device_photos p JOIN devices d ON d.id = p.device_id
+     WHERE p.device_id = $1 AND d.org_id = $2`,
+    [id, orgId]
+  )
+  return rows[0] ?? null
+}
+
+export async function setPhoto(db: Queryable, id: string, image: string) {
+  await db.query(
+    `INSERT INTO device_photos (device_id, image) VALUES ($1, $2)
+     ON CONFLICT (device_id) DO UPDATE SET image = EXCLUDED.image, updated_at = NOW()`,
+    [id, image]
+  )
+}
+
+export async function deletePhoto(db: Queryable, id: string) {
+  await db.query('DELETE FROM device_photos WHERE device_id = $1', [id])
+}
