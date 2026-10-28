@@ -43,7 +43,8 @@ export default async function reportsRoutes(app: FastifyInstance) {
       params: Type.Object({ spaceId: Type.String({ pattern: '^[0-9a-fA-F-]{36}$' }) }),
       querystring: Type.Object({
         start: Type.Optional(Type.String()),
-        end: Type.Optional(Type.String())
+        end: Type.Optional(Type.String()),
+        deviceId: Type.Optional(Type.String({ pattern: '^[0-9a-fA-F-]{36}$' }))
       })
     }
   }, async (req, reply) => {
@@ -59,8 +60,8 @@ export default async function reportsRoutes(app: FastifyInstance) {
     if (end.getTime() - start.getTime() > MAX_DAYS * 86400000)
       return reply.code(400).send({ error: `El rango no puede superar ${MAX_DAYS} días` })
 
-    const report = await buildSpaceReport(app.db, spaceId, start, end)
-    if (!report) return reply.code(404).send({ error: 'Espacio no encontrado' })
+    const report = await buildSpaceReport(app.db, spaceId, start, end, req.query.deviceId)
+    if (!report) return reply.code(404).send({ error: 'Espacio o estación no encontrados' })
     return report
   })
 
