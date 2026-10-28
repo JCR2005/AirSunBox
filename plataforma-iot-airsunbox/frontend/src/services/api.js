@@ -156,7 +156,14 @@ export const spaces = {
 export const reports = {
   getHeatmapData: (orgId, startDate, endDate) => request(`/reports/heatmap?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
   getRespiratoryRisk: (orgId, startDate, endDate) => request(`/reports/respiratory-risk?orgId=${orgId || ''}&start=${startDate || ''}&end=${endDate || ''}`),
-  getGlobalStats: () => request('/reports/stats')
+  getGlobalStats: () => request('/reports/stats'),
+  space: (spaceId, start, end, deviceId) => {
+    const q = new URLSearchParams()
+    if (start) q.set('start', start)
+    if (end) q.set('end', end)
+    if (deviceId) q.set('deviceId', deviceId)
+    return request(`/reports/space/${spaceId}${q.toString() ? `?${q}` : ''}`)
+  }
 }
 export const requests = {
   list: () => request('/requests'),

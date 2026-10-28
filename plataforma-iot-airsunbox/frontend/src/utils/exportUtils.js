@@ -1354,3 +1354,240 @@ export function exportStationWeeklyPDF(payload = {}) {
 
   doc.save(`resumen_semanal_${slugify(device.name)}_${new Date().toISOString().slice(0, 10)}.pdf`)
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REPORTE DE ESPACIO (organizaciones independientes)
+// Se arma con las variables y niveles que definió el propio espacio.
+// ─────────────────────────────────────────────────────────────────────────────
+const hexToRgb = (hex) => {
+  const h = String(hex || '#67B7E8').replace('#', '')
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+const fmtNum = (v, d = 1) => (v == null || Number.isNaN(Number(v)) ? '—' : Number(v).toFixed(Math.abs(v) >= 100 ? 0 : d))
+const levelName = (v, idx) => (idx != null && v.levels ? v.levels[idx]?.name : '')
+const dayStr = (d) => { const [y, m, dd] = String(d).slice(0, 10).split('-'); return dd ? `${dd}/${m}/${y}` : String(d) }
+const whenStr = (t) => (t ? new Date(t).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—')
+const pctStr = (x) => `${Math.round((x || 0) * 100)} %`
+const INC_STATUS = { open: 'Abierta', in_review: 'En atención', resolved: 'Resuelta' }
+const capFirst = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1)
+const safeName = (s) => String(s || 'espacio').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '')
+
+export function exportSpaceReportPDF(report) {
+  const { space = {}, period = {}, variables = [], devices = [], stations = [], summary = {}, alerts = { total: 0, items: [] }, incidents = { total: 0, items: [] }, deviceId } = report || {}
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const left = 14
+  const usable = pageWidth - left * 2
+  const title = `Reporte del espacio ${space.name || ''}`
+  let y = 22
+
+  const ensure = (h) => {
+    if (y + h > pageHeight - PIE_ALTO) { doc.addPage(); y = 22 }
+  }
+
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(30, 41, 59)
+  doc.text(title, left, y); y += 7
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(100, 116, 139)
+  const total = variables.reduce((a, v) => a + (v.stats?.count || 0), 0)
+  const scope = deviceId ? `Estación: ${stations[0]?.name || ''}` : `${devices.length} estación(es)`
+  doc.text(`Periodo: ${formatDate(period.start)} al ${formatDate(period.end)} · ${scope} · ${total.toLocaleString('es-GT')} lecturas`, left, y)
+  y += 5.5
+  doc.text(`Cobertura de datos: ${pctStr(summary.coverage)} · Última lectura: ${whenStr(summary.last)} · Alertas: ${alerts.total} · Incidencias: ${incidents.total}`, left, y)
+  y += 10
+
+  for (const v of variables) {
+    ensure(46)
+    doc.setDrawColor(226, 232, 240); doc.line(left, y - 4, left + usable, y - 4)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(30, 41, 59)
+    doc.text(`${capFirst(v.name)}${v.unit ? ` (${v.unit})` : ''}`, left, y + 2)
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(100, 116, 139)
+    doc.text(`Clave: ${v.station_key}`, left + usable, y + 2, { align: 'right' })
+    y += 9
+
+    if (!v.stats?.count) {
+      doc.text('Sin lecturas en el periodo.', left, y); y += 10
+      continue
+    }
+    doc.setTextColor(30, 41, 59); doc.setFontSize(10)
+    const lv = levelName(v, v.level)
+    doc.text(`Promedio ${fmtNum(v.stats.avg)}${lv ? ` (${lv})` : ''}   ·   Mínimo ${fmtNum(v.stats.min)}   ·   Máximo ${fmtNum(v.stats.max)}   ·   ${v.stats.count.toLocaleString('es-GT')} lecturas`, left, y)
+    y += 5
+    if (v.peak) {
+      doc.setFontSize(9); doc.setTextColor(100, 116, 139)
+      doc.text(`Máximo registrado: ${fmtNum(v.peak.value)} el ${whenStr(v.peak.time)}${v.peak.device ? ` en ${v.peak.device}` : ''}`, left, y)
+      y += 2
+    }
+    y += 5
+
+    // Horas en cada nivel: barra apilada + leyenda
+    if (v.levels && v.totalHours) {
+      let x = left
+      v.levels.forEach((l, i) => {
+        const w = (v.hoursByLevel[i] / v.totalHours) * usable
+        if (w <= 0) return
+        doc.setFillColor(...hexToRgb(l.color))
+        doc.rect(x, y, Math.max(w - 0.5, 0.3), 4, 'F')
+        x += w
+      })
+      y += 8
+      doc.setFontSize(8.5)
+      let lx = left
+      v.levels.forEach((l, i) => {
+        const txt = `${l.name}: ${v.hoursByLevel[i]} h (${Math.round((v.hoursByLevel[i] / v.totalHours) * 100)} %)`
+        const tw = doc.getTextWidth(txt) + 8
+        if (lx + tw > left + usable) { lx = left; y += 5 }
+        doc.setFillColor(...hexToRgb(l.color)); doc.rect(lx, y - 2.6, 2.6, 2.6, 'F')
+        doc.setTextColor(51, 65, 85); doc.text(txt, lx + 4, y)
+        lx += tw
+      })
+      y += 8
+    }
+
+    // Promedios diarios
+    if (v.daily?.length) {
+      ensure(14)   // la tabla arranca junto a su variable y se corta por filas
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(100, 116, 139)
+      const cols = [left, left + 40, left + 75, left + 110]
+      ;['Día', 'Promedio', 'Mínimo', 'Máximo'].forEach((h, i) => doc.text(h, cols[i], y))
+      y += 4.5
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 41, 59)
+      for (const d of v.daily) {
+        ensure(5)
+        doc.text(dayStr(d.day), cols[0], y)
+        doc.text(fmtNum(d.avg), cols[1], y)
+        doc.text(fmtNum(d.min), cols[2], y)
+        doc.text(fmtNum(d.max), cols[3], y)
+        y += 4.5
+      }
+      y += 6
+    }
+  }
+
+  // Promedio por estación
+  if (devices.length > 1) {
+    ensure(20)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(30, 41, 59)
+    doc.text('Promedio por estación', left, y); y += 7
+    const colW = (usable - 50) / Math.max(variables.length, 1)
+    doc.setFontSize(8); doc.setTextColor(100, 116, 139)
+    doc.text('Estación', left, y)
+    variables.forEach((v, i) => doc.text(doc.splitTextToSize(v.name, colW - 2)[0], left + 50 + i * colW, y))
+    y += 5
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 41, 59)
+    for (const d of devices) {
+      ensure(5)
+      doc.text(doc.splitTextToSize(d.name, 48)[0], left, y)
+      variables.forEach((v, i) => {
+        const r = v.byDevice.find(x => x.id === d.id)
+        doc.text(r ? fmtNum(r.avg) : '—', left + 50 + i * colW, y)
+      })
+      y += 5
+    }
+  }
+
+  const sectionTitle = (t) => {
+    ensure(16)
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(30, 41, 59)
+    doc.text(t, left, y); y += 7
+  }
+  const row = (cells, xs, bold = false) => {
+    ensure(5)
+    doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(8.5)
+    doc.setTextColor(...(bold ? [100, 116, 139] : [30, 41, 59]))
+    cells.forEach((c, i) => doc.text(doc.splitTextToSize(String(c ?? '—'), (xs[i + 1] ?? left + usable) - xs[i] - 2)[0], xs[i], y))
+    y += 5
+  }
+
+  y += 4
+  sectionTitle('Estado de las estaciones')
+  const sx = [left, left + 70, left + 100, left + 130]
+  row(['Estación', 'Cobertura', 'Lecturas', 'Última lectura'], sx, true)
+  stations.forEach(st => row([st.name, pctStr(st.coverage), st.readings.toLocaleString('es-GT'), whenStr(st.last)], sx))
+
+  y += 4
+  sectionTitle(`Alertas disparadas (${alerts.total})`)
+  if (!alerts.total) row(['No se disparó ninguna alerta en el periodo.'], [left])
+  else {
+    const ax = [left, left + 32, left + 75, left + 112, left + 132, left + 160]
+    row(['Fecha', 'Estación', 'Variable', 'Valor', 'Nivel', 'Canal'], ax, true)
+    alerts.items.forEach(a => row([whenStr(a.time), a.device, capFirst(a.variable), fmtNum(a.value), a.category || '—', capFirst(a.channel || '—')], ax))
+  }
+
+  y += 4
+  sectionTitle(`Incidencias (${incidents.total})`)
+  if (!incidents.total) row(['No se reportaron incidencias en el periodo.'], [left])
+  else {
+    const ix = [left, left + 32, left + 70, left + 95]
+    row(['Fecha', 'Estación', 'Estado', 'Problema'], ix, true)
+    incidents.items.forEach(i => row([whenStr(i.time), i.device, INC_STATUS[i.status] || i.status, i.reason], ix))
+  }
+
+  const pages = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p)
+    addPdfHeaderFooter(doc, title, p, pages)
+  }
+  doc.save(`Reporte_${safeName(space.name + (deviceId ? ` ${stations[0]?.name || ""}` : ""))}_${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
+export function exportSpaceReportExcel(report) {
+  const { space = {}, period = {}, variables = [], devices = [], stations = [], summary = {}, alerts = { total: 0, items: [] }, incidents = { total: 0, items: [] }, deviceId } = report || {}
+  const wb = XLSX.utils.book_new()
+
+  const resumen = [
+    ['Reporte del espacio', space.name || ''],
+    ['Periodo', `${formatDate(period.start)} al ${formatDate(period.end)}`],
+    [deviceId ? 'Estación' : 'Estaciones', deviceId ? (stations[0]?.name || '') : devices.length],
+    ['Cobertura de datos', pctStr(summary.coverage)],
+    ['Última lectura', whenStr(summary.last)],
+    ['Alertas disparadas', alerts.total],
+    ['Incidencias', incidents.total],
+    [],
+    ['Variable', 'Clave', 'Unidad', 'Promedio', 'Nivel del promedio', 'Mínimo', 'Máximo', 'Máximo registrado el', 'Máximo en estación', 'Lecturas', 'Horas con datos',
+      ...((variables.find(v => v.levels)?.levels || []).map(l => `Horas en ${l.name}`))]
+  ]
+  for (const v of variables) {
+    resumen.push([
+      v.name, v.station_key, v.unit || '',
+      v.stats?.avg != null ? Number(Number(v.stats.avg).toFixed(2)) : '',
+      levelName(v, v.level),
+      v.stats?.min ?? '', v.stats?.max ?? '', v.peak ? whenStr(v.peak.time) : '', v.peak?.device || '', v.stats?.count || 0, v.totalHours || 0,
+      ...(v.hoursByLevel || [])
+    ])
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), 'Resumen')
+
+  const diario = [['Variable', 'Día', 'Promedio', 'Mínimo', 'Máximo']]
+  for (const v of variables) for (const d of v.daily || []) {
+    diario.push([v.name, dayStr(d.day), d.avg != null ? Number(d.avg.toFixed(2)) : '', d.min, d.max])
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(diario), 'Diario')
+
+  const est = [['Estación', 'Variable', 'Promedio', 'Nivel', 'Mínimo', 'Máximo', 'Lecturas']]
+  for (const v of variables) for (const r of v.byDevice || []) {
+    est.push([r.name, v.name, Number(r.avg.toFixed(2)), levelName(v, r.level), r.min, r.max, r.count])
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(est), 'Por estación')
+
+  const hora = [['Hora', ...variables.map(v => `${v.name}${v.unit ? ` (${v.unit})` : ''}`)]]
+  for (let h = 0; h < 24; h++) {
+    hora.push([`${String(h).padStart(2, '0')}:00`, ...variables.map(v => (v.byHour?.[h] != null ? Number(v.byHour[h].toFixed(2)) : ''))])
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hora), 'Por hora del día')
+
+  const cov = [['Estación', 'Cobertura de datos', 'Horas con datos', 'Lecturas', 'Última lectura']]
+  for (const st of stations) cov.push([st.name, pctStr(st.coverage), st.hours, st.readings, whenStr(st.last)])
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cov), 'Estado de estaciones')
+
+  const al = [['Fecha', 'Estación', 'Variable', 'Valor', 'Nivel', 'Canal', 'Estado']]
+  for (const a of alerts.items) al.push([whenStr(a.time), a.device, a.variable, a.value, a.category || '', a.channel || '', a.status])
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(al), 'Alertas')
+
+  const inc = [['Fecha', 'Estación', 'Estado', 'Problema', 'Resuelta', 'Respuesta']]
+  for (const i of incidents.items) inc.push([whenStr(i.time), i.device, INC_STATUS[i.status] || i.status, i.reason, whenStr(i.resolved_at), i.notes || ''])
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(inc), 'Incidencias')
+
+  XLSX.writeFile(wb, `Reporte_${safeName(space.name + (deviceId ? ` ${stations[0]?.name || ""}` : ""))}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+}

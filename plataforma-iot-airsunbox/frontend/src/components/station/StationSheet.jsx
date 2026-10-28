@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeft, Pencil, Wifi, WifiOff, Layers, Eye, EyeOff, Copy, Check, Bell, Camera,
@@ -231,8 +232,10 @@ function SpecModal({ device, onClose, onSaved }) {
     </div>
   )
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm" onClick={onClose}>
+  // Portal al <body>: dentro de la columna lateral el modal quedaba atrapado en
+  // su contexto de apilado y el gauge del AQI se dibujaba encima.
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/45 backdrop-blur-sm" onClick={onClose}>
       <div role="dialog" aria-modal="true" aria-labelledby="ficha-titulo"
            className="w-full max-w-lg rounded-3xl shadow-2xl animate-in zoom-in-95 duration-200"
            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
@@ -269,7 +272,8 @@ function SpecModal({ device, onClose, onSaved }) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
