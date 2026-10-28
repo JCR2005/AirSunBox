@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { getDeviceVariableScope, isLabelAllowed } from './deviceScopeService.js'
+import { getDeviceVariableScope, resolveVariable } from './deviceScopeService.js'
 import { ensureDeviceVariable, insert as insertDot, insertBatch } from '../repositories/dots.js'
 import { updateLastSeen } from '../repositories/devices.js'
 import { evaluateDeviceAlerts } from './alertingService.js'
@@ -33,7 +33,7 @@ export async function processDevicePayload(
       continue
     }
 
-    const variable = opts.lowercaseVariables === false
+    const sent = opts.lowercaseVariables === false
       ? String(rawVariable)
       : String(rawVariable).toLowerCase()
     const value = Number(rawValue)
@@ -42,8 +42,11 @@ export async function processDevicePayload(
       continue
     }
 
-    if (!isLabelAllowed(scope, variable)) {
-      app.log.warn(`Variable "${variable}" no pertenece al espacio — ignorada (device ${deviceId})`)
+    // En un espacio, la estación envía el nombre de la variable en el espacio
+    // (temperatura) y se guarda con la clave interna del catálogo.
+    const variable = resolveVariable(scope, sent)
+    if (!variable) {
+      app.log.warn(`Variable "${sent}" no pertenece al espacio — ignorada (device ${deviceId})`)
       ignored++
       continue
     }

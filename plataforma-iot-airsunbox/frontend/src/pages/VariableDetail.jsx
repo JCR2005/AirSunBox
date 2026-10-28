@@ -86,6 +86,7 @@ export default function VariableDetail() {
   const [aggregation, setAggregation] = useState('avg') 
   const [samplePeriod, setSamplePeriod] = useState('1 minute') 
   const [deviceInfo, setDeviceInfo] = useState(null)
+  const [varMeta, setVarMeta] = useState(null)   // nombre y unidad de la variable
 
   // Estado para guardar los rangos (Excelente, Buena, etc.)
   const [ranges, setRanges] = useState([])
@@ -141,6 +142,11 @@ export default function VariableDetail() {
         if (!deviceInfo) {
           const dev = await devicesApi.get(deviceId).catch(() => null)
           if (active && dev) setDeviceInfo(dev)
+        }
+        if (!varMeta) {
+          const devVars = await devicesApi.variables(deviceId).catch(() => [])
+          const meta = (devVars || []).find(v => v.label === cleanVariable)
+          if (active && meta) setVarMeta(meta)
         }
 
         // 1. Obtener los rangos de esta variable para pintar el fondo (colores)
@@ -364,8 +370,9 @@ export default function VariableDetail() {
                 <ArrowLeft size={18} />
               </button>
               <div>
-                <h1 className="text-2xl font-black tracking-tight uppercase" style={{ color: 'var(--text)' }}>
-                  {variableLabel}
+                <h1 className="text-2xl font-black tracking-tight" style={{ color: 'var(--text)' }}>
+                  {varMeta?.name || variableLabel}
+                  {varMeta?.unit && <span className="text-base font-semibold ml-2" style={{ color: 'var(--text2)' }}>({varMeta.unit})</span>}
                 </h1>
                 <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text2)' }}>
                   Dispositivo: <span style={{ color: 'var(--text)' }}>{deviceInfo?.name || 'Cargando...'}</span> | ID: <span className="font-mono text-[11px]">{deviceId}</span>

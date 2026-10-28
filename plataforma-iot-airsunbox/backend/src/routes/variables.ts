@@ -71,16 +71,20 @@ export default async function variablesRoutes(app: FastifyInstance) {
       return reply.code(400).send({ error: 'Faltan campos obligatorios (nombre o unidad).' })
     }
 
-    // El identificador es único en todo el catálogo (es lo que envía la
-    // estación). Una variable privada de un espacio no debe fallar porque otra
-    // organización o la plantilla global ya usen el nombre: toma el siguiente
-    // libre (temperatura-2, temperatura-3…). Las globales sí exigen uno único.
+    // `cleanLabel` es lo que envía la estación y debe ser único dentro del
+    // espacio. La clave interna (`label`) es única en todo el catálogo: si otra
+    // organización o la plantilla global ya la usan, se toma una libre
+    // (temperatura-2…) sin que la estación ni el usuario lo noten.
+    if (spaceId && await variablesRepo.stationKeyTakenInSpace(app.db, spaceId, cleanLabel)) {
+      return reply.code(400).send({ error: `Ya tenés una variable «${cleanLabel}» en este espacio. Elegí otro nombre.` })
+    }
     const intentos = spaceId ? 20 : 1
     for (let n = 1; n <= intentos; n++) {
       const candidate = n === 1 ? cleanLabel : `${cleanLabel}-${n}`
       try {
         const row = await variablesRepo.create(app.db, {
           label: candidate,
+          stationKey: cleanLabel,
           name: String(name).trim(),
           unit: String(unit).trim(),
           icon,

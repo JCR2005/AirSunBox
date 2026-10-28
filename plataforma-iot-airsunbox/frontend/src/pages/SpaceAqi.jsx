@@ -153,7 +153,7 @@ export default function SpaceAqi() {
       .filter(v => localSet.has(v.variable_label))
       .map((v, i) => {
         const cv = cat.find(x => x.label === v.variable_label)
-        return { _id: i, label: v.variable_label, catalogLabel: v.variable_label, name: cv?.name || v.variable_label, unit: cv?.unit || '' }
+        return { _id: i, label: v.variable_label, catalogLabel: v.variable_label, stationKey: cv?.station_key || v.variable_label, name: cv?.name || v.variable_label, unit: cv?.unit || '' }
       })
     setVars(list)
 
@@ -353,7 +353,7 @@ export default function SpaceAqi() {
         const norm = normalizeVarName(name)
         // Reutilizar una variable local existente: por label actual, por label generado o por nombre normalizado.
         const match = locals.find(x => x.label === v.catalogLabel)
-          || locals.find(x => x.label === generateLabel(name))
+          || locals.find(x => x.label === generateLabel(name) || x.station_key === generateLabel(name))
           || locals.find(x => normalizeVarName(x.name) === norm)
         if (match) {
           const target = match.label
@@ -363,6 +363,7 @@ export default function SpaceAqi() {
           }
           remap[v.label] = target
           v.catalogLabel = target
+          v.stationKey = match.station_key || target
           continue
         }
         // Renombrada sin colisión → actualizar la fila existente (el label queda como id técnico).
@@ -376,6 +377,7 @@ export default function SpaceAqi() {
         nextCatalog.push(created)
         remap[v.label] = created.label
         v.catalogLabel = created.label
+        v.stationKey = created.station_key || created.label
       }
       setCatalog(nextCatalog)
 
@@ -678,9 +680,7 @@ export default function SpaceAqi() {
                                 <p className="text-xs mt-2 sm:pl-11" style={{ color: dup ? '#EF4444' : 'var(--text2)' }}>
                                   {dup
                                     ? 'Otra variable ya usa este nombre. Cambiá uno de los dos.'
-                                    : v.catalogLabel
-                                      ? <>Identificador para la estación: <span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{v.catalogLabel}</span></>
-                                      : <>Identificador sugerido: <span className="font-mono">{v.label}</span> · si ya existe, al guardar se le agrega un número</>}
+                                    : <>La estación la envía como <span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{v.catalogLabel ? (v.stationKey || v.label) : v.label}</span></>}
                                 </p>
                               )}
                             </div>

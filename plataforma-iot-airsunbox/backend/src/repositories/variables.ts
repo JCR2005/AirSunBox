@@ -8,6 +8,7 @@ export interface CatalogVariableRow {
   description: string | null
   data_type: string | null
   space_id: string | null
+  station_key: string | null
 }
 
 export interface FullVariableRow extends CatalogVariableRow {
@@ -16,7 +17,7 @@ export interface FullVariableRow extends CatalogVariableRow {
 
 export async function listGlobal(db: Queryable): Promise<CatalogVariableRow[]> {
   const { rows } = await db.query<CatalogVariableRow>(
-    `SELECT label, name, unit, icon, description, data_type, space_id
+    `SELECT label, name, unit, icon, description, data_type, space_id, COALESCE(station_key, label) AS station_key
      FROM variable_catalog
      WHERE space_id IS NULL
      ORDER BY name ASC`
@@ -26,7 +27,7 @@ export async function listGlobal(db: Queryable): Promise<CatalogVariableRow[]> {
 
 export async function listGlobalOrSpace(db: Queryable, spaceId: string): Promise<CatalogVariableRow[]> {
   const { rows } = await db.query<CatalogVariableRow>(
-    `SELECT label, name, unit, icon, description, data_type, space_id
+    `SELECT label, name, unit, icon, description, data_type, space_id, COALESCE(station_key, label) AS station_key
      FROM variable_catalog
      WHERE space_id IS NULL OR space_id = $1
      ORDER BY space_id NULLS FIRST, name ASC`,
@@ -59,8 +60,18 @@ export async function labelsForSpace(db: Queryable, spaceId: string): Promise<{ 
   return rows
 }
 
+// ¿Ya hay en el espacio una variable que la estación envía con ese nombre?
+export async function stationKeyTakenInSpace(db: Queryable, spaceId: string, stationKey: string): Promise<boolean> {
+  const { rowCount } = await db.query(
+    'SELECT 1 FROM variable_catalog WHERE space_id = $1 AND COALESCE(station_key, label) = $2',
+    [spaceId, stationKey]
+  )
+  return (rowCount ?? 0) > 0
+}
+
 export async function create(db: Queryable, params: {
   label: string
+  stationKey?: string | null
   name: string
   unit: string
   icon?: string | null
@@ -69,10 +80,10 @@ export async function create(db: Queryable, params: {
   spaceId?: string | null
 }): Promise<FullVariableRow | undefined> {
   const { rows } = await db.query<FullVariableRow>(
-    `INSERT INTO variable_catalog (label, name, unit, icon, description, data_type, space_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO variable_catalog (label, name, unit, icon, description, data_type, space_id, station_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [params.label, params.name, params.unit, params.icon || 'Activity', params.description ?? null, params.dataType || 'number', params.spaceId || null]
+    [params.label, params.name, params.unit, params.icon || 'Activity', params.description ?? null, params.dataType || 'number', params.spaceId || null, params.stationKey || params.label]
   )
   return rows[0]
 }

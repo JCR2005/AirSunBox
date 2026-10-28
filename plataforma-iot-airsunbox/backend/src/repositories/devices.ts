@@ -170,7 +170,7 @@ export async function updateLastSeen(db: Queryable, id: string, now: Date): Prom
 
 export async function listVariablesCatalog(db: Queryable) {
   const { rows } = await db.query(
-    `SELECT label, name, unit, icon, description, data_type
+    `SELECT label, name, unit, icon, description, data_type, COALESCE(station_key, label) AS station_key
      FROM variable_catalog
      ORDER BY name ASC`
   )
@@ -179,7 +179,7 @@ export async function listVariablesCatalog(db: Queryable) {
 
 export async function getDeviceVariables(db: Queryable, deviceId: string, orgId: string) {
   const { rows } = await db.query(
-    `SELECT vc.label, vc.name, vc.unit, vc.icon, vc.description, dv.created_at
+    `SELECT vc.label, COALESCE(vc.station_key, vc.label) AS station_key, vc.name, vc.unit, vc.icon, vc.description, dv.created_at
      FROM device_variables dv
      JOIN variable_catalog vc ON vc.label = dv.variable_label
      JOIN devices d ON d.id = dv.device_id
@@ -192,7 +192,7 @@ export async function getDeviceVariables(db: Queryable, deviceId: string, orgId:
 
 export async function getDeviceLastValues(db: Queryable, deviceId: string, orgId: string) {
   const { rows } = await db.query(
-    `SELECT vc.label, vc.name, vc.unit, vc.icon
+    `SELECT vc.label, COALESCE(vc.station_key, vc.label) AS station_key, vc.name, vc.unit, vc.icon
      FROM device_variables dv
      JOIN variable_catalog vc ON vc.label = dv.variable_label
      JOIN devices d ON d.id = dv.device_id
