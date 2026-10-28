@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ClienteLayout from '../components/airsunbox/ClienteLayout'
 import AdminLayout from '../components/admin/AdminLayout'
 import useAuthStore from '../store/auth'
+import SpaceReport from './reports/SpaceReport'
 import { reports as reportsApi, organizations as orgsApi } from '../services/api'
 import { 
   BarChart3, Thermometer, Wind, Filter, Calendar, 
@@ -105,7 +106,16 @@ function ChangeView({ center, zoom }) {
   return null;
 }
 
+// Las organizaciones independientes reportan por espacio, con sus propias
+// variables y niveles; los reportes de islas de calor y riesgo respiratorio
+// usan las variables globales de la red AirSunBox.
 export default function Reports() {
+  const org = useAuthStore(s => s.org)
+  if (org?.type === 'B') return <SpaceReport />
+  return <NetworkReports />
+}
+
+function NetworkReports() {
   const { user } = useAuthStore()
   const isClient = user?.role === 'client'
   
