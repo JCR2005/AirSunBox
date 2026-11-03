@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1828" height="556" viewBox="0 0 1828 556" font-family="Liberation Sans, Arial, sans-serif">
+<defs><marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/></marker></defs>
+<rect width="1828" height="556" fill="#ffffff"/>
+<rect x="1" y="10" width="1826" height="216" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="10" width="30" height="216" fill="#5a6b7c"/>
+<text x="16.0" y="118.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 118.0)">Desarrollador</text>
+<rect x="1" y="246" width="1826" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="246" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="316.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 316.0)">GitHub Actions</text>
+<rect x="1" y="406" width="1826" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="406" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="476.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 476.0)">AWS (EC2)</text>
+<path d="M109.0,80.0 L162.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M270.0,80.0 L286.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M394.0,80.0 L390.0,80.0 L390.0,316.0 L410.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M518.0,316.0 L566.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M588.0,294.0 L588.0,156.0 L658.0,156.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="594" y="288.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M712.0,192.0 L712.0,217.0 L340.0,217.0 L340.0,116.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M610.0,316.0 L762.0,316.0 L762.0,80.0 L782.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="616" y="310.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M890.0,80.0 L886.0,80.0 L886.0,316.0 L906.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1014.0,316.0 L1030.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1138.0,316.0 L1134.0,316.0 L1134.0,476.0 L1154.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1262.0,476.0 L1278.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1386.0,476.0 L1434.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1478.0,476.0 L1563.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1484" y="470.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M1456.0,454.0 L1456.0,80.0 L1526.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1462" y="448.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M1634.0,80.0 L1687.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<circle cx="92" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="1.6"/>
+<rect x="162.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="216" y="65.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Crear rama</text><text x="216" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">feature/fix</text><text x="216" y="95.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">desde develop</text>
+<rect x="286.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="340" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Abrir PR a</text><text x="340" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">develop</text>
+<rect x="410.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="464" y="301.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">CI:</text><text x="464" y="316.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">migraciones,</text><text x="464" y="331.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">build y pruebas</text>
+<path d="M588,294.0 L610,316.0 L588,338.0 L566,316.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="581" y="351.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿CI en verde?</text>
+<rect x="658.0" y="120.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="148.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Corregir y</text><text x="712" y="163.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">volver a subir</text>
+<rect x="782.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="836" y="65.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Merge a develop</text><text x="836" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">y PR de release</text><text x="836" y="95.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">a main</text>
+<rect x="906.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="960" y="301.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">CI + regla</text><text x="960" y="316.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">«Proteger</text><text x="960" y="331.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">main»; merge</text>
+<rect x="1030.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1084" y="308.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Job deploy: rol</text><text x="1084" y="323.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">IAM por OIDC</text>
+<rect x="1154.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1208" y="453.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Actualizar</text><text x="1208" y="468.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">código y</text><text x="1208" y="483.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">reconstruir</text><text x="1208" y="498.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">contenedores</text>
+<rect x="1278.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1332" y="468.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Verificar salud</text><text x="1332" y="483.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">y HTTPS</text>
+<path d="M1456,454.0 L1478,476.0 L1456,498.0 L1434,476.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="1449" y="511.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Saludable?</text>
+<circle cx="1580" cy="476.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/><text x="1580" y="507.0" font-size="11.5" text-anchor="middle" fill="#1a1a1a">Versión en</text><text x="1580" y="520.0" font-size="11.5" text-anchor="middle" fill="#1a1a1a">producción</text>
+<rect x="1526.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1580" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Rollback según</text><text x="1580" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">el runbook</text>
+<circle cx="1704" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+</svg>

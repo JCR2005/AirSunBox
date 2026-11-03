@@ -1,0 +1,22 @@
+// GitFlow + CI/CD
+digraph cicd {
+  graph [rankdir=LR, fontname="Liberation Sans", fontsize=12, nodesep=0.3, ranksep=0.35, pad=0.3]
+  node  [shape=box, style="filled", fontname="Liberation Sans", fontsize=11, fillcolor="#E1D5E7", color="#9673A6"]
+  edge  [fontname="Liberation Sans", fontsize=9, color="#333333"]
+
+  subgraph cluster_gh { label="GitHub (GitFlow + Actions)"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    feat   [label="feature/* · fix/*\n(desde develop)"]
+    prdev  [label="PR → develop\nCI: backend + frontend"]
+    prmain [label="PR de release\ndevelop → main\nCI + regla 'Proteger main'"]
+    deploy [label="Job deploy\nOIDC → rol IAM"]
+    feat -> prdev -> prmain -> deploy
+  }
+  subgraph cluster_aws { label="AWS us-east-2"; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    ec2   [label="EC2 vía SSM Run Command\ngit ff a main\ndocker compose build/up"]
+    check [label="Verificación\nbackend healthy · frontend running\nHTTPS 200"]
+    ec2 -> check
+  }
+  deploy -> ec2 [label="SSM SendCommand"]
+  ci [label="Job backend: migraciones · typecheck ·\nbuild · smoke tests\nJob frontend: npm ci · build", shape=note, fillcolor="#FFF2CC", color="#D6B656"]
+  ci -> prdev [style=dotted, arrowhead=none]
+}

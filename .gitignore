@@ -32,11 +32,19 @@ node_modules/
 # Archivos compilados
 dist/
 
-# Documentación (manuales, runbook, plantillas, capturas y sus generadores):
-# se gestiona fuera del repositorio
-docs/
+# Documentación: los .odt de docs/entregables se regeneran con docs/build.py
+# (en el repo quedan las fuentes .md, los diagramas, las capturas y los PDF)
+docs/entregables/*.odt
 screenshots/
 MANUAL_INDEPENDIENTES.*
 build_manual.cjs
 **/build_manual.cjs
-infra/seguridad/README.md
+
+# Herramientas locales fuera del proyecto
+lista-enlazada
+netlify.toml
+
+# Archivos del agente y del navegador de pruebas
+CLAUDE.md
+.claude/
+.playwright-mcp/

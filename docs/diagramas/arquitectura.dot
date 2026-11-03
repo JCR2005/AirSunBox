@@ -1,0 +1,54 @@
+// Arquitectura desplegada de AirSunBox (AWS us-east-2)
+digraph arquitectura {
+  graph [rankdir=TB, fontname="Liberation Sans", fontsize=13, nodesep=0.25, ranksep=0.45, bgcolor="white", pad=0.2, newrank=true]
+  node  [shape=box, style="filled", fontname="Liberation Sans", fontsize=13, fillcolor="#E1D5E7", color="#9673A6"]
+  edge  [fontname="Liberation Sans", fontsize=10, color="#333333"]
+
+  usuario [label="Navegador\n(usuarios y admin)", shape=box, fillcolor="#E1D5E7"]
+  esp32   [label="Estaciones ESP32\n(sensores)", fillcolor="#E1D5E7"]
+  github  [label="GitHub\n(repo + Actions CI/CD)", fillcolor="#E1D5E7"]
+  subgraph cluster_ext {
+    label="Servicios externos"; fontsize=12; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    gmail   [label="Gmail SMTP\n(2FA, recuperación,\nalertas)", fillcolor="#E1D5E7"]
+    telegram[label="API de Telegram\n(alertas y bot)", fillcolor="#E1D5E7"]
+    le      [label="Let's Encrypt\n(certificado TLS)", fillcolor="#E1D5E7"]
+    gmail -> le [style=invis]
+  }
+
+  subgraph cluster_aws {
+    label="AWS — us-east-2"; fontname="Liberation Sans"; fontsize=11; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+    ssm  [label="SSM Parameter Store\n/airsunbox/prod/*\n(SecureString, KMS)"]
+    iam  [label="IAM\nrol sanik-iot-ec2-role\nrol airsunbox-github-deploy (OIDC)"]
+    subgraph cluster_sg {
+      label="Security group launch-wizard-3: 80, 443 públicos · 22 solo 2 IPs"; fontsize=9; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+      subgraph cluster_ec2 {
+        label="EC2 t3.small · Ubuntu 24.04 · disco EBS cifrado (KMS aws/ebs)"; fontsize=10; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+        subgraph cluster_docker {
+          label="Docker Compose (proyecto airsunbox, red iot_network)"; fontsize=9; style="filled"; fillcolor="#DAE8FC"; color="#6C8EBF"
+          nginx   [label="iot_frontend\nnginx + React (Vite)\nHTTPS :443, HTTP→HTTPS :80"]
+          backend [label="iot_backend\nNode 20 · Fastify 4 · TypeScript\nREST /api · WebSocket /ws\nBullMQ (ingesta y alertas)"]
+          db      [label="iot_db\nPostgreSQL 16 + TimescaleDB\n(hypertable dots)", shape=cylinder]
+          redis   [label="iot_redis\nRedis 7\n(colas, pub/sub, rate limit)", shape=cylinder]
+          emqx    [label="iot_mqtt\nEMQX 5 (MQTT)"]
+        }
+        certbot [label="certbot (snap)\nrenovación + hook recarga nginx"]
+      }
+    }
+  }
+
+  usuario -> nginx   [label="HTTPS"]
+  esp32   -> nginx   [label="HTTPS POST\n/api/dots/{token}"]
+  esp32   -> emqx    [label="MQTT\n/v1/devices/{token}/data", style=dashed]
+  nginx   -> backend [label="/api, /ws"]
+  backend -> db      [label="SQL"]
+  backend -> redis
+  emqx    -> backend [label="suscripción\ncompartida"]
+  backend -> gmail   [label="SMTP TLS"]
+  backend -> telegram[label="HTTPS"]
+  backend -> ssm     [label="al arrancar\n(rol del EC2)"]
+  ssm -> iam [style=invis]
+  { rank=same; usuario; esp32; github }
+  certbot -> le      [label="ACME"]
+  github  -> iam     [label="OIDC"]
+  iam     -> backend [label="SSM SendCommand\n(deploy)", style=dashed, lhead=cluster_ec2]
+}
