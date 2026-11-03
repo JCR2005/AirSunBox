@@ -711,8 +711,9 @@ export default function ClientDeviceDetail() {
 
                     <div className="flex items-center justify-center gap-1.5 mt-3 w-full">
                       {aqiData.dominantPollutant && (
-                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                          Contaminante dominante: <span className="text-[#67B7E8]">{variables.find(v => v.label === aqiData.dominantPollutant)?.name || aqiData.dominantPollutant}</span>
+                        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: 'var(--text2)', border: '1px solid var(--border)' }}
+                              title="La variable del índice con el peor nivel en este momento">
+                          Variable dominante: <span className="text-[#67B7E8]">{variables.find(v => v.label === aqiData.dominantPollutant)?.name || aqiData.dominantPollutant}</span>
                         </span>
                       )}
                       <span className="relative flex w-2 h-2">
