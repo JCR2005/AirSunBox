@@ -330,8 +330,8 @@ Las migraciones están en `plataforma-iot-airsunbox/database/` y son
 | 8–9 | `v11`, `v12` | Motor de alertas y canal Telegram |
 | 10–13 | `v13`, `v15`, `v16`, `v17` | Color de espacio, OTP/2FA, ajustes de H₂S |
 | 14–16 | `migrate-full.sql`, `v7`, `v14` | Consolidación, *backfill*, mapa público y frases |
-| 17–22 | `v18`–`v22` | Bandera 2FA sin contraseñas en texto plano, compresión de `dots`, alineación con producción, organización interna, `password_changed_at` |
-| 23–24 | `v23`, `v24` | Clave de estación por espacio (`station_key`); ficha técnica (`devices.hardware`) y foto del equipo (`device_photos`) |
+| 17–21 | `v18`–`v22` | Bandera 2FA sin contraseñas en texto plano, compresión de `dots`, alineación con producción, organización interna, `password_changed_at` |
+| 22–23 | `v23`, `v24` | Clave de estación por espacio (`station_key`); ficha técnica (`devices.hardware`) y foto del equipo (`device_photos`) |
 
 Se ejecutan automáticamente:
 
@@ -370,8 +370,11 @@ sección 4).
   lleva `develop` a `main`.
 - **CI** (`.github/workflows/ci.yml`), en cada push y PR a `develop` y `main`:
     - job `backend`: levanta TimescaleDB y Redis, aplica todas las migraciones,
-    typecheck, build, arranca el backend y corre las pruebas de humo
-    (`tests/smoke.mjs`);
+    typecheck y build; corre las pruebas unitarias (`tests/unit/`, entre
+    ellas el cálculo del índice de calidad); arranca el backend y corre las
+    pruebas de humo (`tests/smoke.mjs`) y de seguridad (`tests/seguridad.mjs`:
+    revocación de sesiones al cerrar sesión o cambiar la contraseña, y
+    aislamiento entre organizaciones);
     - job `frontend`: instalación y build de producción.
 
 - **CD:** al hacer merge en `main`, el job `deploy` asume el rol IAM por OIDC y

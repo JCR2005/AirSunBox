@@ -19,6 +19,8 @@ la ciudadanía.
 ![TimescaleDB](https://img.shields.io/badge/TimescaleDB-PostgreSQL_16-FDB515?logo=postgresql&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS-EC2_·_SSM_·_KMS-FF9900?logo=amazonwebservices&logoColor=white)
 
+**Demo en video: LINK_DEL_VIDEO**
+
 </div>
 
 ![Detalle de una estación: índice de calidad del aire en vivo y lecturas actuales](docs/capturas/40_estacion.png)
@@ -142,17 +144,25 @@ AWS** (IoT Core, SQS, EventBridge, ECS Fargate, Aurora) está en
 - **GitFlow:** ramas `feature/*`, `fix/*` y `hotfix/*` → PR a `develop` →
   PR de *release* a `main`. Más de 60 PRs integrados.
 - **Integración continua:** en cada PR, el job `backend` levanta TimescaleDB y
-  Redis, aplica todas las migraciones sobre una base vacía, verifica tipos,
-  compila, arranca la API y corre pruebas de humo; el job `frontend` compila
-  la aplicación. La rama `main` está protegida: solo acepta PRs con ambos
-  checks en verde.
+  Redis, aplica todas las migraciones sobre una base vacía, verifica tipos y
+  compila; después corre tres grupos de pruebas con `node:test`:
+  - **unitarias** del cálculo del índice de calidad del aire: niveles y sus
+    límites, ponderación por prioridad, variables sin datos, espacios sin
+    configuración y variable dominante;
+  - **de humo** contra la API en marcha;
+  - **de seguridad** contra la API en marcha: un token deja de valer al
+    cerrar sesión o al cambiar la contraseña, y una organización no puede
+    leer, listar, editar ni borrar espacios, estaciones ni reportes de otra.
+
+  El job `frontend` compila la aplicación. La rama `main` está protegida:
+  solo acepta PRs con ambos checks en verde.
 - **Despliegue continuo:** al integrar en `main`, el job `deploy` se
   autentica en AWS por OIDC (sin claves guardadas), ejecuta el despliegue en
   la instancia con SSM Run Command y verifica que la API y la web respondan.
 - **Infraestructura como código:** VPC, subred, grupo de seguridad e
   instancia descritos con [Terraform](terraform/).
-- **Migraciones:** 24 versiones SQL idempotentes, aplicadas en orden por
-  `database/initdb/00-schema.sh`.
+- **Migraciones:** 23 scripts SQL idempotentes (del esquema inicial a la
+  `v24`), aplicados en orden por `database/initdb/00-schema.sh`.
 
 ## Documentación
 
