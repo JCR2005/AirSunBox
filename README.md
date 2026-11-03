@@ -183,7 +183,7 @@ AirSunBox/
 ├── docs/                       # Manuales, runbook, diagramas y capturas
 ├── infra/seguridad/            # Scripts de secretos en SSM y cifrado del disco
 ├── terraform/                  # Infraestructura de AWS como código
-├── geoJAson/                   # Zonas de Quetzaltenango para el mapa público
+├── geojson/                   # Polígono de referencia de la Zona 3 de Quetzaltenango
 └── .github/workflows/ci.yml    # CI y despliegue continuo
 ```
 
