@@ -255,7 +255,9 @@ export default async function devicesRoutes(app: FastifyInstance) {
       params: Type.Object({ id: Type.String() }),
       querystring: Type.Object({ orgId: Type.Optional(Type.String()) })
     }
-  }, async (req) => {
+  }, async (req, reply) => {
+    if (!await devicesRepo.deviceBelongsToOrg(app.db, req.params.id, targetOrgId(req)))
+      return reply.code(404).send({ error: 'Estación no encontrada' })
     const photo = await devicesRepo.getPhoto(app.db, req.params.id, targetOrgId(req))
     return { image: photo?.image ?? null, updated_at: photo?.updated_at ?? null }
   })
@@ -300,7 +302,10 @@ export default async function devicesRoutes(app: FastifyInstance) {
       params: Type.Object({ id: Type.String() }),
       querystring: Type.Object({ orgId: Type.Optional(Type.String()) })
     }
-  }, async (req) => {
+  }, async (req, reply) => {
+    // Una estación ajena responde 404, igual que el detalle, en vez de una lista vacía
+    if (!await devicesRepo.deviceBelongsToOrg(app.db, req.params.id, targetOrgId(req)))
+      return reply.code(404).send({ error: 'Estación no encontrada' })
     return devicesRepo.getDeviceVariables(app.db, req.params.id, targetOrgId(req))
   })
 
@@ -309,7 +314,9 @@ export default async function devicesRoutes(app: FastifyInstance) {
       params: Type.Object({ id: Type.String() }),
       querystring: Type.Object({ orgId: Type.Optional(Type.String()) })
     }
-  }, async (req) => {
+  }, async (req, reply) => {
+    if (!await devicesRepo.deviceBelongsToOrg(app.db, req.params.id, targetOrgId(req)))
+      return reply.code(404).send({ error: 'Estación no encontrada' })
     const variables = await devicesRepo.getDeviceLastValues(app.db, req.params.id, targetOrgId(req))
 
     for (const v of variables) {
