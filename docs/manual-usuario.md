@@ -138,7 +138,9 @@ En **Resumen**, a la izquierda está la ficha de la estación:
 A la derecha:
 
 - **Calidad del aire:** el índice (AQI) con su nivel, una recomendación de
-  salud y el contaminante dominante. Si la estación no envía datos, el
+  salud y la **variable dominante**: la variable del índice con el peor nivel
+  en ese momento. Puede ser un contaminante o, si el espacio la incluyó en el
+  índice, otra variable como la humedad. Si la estación no envía datos, el
   indicador queda en gris, sin recomendación.
 - **Lecturas actuales:** una tarjeta por variable con su último valor, su
   unidad y una barra que muestra en qué nivel está. Con **Elegir variables**
