@@ -1370,6 +1370,7 @@ const dayStr = (d) => { const [y, m, dd] = String(d).slice(0, 10).split('-'); re
 const whenStr = (t) => (t ? new Date(t).toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 const pctStr = (x) => `${Math.round((x || 0) * 100)} %`
 const INC_STATUS = { open: 'Abierta', in_review: 'En atención', resolved: 'Resuelta' }
+const ALERT_STATUS = { sent: 'Enviado', partial: 'Envío parcial', failed: 'No se pudo enviar' }
 const capFirst = (s) => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1)
 const safeName = (s) => String(s || 'espacio').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '')
 
@@ -1582,7 +1583,7 @@ export function exportSpaceReportExcel(report) {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cov), 'Estado de estaciones')
 
   const al = [['Fecha', 'Estación', 'Variable', 'Valor', 'Nivel', 'Canal', 'Estado']]
-  for (const a of alerts.items) al.push([whenStr(a.time), a.device, a.variable, a.value, a.category || '', a.channel || '', a.status])
+  for (const a of alerts.items) al.push([whenStr(a.time), a.device, a.variable, a.value, a.category || '', a.channel || '', ALERT_STATUS[a.status] || a.status])
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(al), 'Alertas')
 
   const inc = [['Fecha', 'Estación', 'Estado', 'Problema', 'Resuelta', 'Respuesta']]
