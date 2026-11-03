@@ -1,127 +1,154 @@
-# Plataforma IoT — Setup
+# Plataforma IoT AirSunBox: instalación y desarrollo
+
+Código de la plataforma: backend, frontend, base de datos y broker MQTT. La
+descripción del proyecto está en el [README principal](../README.md).
 
 ## Requisitos
-- Docker Desktop instalado
+
+- Docker y Docker Compose
+- Node.js 20 (para el servidor de desarrollo del frontend)
 - Git
 
-## Levantar todo con un comando
+## Levantar el entorno local
 
-Primero los secretos (ningún secreto está en el repositorio):
+### 1. Configuración
+
+En el repositorio no hay secretos: el backend los lee del entorno y no arranca
+si faltan `DB_PASSWORD` o `JWT_SECRET`.
 
 ```bash
-cp backend/.env.example backend/.env    # completar DB_PASSWORD, JWT_SECRET y SMTP_*
-echo "DB_PASSWORD=<la misma>" > .env    # la usa compose al crear la base
-docker-compose up -d
+cp backend/.env.example backend/.env
 ```
 
-Eso levanta los 5 servicios:
+Completá en `backend/.env`:
 
-| Servicio      | URL / Puerto                        |
-|---------------|-------------------------------------|
-| Frontend      | http://localhost                    |
-| Backend API   | http://localhost:3000               |
-| MQTT          | mqtt://localhost:1883               |
-| EMQX Panel    | http://localhost:18083              |
-| TimescaleDB   | localhost:5432                      |
-| Redis         | localhost:6379                      |
+- `DB_PASSWORD`: una contraseña cualquiera para la base local;
+- `JWT_SECRET`: una cadena aleatoria larga (`openssl rand -hex 32`);
+- `SMTP_*`: opcional; sin SMTP no salen los correos de 2FA, recuperación de
+  contraseña ni alertas.
 
-## Credenciales por defecto
+Compose usa la misma contraseña al crear la base:
 
-**Base de datos**
-- Usuario: `iot_user`
-- Password: la que definas en `DB_PASSWORD` (ver *Secretos* más abajo)
-- Base: `iot_platform`
+```bash
+echo "DB_PASSWORD=<la misma de backend/.env>" > .env
+```
 
-**EMQX Panel** (administración del broker MQTT)
-- URL: http://localhost:18083
-- Usuario y contraseña: los de fábrica de EMQX; cambiarlos al primer ingreso.
-  El panel solo escucha en 127.0.0.1.
+Para que el servidor de Vite llegue al backend, publicá el puerto 3000 solo en
+tu máquina con un `docker-compose.override.yml` (está en `.gitignore`):
 
-## Secretos
+```yaml
+services:
+  backend:
+    ports:
+      - "127.0.0.1:3000:3000"
+```
 
-- En el repositorio no hay secretos: el código los lee del entorno y no tiene
-  valores por defecto (sin `DB_PASSWORD` o `JWT_SECRET` el backend no arranca).
-- **Producción:** `JWT_SECRET`, `DB_PASSWORD` y `SMTP_PASS` están cifrados en
-  AWS SSM Parameter Store (`/airsunbox/prod/*`) y el backend los lee al
-  arrancar con el rol del EC2. Procedimiento y scripts en
-  [`infra/seguridad`](../infra/seguridad/README.md).
-- **Desarrollo:** `backend/.env` (en `.gitignore`), a partir de `backend/.env.example`.
+### 2. Servicios
 
-## Estructura del proyecto
+```bash
+docker compose up -d timescaledb redis emqx backend
+```
+
+La primera vez, Postgres ejecuta `database/initdb/00-schema.sh`, que aplica
+todas las migraciones en orden.
+
+| Servicio | Dirección local |
+|---|---|
+| Backend (API) | http://localhost:3000 |
+| Documentación de la API (Swagger) | http://localhost:3000/docs |
+| TimescaleDB | `localhost:5434` (usuario `iot_user`, base `iot_platform`) |
+| Redis | `localhost:6379` |
+| MQTT | `mqtt://localhost:1883` |
+| Panel de EMQX | http://localhost:18083 |
+
+Los puertos de la base, Redis y el panel de EMQX solo escuchan en
+`127.0.0.1`.
+
+### 3. Primer superadministrador
+
+```bash
+docker compose exec backend node dist/scripts/createSuperadmin.js admin@ejemplo.com
+```
+
+Sin `SUPERADMIN_PASSWORD` en `backend/.env`, el script genera una contraseña
+aleatoria y la muestra una sola vez.
+
+### 4. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Abrí http://localhost:5173. Vite envía `/api` y `/ws` al backend en
+`localhost:3000`.
+
+## Enviar lecturas de prueba
+
+Cada estación tiene un token. Se ve en el detalle de la estación (pestaña
+**Conectar ESP32**), donde también está el sketch para ESP32/ESP8266.
+
+Por HTTP:
+
+```bash
+curl -X POST http://localhost:3000/api/dots/<TOKEN> \
+  -H 'Content-Type: application/json' \
+  -d '{"temperatura": 21.4, "humedad": 64, "pm2.5": 18.2}'
+```
+
+Por MQTT, en el tema `/v1/devices/<TOKEN>/data` con el mismo JSON.
+
+Las claves del JSON son las variables de la estación. En los espacios de
+organizaciones independientes se usa la **clave de estación** de cada
+variable.
+
+## Estructura
 
 ```
-plataforma-iot/
-├── docker-compose.yml      ← levanta todo
-├── database/
-│   └── init.sql            ← tablas de la base de datos
-├── backend/                ← Node.js + Fastify (Prog. 1)
-└── frontend/               ← React + Vite (Prog. 2)
+plataforma-iot-airsunbox/
+├── docker-compose.yml        # TimescaleDB, Redis, EMQX, backend y nginx
+├── backend/                  # API: Node.js 20 + Fastify 4 + TypeScript
+│   ├── src/
+│   │   ├── routes/           # Endpoints por dominio (auth, devices, dots, alerts…)
+│   │   ├── services/         # Lógica: AQI, ingesta, alertas, reportes, 2FA…
+│   │   ├── repositories/     # Consultas SQL
+│   │   ├── plugins/          # Base de datos, Redis, MQTT, WebSocket, autenticación
+│   │   ├── lib/              # Correo, secretos (AWS SSM), estado de estaciones
+│   │   └── scripts/          # Tareas de administración (primer superadmin)
+│   └── tests/smoke.mjs       # Pruebas de humo que corre el CI
+├── frontend/                 # React 18 + Vite + Tailwind + Zustand
+│   ├── src/pages/            # Pantallas de cliente, admin y públicas
+│   ├── src/components/       # Componentes (estación, mapas, reportes…)
+│   ├── src/utils/exportUtils.js  # Reportes PDF (jsPDF) y Excel (SheetJS)
+│   └── nginx.conf            # HTTPS, cabeceras de seguridad y proxy a la API
+├── database/                 # Migraciones SQL idempotentes (init, v2 … v24)
+│   └── initdb/00-schema.sh   # Aplica las migraciones en orden
+├── tools/simulate-station.mjs  # Generador de series realistas para pruebas
+└── whatsapp-bot/             # Prototipo de bot de WhatsApp
 ```
 
 ## Comandos útiles
 
 ```bash
-# Ver logs de todos los servicios
-docker-compose logs -f
+docker compose logs -f backend      # logs del backend
+docker compose restart backend      # reiniciar un servicio
+docker compose down                 # apagar todo
+docker compose down -v              # apagar y borrar los datos
 
-# Ver logs solo del backend
-docker-compose logs -f backend
-
-# Reiniciar un servicio
-docker-compose restart backend
-
-# Apagar todo
-docker-compose down
-
-# Apagar todo y borrar datos
-docker-compose down -v
+cd backend && npm run typecheck     # verificación de tipos (también en el CI)
+cd backend && npm test              # pruebas de humo contra un backend en marcha
 ```
 
-## Configuración del ESP32
+## Migraciones
 
-El ESP32 manda datos a:
-```
-MQTT broker: mqtt://TU_IP:1883
-Topic:       /v1/devices/{DEVICE_TOKEN}/data
-Payload:     {"temperatura": 25.4, "humedad": 60}
-```
+Cada cambio de esquema es un archivo `database/vNN-descripcion.sql`,
+idempotente, agregado al final de `database/initdb/00-schema.sh`. El CI las
+aplica todas sobre una base vacía en cada PR. En una base existente se aplican
+con `psql` (ver el [Runbook](../docs/runbook.md), sección 4).
 
-## Deploy en Railway
+## Producción
 
-1. Subir el repo a GitHub
-2. Crear proyecto en railway.app
-3. Agregar cada servicio desde el repo
-4. Las variables de entorno ya están en docker-compose.yml
-
-## Caso de uso: creación de espacio
-
-**Actor:** administrador de la plataforma
-**Disparador:** el admin quiere registrar un espacio físico nuevo (ej. "Sala de
-servidores") para luego asociarle estaciones IoT.
-
-### Flujo principal
-1. En "Mis espacios", pulsa **+ Nuevo espacio**.
-2. Escribe el **nombre** (ej. "Sala de servidores GmbH").
-3. El **slug se genera automáticamente** al escribir (sin tildes ni símbolos →
-   `sala-de-servidores-gmbh`); el campo slug no se edita a mano.
-4. Elige la **categoría** (Aire · Tierra · Agua · Otro).
-5. Si elige **Otro**, escribe el tipo libre y **selecciona un icono de la
-   galería** (catálogo con scroll oculto y flechita nav) — ej. `servidor`.
-6. Guardar → se crea el espacio (HTTP 201) y aparece en la grilla con su
-   nombre, slug **y el icono elegido** en la tarjeta.
-
-### Reglas
-- El slug se deriva del **nombre** con `generateLabel` (a nivel de módulo):
-  minúsculas, sin acentos, espacios→guiones, sin guiones al inicio/fin.
-- La tarjeta del listado muestra el **icono seleccionado en la galería**
-  (mapa `nombre→componente lucide` reutilizado por modal y tarjetas), con
-  fallback a `Layers` si el espacio no trae icono.
-
-### Caso de éxito
-"Creé 'Sala de servidores' → slug `sala-de-servidores`, icono **servidor** →
-la tarjeta lo muestra al instante. Verificado en vivo: HTTP 200 · bundle sin
-ReferenceError (hash distinto al bundle roto)."
-
-### Postcondiciones
-- Persistido en backend (`spaces`), visible en la grilla del listado.
-- Puede editarse (lápiz) y abrirse para agregar estaciones.
+El despliegue en AWS (EC2, secretos en SSM, HTTPS, despliegue continuo) está
+documentado en el [Manual técnico](../docs/manual-tecnico.md), el
+[Runbook](../docs/runbook.md) y [`infra/seguridad`](../infra/seguridad/README.md).
