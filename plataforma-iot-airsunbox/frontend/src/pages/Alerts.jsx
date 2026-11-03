@@ -544,6 +544,8 @@ export default function Alerts() {
                         <p className="text-xs" style={{ color: 'var(--text2)' }}>
                           {when(log.created_at)}{log.channel && log.channel !== 'none' ? ` · ${log.channel}` : ''}
                         </p>
+                        {log.status === 'failed' && <p className="text-xs font-semibold" style={{ color: '#DC2626' }}>No se pudo enviar</p>}
+                        {log.status === 'partial' && <p className="text-xs font-semibold" style={{ color: '#B7791F' }}>Algunos canales fallaron</p>}
                       </li>
                     ))}
                   </ol>
