@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1704" height="556" viewBox="0 0 1704 556" font-family="Liberation Sans, Arial, sans-serif">
+<defs><marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/></marker></defs>
+<rect width="1704" height="556" fill="#ffffff"/>
+<rect x="1" y="10" width="1702" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="10" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="80.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 80.0)">Usuario</text>
+<rect x="1" y="170" width="1702" height="216" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="170" width="30" height="216" fill="#5a6b7c"/>
+<text x="16.0" y="278.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 278.0)">Sistema</text>
+<rect x="1" y="406" width="1702" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="406" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="476.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 476.0)">Servicio de correo</text>
+<path d="M109.0,80.0 L162.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M270.0,80.0 L266.0,80.0 L266.0,240.0 L286.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M394.0,240.0 L442.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M464.0,262.0 L464.0,316.0 L534.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="470" y="277.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M588.0,352.0 L588.0,377.0 L216.0,377.0 L216.0,116.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M486.0,240.0 L566.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="492" y="234.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M588.0,218.0 L588.0,180.0 L1332.0,180.0 L1332.0,204.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="594" y="212.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M610.0,240.0 L658.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="616" y="234.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M712.0,276.0 L712.0,440.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M766.0,476.0 L762.0,476.0 L762.0,80.0 L782.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M890.0,80.0 L886.0,80.0 L886.0,240.0 L906.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1014.0,240.0 L1062.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1084.0,262.0 L1084.0,316.0 L1154.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1090" y="277.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M1208.0,352.0 L1208.0,377.0 L836.0,377.0 L836.0,116.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1106.0,240.0 L1278.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1112" y="234.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M1386.0,240.0 L1382.0,240.0 L1382.0,80.0 L1402.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1510.0,80.0 L1563.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<circle cx="92" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="1.6"/>
+<rect x="162.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="216" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Ingresar correo</text><text x="216" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">y contraseña</text>
+<rect x="286.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="340" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Validar</text><text x="340" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">credenciales</text><text x="340" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(bcrypt)</text>
+<path d="M464,218.0 L486,240.0 L464,262.0 L442,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="457" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Credenciales</text><text x="457" y="288.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">válidas?</text>
+<rect x="534.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="588" y="301.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Mostrar error</text><text x="588" y="316.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(límite de</text><text x="588" y="331.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">intentos)</text>
+<path d="M588,218.0 L610,240.0 L588,262.0 L566,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="581" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿2FA activo?</text>
+<rect x="658.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Generar código</text><text x="712" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">de 6 dígitos</text><text x="712" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(10 min)</text>
+<rect x="658.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="468.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Enviar código</text><text x="712" y="483.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">al correo</text>
+<rect x="782.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="836" y="65.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Ingresar código</text><text x="836" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">o código de</text><text x="836" y="95.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">respaldo</text>
+<rect x="906.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="960" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Validar código</text>
+<path d="M1084,218.0 L1106,240.0 L1084,262.0 L1062,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="1077" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Código válido?</text>
+<rect x="1154.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1208" y="301.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Contar intento;</text><text x="1208" y="316.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">bloquear 15 min</text><text x="1208" y="331.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">al 3.º</text>
+<rect x="1278.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1332" y="232.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Emitir sesión</text><text x="1332" y="247.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">JWT (24 h)</text>
+<rect x="1402.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1456" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Acceder al</text><text x="1456" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">panel</text>
+<circle cx="1580" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+</svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1580" height="556" viewBox="0 0 1580 556" font-family="Liberation Sans, Arial, sans-serif">
+<defs><marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/></marker></defs>
+<rect width="1580" height="556" fill="#ffffff"/>
+<rect x="1" y="10" width="1578" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="10" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="80.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 80.0)">Usuario</text>
+<rect x="1" y="170" width="1578" height="216" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="170" width="30" height="216" fill="#5a6b7c"/>
+<text x="16.0" y="278.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 278.0)">Sistema</text>
+<rect x="1" y="406" width="1578" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="406" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="476.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 476.0)">Servicio de correo</text>
+<path d="M109.0,80.0 L162.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M270.0,80.0 L266.0,80.0 L266.0,240.0 L286.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M394.0,240.0 L390.0,240.0 L390.0,476.0 L410.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M518.0,476.0 L514.0,476.0 L514.0,80.0 L534.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M642.0,80.0 L638.0,80.0 L638.0,240.0 L658.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M766.0,240.0 L814.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M836.0,262.0 L836.0,316.0 L906.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="842" y="277.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M1014.0,316.0 L1067.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M836.0,218.0 L836.0,80.0 L906.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="842" y="212.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M1014.0,80.0 L1010.0,80.0 L1010.0,240.0 L1030.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1138.0,240.0 L1154.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1262.0,240.0 L1258.0,240.0 L1258.0,80.0 L1278.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1386.0,80.0 L1439.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<circle cx="92" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="1.6"/>
+<rect x="162.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="216" y="65.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Solicitar</text><text x="216" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">recuperación</text><text x="216" y="95.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">con su correo</text>
+<rect x="286.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="340" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Generar enlace</text><text x="340" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">de un solo uso</text><text x="340" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(10 min)</text>
+<rect x="410.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="464" y="476.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Enviar enlace</text>
+<rect x="534.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="588" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Abrir enlace</text>
+<rect x="658.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Validar enlace</text>
+<path d="M836,218.0 L858,240.0 L836,262.0 L814,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="829" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Vigente y sin</text><text x="829" y="288.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">usar?</text>
+<rect x="906.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="960" y="301.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Mostrar «Este</text><text x="960" y="316.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">enlace ya no</text><text x="960" y="331.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">sirve»</text>
+<circle cx="1084" cy="316.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+<rect x="906.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="960" y="57.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Elegir</text><text x="960" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">contraseña</text><text x="960" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">nueva y</text><text x="960" y="102.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">confirmar</text>
+<rect x="1030.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1084" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Guardar</text><text x="1084" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">contraseña y</text><text x="1084" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">consumir enlace</text>
+<rect x="1154.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1208" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Cerrar sesiones</text><text x="1208" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">en todos los</text><text x="1208" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">dispositivos</text>
+<rect x="1278.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1332" y="57.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Iniciar sesión</text><text x="1332" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">con la</text><text x="1332" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">contraseña</text><text x="1332" y="102.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">nueva</text>
+<circle cx="1456" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+</svg>

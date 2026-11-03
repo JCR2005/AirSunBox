@@ -162,10 +162,14 @@ export async function dispatch(app: FastifyInstance, alert: AlertRow, ctx: Alert
 
   if (opts.test) return results
 
+  // sent: llegó por todos los canales; partial: por algunos; failed: por ninguno
+  const delivered = results.filter(r => r.ok).length
+  const status = !results.length || delivered === results.length ? 'sent' : delivered ? 'partial' : 'failed'
+
   await app.db.query(
     `INSERT INTO alert_logs (alert_id, device_id, variable, value, aqi, category, channel, status, message)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'sent', $8)`,
-    [alert.id, alert.device_id, alert.variable, ctx.rawValue ?? null, ctx.aqi ?? null, ctx.category ?? null, channels.join(', ') || 'none', messageText]
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [alert.id, alert.device_id, alert.variable, ctx.rawValue ?? null, ctx.aqi ?? null, ctx.category ?? null, channels.join(', ') || 'none', status, messageText]
   )
 
   await app.db.query(

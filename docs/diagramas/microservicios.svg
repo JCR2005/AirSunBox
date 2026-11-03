@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="930" viewBox="0 0 1640 930">
+<defs><marker id="m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#333333"/></marker></defs>
+<rect width="1640" height="930" fill="white"/>
+<rect x="20" y="50" width="210" height="330" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="125.0" y="68.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Clientes</text>
+<rect x="40" y="90" width="170" height="70" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="125.0" y="116.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Estaciones</text>
+<text x="125.0" y="136.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">ESP32 / LoRaWAN</text>
+<rect x="40" y="240" width="170" height="70" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="125.0" y="266.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Navegador / PWA</text>
+<text x="125.0" y="279.4" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">clientes, equipo,</text>
+<text x="125.0" y="292.6" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">ciudadanos</text>
+<rect x="270" y="50" width="250" height="420" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="395.0" y="68.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Borde</text>
+<rect x="290" y="90" width="210" height="70" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="395.0" y="116.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">AWS IoT Core</text>
+<text x="395.0" y="136.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">broker MQTT gestionado</text>
+<rect x="290" y="200" width="210" height="70" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="395.0" y="226.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">API Gateway / ALB</text>
+<text x="395.0" y="246.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">REST y WebSocket</text>
+<rect x="290" y="360" width="210" height="70" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="395.0" y="386.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">CloudFront + S3</text>
+<text x="395.0" y="406.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">frontend React</text>
+<rect x="560" y="210" width="460" height="560" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="790.0" y="228.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Microservicios — Amazon ECS Fargate</text>
+<rect x="580" y="250" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="680.0" y="273.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Ingesta</text>
+<text x="680.0" y="293.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">lecturas por HTTP</text>
+<rect x="580" y="340" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="680.0" y="363.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Identidad</text>
+<text x="680.0" y="383.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">login, 2FA, sesiones</text>
+<rect x="580" y="430" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="680.0" y="453.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Organizaciones y espacios</text>
+<text x="680.0" y="473.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">e índice de calidad</text>
+<rect x="580" y="520" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="680.0" y="543.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Estaciones</text>
+<text x="680.0" y="563.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">ficha, tokens, fotos</text>
+<rect x="800" y="250" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="900.0" y="273.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Telemetría</text>
+<text x="900.0" y="293.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">series, AQI, tiempo real</text>
+<rect x="800" y="340" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="900.0" y="363.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Alertas</text>
+<text x="900.0" y="383.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">reglas y avisos</text>
+<rect x="800" y="430" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="900.0" y="453.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Reportes</text>
+<text x="900.0" y="473.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">PDF, Excel, datos abiertos</text>
+<rect x="800" y="520" width="200" height="64" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="900.0" y="543.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Soporte</text>
+<text x="900.0" y="563.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">solicitudes, incidencias</text>
+<text x="790" y="713.4" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#1e3a5f" dominant-baseline="middle">Cada servicio se despliega, escala y falla por separado,</text>
+<text x="790" y="726.6" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#1e3a5f" dominant-baseline="middle">y es dueño de sus propios datos.</text>
+<rect x="1060" y="50" width="230" height="620" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="1175.0" y="68.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Mensajería y avisos</text>
+<rect x="1075" y="90" width="200" height="90" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1175.0" y="126.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Amazon SQS</text>
+<text x="1175.0" y="139.4" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">cola de lecturas</text>
+<text x="1175.0" y="152.6" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">(absorbe los picos)</text>
+<rect x="1075" y="410" width="200" height="80" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1175.0" y="441.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Amazon EventBridge</text>
+<text x="1175.0" y="461.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">bus de eventos</text>
+<rect x="1075" y="540" width="200" height="80" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1175.0" y="571.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Amazon SES / SNS</text>
+<text x="1175.0" y="584.4" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">correo con dominio,</text>
+<text x="1175.0" y="597.6" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">SMS, push</text>
+<rect x="1330" y="50" width="290" height="620" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="1475.0" y="68.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Datos gestionados</text>
+<path d="M1350,259 L1350,321 A125.0,9 0 0 0 1600,321 L1600,259" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<ellipse cx="1475.0" cy="259" rx="125.0" ry="9" fill="#EDE4F1" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1475.0" y="288.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Serie de tiempo</text>
+<text x="1475.0" y="307.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">Timescale Cloud o Timestream</text>
+<path d="M1350,359 L1350,421 A125.0,9 0 0 0 1600,421 L1600,359" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<ellipse cx="1475.0" cy="359" rx="125.0" ry="9" fill="#EDE4F1" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1475.0" y="388.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">ElastiCache (Valkey)</text>
+<text x="1475.0" y="407.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">pub/sub, caché, intentos</text>
+<path d="M1350,459 L1350,521 A125.0,9 0 0 0 1600,521 L1600,459" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<ellipse cx="1475.0" cy="459" rx="125.0" ry="9" fill="#EDE4F1" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1475.0" y="488.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Aurora PostgreSQL</text>
+<text x="1475.0" y="507.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">usuarios, espacios, estaciones</text>
+<path d="M1350,569 L1350,631 A125.0,9 0 0 0 1600,631 L1600,569" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<ellipse cx="1475.0" cy="569" rx="125.0" ry="9" fill="#EDE4F1" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1475.0" y="598.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Amazon S3</text>
+<text x="1475.0" y="617.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">respaldos, reportes, datos abiertos</text>
+<rect x="20" y="800" width="1600" height="110" rx="10" fill="#DAE8FC" stroke="#6C8EBF" stroke-width="1.5"/>
+<text x="820.0" y="818.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1e3a5f" dominant-baseline="middle">Transversal</text>
+<rect x="60" y="840" width="300" height="54" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="210.0" y="858.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">CloudWatch + X-Ray</text>
+<text x="210.0" y="878.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">logs, métricas y trazas</text>
+<rect x="420" y="840" width="300" height="54" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="570.0" y="858.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Secrets Manager / SSM + KMS</text>
+<text x="570.0" y="878.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">llaves y secretos cifrados</text>
+<rect x="780" y="840" width="300" height="54" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="930.0" y="858.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Amazon ECR</text>
+<text x="930.0" y="878.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">un repositorio por servicio</text>
+<rect x="1140" y="840" width="420" height="54" rx="6" fill="#E1D5E7" stroke="#9673A6" stroke-width="1.5"/>
+<text x="1350.0" y="858.0" font-family="Liberation Sans" font-size="13" text-anchor="middle" font-weight="bold" fill="#1f2937" dominant-baseline="middle">Terraform</text>
+<text x="1350.0" y="878.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#374151" dominant-baseline="middle">IaC por servicio + CI/CD con GitHub Actions</text>
+<path d="M210,125 L290,125" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="216.2" y="98" width="67.6" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="250" y="108.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#111827" dominant-baseline="middle">MQTT/TLS</text>
+<path d="M210,145 L250,145 L250,225 L290,225" fill="none" stroke="#333333" stroke-width="1.6" stroke-dasharray="6,4" marker-end="url(#m)"/>
+<rect x="227.0" y="175" width="46.0" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="250" y="185.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#111827" dominant-baseline="middle">HTTPS</text>
+<path d="M210,265 L290,250" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<path d="M210,285 L250,285 L250,395 L290,395" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<path d="M500,235 L560,235" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="510.6" y="210" width="38.8" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="530" y="220.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#111827" dominant-baseline="middle">REST</text>
+<path d="M500,115 L1075,115" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="741.8" y="90" width="96.4" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="790" y="100.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">1. regla IoT</text>
+<path d="M600,250 L600,160 L1075,160" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="731.0" y="135" width="118.0" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="790" y="145.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">1. lectura HTTP</text>
+<path d="M1175,180 L1175,272 L1000,272" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="1059.0" y="248" width="82.0" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1100" y="258.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">2. consume</text>
+<path d="M1000,290 L1350,290" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="1272.6" y="268" width="74.8" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1310" y="278.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">3. guarda</text>
+<path d="M1000,306 L1120,306 L1120,410" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="1115.2" y="330" width="139.6" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1185" y="340.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">4. LecturaRecibida</text>
+<path d="M1075,440 L1000,380" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="992.6" y="415" width="74.8" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1030" y="425.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">5. evalúa</text>
+<path d="M1000,392 L1075,570" fill="none" stroke="#333333" stroke-width="1.6" marker-end="url(#m)"/>
+<rect x="998.2" y="490" width="67.6" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1032" y="500.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="bold" fill="#111827" dominant-baseline="middle">6. avisa</text>
+<path d="M1020,740 L1310,740 L1310,600 L1350,600" fill="none" stroke="#333333" stroke-width="1.6" stroke-dasharray="6,4" marker-end="url(#m)"/>
+<rect x="1062.8" y="715" width="204.4" height="20" rx="4" fill="white" fill-opacity="0.92"/>
+<text x="1165" y="725.0" font-family="Liberation Sans" font-size="11" text-anchor="middle" font-weight="normal" fill="#111827" dominant-baseline="middle">cada servicio con sus datos</text>
+</svg>

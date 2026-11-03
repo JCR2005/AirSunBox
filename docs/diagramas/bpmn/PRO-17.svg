@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1704" height="556" viewBox="0 0 1704 556" font-family="Liberation Sans, Arial, sans-serif">
+<defs><marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1a1a1a"/></marker></defs>
+<rect width="1704" height="556" fill="#ffffff"/>
+<rect x="1" y="10" width="1702" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="10" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="80.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 80.0)">Estación ESP32</text>
+<rect x="1" y="170" width="1702" height="216" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="170" width="30" height="216" fill="#5a6b7c"/>
+<text x="16.0" y="278.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 278.0)">Sistema</text>
+<rect x="1" y="406" width="1702" height="140" fill="#ffffff" stroke="#5a6b7c" stroke-width="1.2"/>
+<rect x="1" y="406" width="30" height="140" fill="#5a6b7c"/>
+<text x="16.0" y="476.0" fill="#ffffff" font-size="13.5" font-weight="bold" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 16.0 476.0)">Usuario</text>
+<path d="M109.0,80.0 L162.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M270.0,80.0 L286.0,80.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M394.0,80.0 L390.0,80.0 L390.0,240.0 L410.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M518.0,240.0 L566.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M588.0,262.0 L588.0,316.0 L658.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="594" y="277.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M766.0,316.0 L819.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M610.0,240.0 L658.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="616" y="234.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M766.0,240.0 L782.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M890.0,240.0 L906.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1014.0,240.0 L1010.0,240.0 L1010.0,476.0 L1030.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1138.0,476.0 L1191.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1014.0,240.0 L1030.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1138.0,240.0 L1186.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1208.0,262.0 L1208.0,316.0 L1315.0,316.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1214" y="277.0" font-size="12" font-weight="bold" fill="#1a1a1a">No</text>
+<path d="M1230.0,240.0 L1278.0,240.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/><text x="1236" y="234.0" font-size="12" font-weight="bold" fill="#1a1a1a">Sí</text>
+<path d="M1386.0,240.0 L1382.0,240.0 L1382.0,476.0 L1402.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<path d="M1510.0,476.0 L1563.0,476.0" fill="none" stroke="#1a1a1a" stroke-width="1.3" marker-end="url(#f)"/>
+<circle cx="92" cy="80.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="1.6"/><circle cx="92" cy="80.0" r="12" fill="#ffffff" stroke="#3a77b0" stroke-width="1"/><path d="M92,72.0 L92,80.0 L98,80.0" stroke="#3a77b0" stroke-width="1.4" fill="none"/><text x="92" y="111.0" font-size="11.5" text-anchor="middle" fill="#1a1a1a">Cada intervalo</text>
+<rect x="162.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="216" y="80.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Medir variables</text>
+<rect x="286.0" y="44.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="340" y="72.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Enviar lectura</text><text x="340" y="87.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(HTTPS o MQTT)</text>
+<rect x="410.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="464" y="232.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Validar token</text><text x="464" y="247.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">de la estación</text>
+<path d="M588,218.0 L610,240.0 L588,262.0 L566,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="581" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Token válido?</text>
+<rect x="658.0" y="280.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="308.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Rechazar (404</text><text x="712" y="323.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Token inválido)</text>
+<circle cx="836" cy="316.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+<rect x="658.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="712" y="232.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Encolar lectura</text><text x="712" y="247.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(BullMQ)</text>
+<rect x="782.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="836" y="232.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Guardar en</text><text x="836" y="247.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">serie de tiempo</text>
+<rect x="906.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="960" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Publicar en</text><text x="960" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">tiempo real</text><text x="960" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">(WebSocket)</text>
+<rect x="1030.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1084" y="468.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Ver valor</text><text x="1084" y="483.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">actualizado</text>
+<circle cx="1208" cy="476.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+<rect x="1030.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1084" y="232.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Evaluar reglas</text><text x="1084" y="247.5" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">de alerta</text>
+<path d="M1208,218.0 L1230,240.0 L1208,262.0 L1186,240.0 z" fill="#d6c7e3" stroke="#7d5a9e" stroke-width="1.5"/><text x="1201" y="275.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">¿Supera umbral</text><text x="1201" y="288.0" font-size="11.5" text-anchor="end" fill="#1a1a1a">fuera de cooldown?</text>
+<circle cx="1332" cy="316.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+<rect x="1278.0" y="204.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1332" y="225.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Enviar correo,</text><text x="1332" y="240.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Telegram o</text><text x="1332" y="255.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">webhook</text>
+<rect x="1402.0" y="440.0" width="108" height="72" rx="7" fill="#e3eef9" stroke="#3a77b0" stroke-width="2"/><text x="1456" y="476.0" font-size="12.5" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a">Recibir alerta</text>
+<circle cx="1580" cy="476.0" r="17" fill="#dce8f6" stroke="#3a77b0" stroke-width="3.2"/>
+</svg>
