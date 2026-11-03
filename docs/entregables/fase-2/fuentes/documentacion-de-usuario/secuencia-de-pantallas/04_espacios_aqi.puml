@@ -1,0 +1,30 @@
+@startuml
+title Secuencia de Pantallas - Espacios y AQI
+
+start
+
+:Dashboard;
+:Spaces;
+
+if (¿Seleccionar espacio?) then (Sí)
+    :SpaceDetail;
+
+    if (¿Consultar calidad del aire?) then (Sí)
+        :SpaceAqi;
+
+        if (¿Regresar al espacio?) then (Sí)
+            :SpaceDetail;
+        else (No)
+            :Continuar en SpaceAqi;
+        endif
+
+    else (No)
+        :Continuar en SpaceDetail;
+    endif
+
+else (No)
+    :Continuar en Spaces;
+endif
+
+stop
+@enduml

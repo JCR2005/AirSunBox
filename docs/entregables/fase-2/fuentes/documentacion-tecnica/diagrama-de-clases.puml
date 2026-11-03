@@ -1,0 +1,269 @@
+@startuml AirSunBox_Class_Diagram
+
+title AirSunBox - Diagrama de Clases
+
+skinparam classAttributeIconSize 0
+skinparam monochrome true
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 70
+skinparam ranksep 80
+
+' =========================================================
+' ENUMERACIONES
+' =========================================================
+
+enum UserRole {
+    ADMIN
+    OPERATOR
+    CLIENT
+}
+
+enum OrganizationStatus {
+    ACTIVE
+    SUSPENDED
+}
+
+enum StationStatus {
+    ACTIVE
+    INACTIVE
+    MAINTENANCE
+}
+
+enum AlertStatus {
+    ACTIVE
+    INACTIVE
+}
+
+enum IncidentStatus {
+    OPEN
+    IN_PROGRESS
+    RESOLVED
+}
+
+enum StationRequestStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+enum AQICategory {
+    EXCELLENT
+    GOOD
+    CAUTION
+    BAD
+    DANGEROUS
+}
+
+enum ReportType {
+    STATISTICS
+    HEATMAP
+    RESPIRATORY_RISK
+}
+
+' =========================================================
+' USUARIOS Y ORGANIZACIONES
+' =========================================================
+
+package "Usuarios y Organizaciones" {
+
+    class User {
+        - id
+        - name
+        - email
+        - passwordHash
+        - role
+        - twoFactorEnabled
+        - active
+    }
+
+    class Organization {
+        - id
+        - name
+        - email
+        - status
+        - createdAt
+    }
+}
+
+' =========================================================
+' ESTACIONES
+' =========================================================
+
+package "Estaciones" {
+
+    class Station {
+        - id
+        - name
+        - location
+        - latitude
+        - longitude
+        - token
+        - status
+        - createdAt
+        - lastReportAt
+    }
+
+    class EnvironmentalVariable {
+        - id
+        - name
+        - unit
+        - description
+    }
+}
+
+' =========================================================
+' MONITOREO AMBIENTAL
+' =========================================================
+
+package "Monitoreo Ambiental" {
+
+    class EnvironmentalReading {
+        - id
+        - timestamp
+        - value
+    }
+
+    class AQIRecord {
+        - id
+        - value
+        - category
+        - calculatedAt
+    }
+}
+
+' =========================================================
+' ALERTAS E INCIDENCIAS
+' =========================================================
+
+package "Alertas e Incidencias" {
+
+    class Alert {
+        - id
+        - threshold
+        - status
+        - destination
+        - createdAt
+    }
+
+    class AlertNotification {
+        - id
+        - sentAt
+        - destination
+        - message
+        - successful
+    }
+
+    class Incident {
+        - id
+        - title
+        - description
+        - status
+        - createdAt
+        - resolvedAt
+    }
+}
+
+' =========================================================
+' SOLICITUDES Y REPORTES
+' =========================================================
+
+package "Solicitudes y Reportes" {
+
+    class StationRequest {
+        - id
+        - description
+        - status
+        - createdAt
+        - reviewedAt
+        - reviewComment
+    }
+
+    class Report {
+        - id
+        - type
+        - generatedAt
+        - startDate
+        - endDate
+    }
+}
+
+' =========================================================
+' ENUM RELATIONSHIPS
+' =========================================================
+
+User --> UserRole
+Organization --> OrganizationStatus
+Station --> StationStatus
+Alert --> AlertStatus
+Incident --> IncidentStatus
+StationRequest --> StationRequestStatus
+AQIRecord --> AQICategory
+Report --> ReportType
+
+' =========================================================
+' ORGANIZACIONES Y USUARIOS
+' =========================================================
+
+Organization "1" -- "*" User : has
+User "*" -- "1" Organization : belongs to
+
+' =========================================================
+' ORGANIZACIONES Y ESTACIONES
+' =========================================================
+
+Organization "1" -- "*" Station : owns
+
+' =========================================================
+' ESTACIONES Y DATOS
+' =========================================================
+
+Station "*" -- "*" EnvironmentalVariable : monitors
+
+Station "1" -- "*" EnvironmentalReading : reports
+
+EnvironmentalVariable "1" -- "*" EnvironmentalReading : measures
+
+Station "1" -- "*" AQIRecord : has
+
+AQIRecord ..> EnvironmentalReading : calculated from
+
+' =========================================================
+' ALERTAS
+' =========================================================
+
+Station "1" -- "*" Alert : configures
+
+EnvironmentalVariable "1" -- "*" Alert : applies to
+
+Alert "1" -- "*" AlertNotification : generates
+
+' =========================================================
+' INCIDENCIAS
+' =========================================================
+
+Station "1" -- "*" Incident : has
+
+User "1" -- "*" Incident : reports
+
+' =========================================================
+' SOLICITUDES
+' =========================================================
+
+Organization "1" -- "*" StationRequest : creates
+
+User "1" -- "*" StationRequest : requests
+
+User "0..1" -- "*" StationRequest : reviews
+
+' =========================================================
+' REPORTES
+' =========================================================
+
+User "1" -- "*" Report : generates
+
+Report ..> Station : analyzes
+Report ..> EnvironmentalReading : uses
+Report ..> AQIRecord : uses
+
+@enduml

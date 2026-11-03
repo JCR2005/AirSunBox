@@ -1,0 +1,23 @@
+@startuml
+title Secuencia de Pantallas - Perfil
+
+start
+
+:Dashboard;
+:Profile;
+
+if (¿Consultar información del perfil?) then (Sí)
+    :Visualizar información del usuario;
+
+    if (¿Continuar en el perfil?) then (Sí)
+        :Profile;
+    else (No)
+        :Finalizar consulta;
+    endif
+
+else (No)
+    :Continuar en Profile;
+endif
+
+stop
+@enduml

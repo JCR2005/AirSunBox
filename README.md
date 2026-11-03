@@ -158,11 +158,22 @@ AWS** (IoT Core, SQS, EventBridge, ECS Fargate, Aurora) está en
 
 | Documento | Contenido | PDF |
 |---|---|---|
-| [Manual técnico](docs/manual-tecnico.md) | Arquitectura, modelo de datos, API, seguridad, CI/CD y trazabilidad de requisitos | [PDF](docs/entregables/Manual_Tecnico_AirSunBox.pdf) |
-| [Manual de usuario](docs/manual-usuario.md) | Guía por rol: clientes, equipo interno y ciudadanía | [PDF](docs/entregables/Manual_Usuario_AirSunBox.pdf) |
-| [Runbook](docs/runbook.md) | Despliegue, rollback, monitoreo y atención de incidentes | [PDF](docs/entregables/Runbook_AirSunBox.pdf) |
-| [Escalabilidad futura](docs/escalabilidad.md) | Procesos BPMN, migraciones planificadas y evolución a microservicios | [PDF](docs/entregables/Escalabilidad_Futura_AirSunBox.pdf) |
+| [Manual técnico](docs/manual-tecnico.md) | Arquitectura, modelo de datos, API, seguridad, CI/CD y trazabilidad de requisitos | [PDF](docs/entregables/fase-3/Manual_Tecnico_AirSunBox.pdf) |
+| [Manual de usuario](docs/manual-usuario.md) | Guía por rol: clientes, equipo interno y ciudadanía | [PDF](docs/entregables/fase-3/Manual_Usuario_AirSunBox.pdf) |
+| [Runbook](docs/runbook.md) | Despliegue, rollback, monitoreo y atención de incidentes | [PDF](docs/entregables/fase-3/Runbook_AirSunBox.pdf) |
+| [Escalabilidad futura](docs/escalabilidad.md) | Procesos BPMN, migraciones planificadas y evolución a microservicios | [PDF](docs/entregables/fase-3/Escalabilidad_Futura_AirSunBox.pdf) |
 | [Casos de uso](docs/casos-de-uso.txt) | Casos de uso extendidos por rol | — |
+
+### Entregas por fase
+
+El proyecto se desarrolló en tres fases. Todas las entregas están en
+[`docs/entregables`](docs/entregables):
+
+| Fase | Entregas |
+|---|---|
+| **Fase 1: análisis y diseño** | [Fundamentos](docs/entregables/fase-1/01-fundamentos.pdf) · [Descripción del proyecto y la empresa](docs/entregables/fase-1/02-descripcion-del-proyecto-y-la-empresa.pdf) · [Problema, objetivos y alcance](docs/entregables/fase-1/03-definicion-del-problema-objetivos-y-alcance.pdf) · [Requisitos funcionales y no funcionales](docs/entregables/fase-1/04-requisitos-funcionales-y-no-funcionales.pdf) · [Análisis económico](docs/entregables/fase-1/05-analisis-economico-y-de-alcance.pdf) · [Riesgos](docs/entregables/fase-1/06-identificacion-y-analisis-de-riesgos.pdf) · [Procesos de negocio](docs/entregables/fase-1/07-procesos-de-negocio.pdf) · [Arquitecturas iniciales](docs/entregables/fase-1/08-diseno-de-arquitecturas-iniciales.pdf) · [Diseño visual (mockups)](docs/entregables/fase-1/09-propuesta-de-diseno-visual-mockups.pdf) · [GitFlow](docs/entregables/fase-1/10-definicion-de-gitflow.pdf) · [Diagramas BPMN, de arquitectura y mockups](docs/entregables/fase-1/diagramas) |
+| **Fase 2: construcción** | [Documentación técnica](docs/entregables/fase-2/documentacion-tecnica.pdf) · [Documentación de usuario](docs/entregables/fase-2/documentacion-de-usuario.pdf) · [Planilla de casos de uso](docs/entregables/fase-2/planilla-de-casos-de-uso.pdf) · [Fuentes de los diagramas](docs/entregables/fase-2/fuentes) |
+| **Fase 3: producción y operación** | Los cuatro documentos de la tabla anterior |
 
 ## Estructura del repositorio
 
@@ -203,7 +214,7 @@ créditos; el entorno completo se puede levantar localmente con Docker.
 | | Rol |
 |---|---|
 | **Juan Carlos Rodríguez López** ([@JCR2005](https://github.com/JCR2005)) | Líder del proyecto; desarrollo del backend, el frontend y la seguridad de producción |
-| **Dany LS** ([@DNLS89](https://github.com/DNLS89)) | Infraestructura en AWS, Terraform y despliegue continuo |
+| **Dany de León Santizo** ([@DNLS89](https://github.com/DNLS89)) | Infraestructura en AWS, Terraform y despliegue continuo |
 
 ## Licencia
 
