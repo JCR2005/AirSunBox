@@ -24,7 +24,7 @@ un modelo de patrocinio corporativo. Reúne tres insumos para ese crecimiento:
 |---|---|
 | Despliegue | 1 instancia EC2 `t3.small` con Docker Compose (nginx, backend, TimescaleDB, Redis, EMQX) |
 | Datos | 10 estaciones, más de 560 000 lecturas en una hypertable comprimida |
-| Esquema | 24 migraciones SQL idempotentes, aplicadas en orden por `00-schema.sh` |
+| Esquema | 23 scripts SQL idempotentes (hasta la `v24`), aplicados en orden por `00-schema.sh` |
 | Arquitectura | **Monolito modular**: un solo backend (Fastify) con módulos internos —identidad, organizaciones y espacios, estaciones, ingesta, telemetría, alertas, reportes, soporte y datos públicos— que comparten proceso y base de datos |
 | Operación | CI/CD con GitHub Actions; secretos en AWS SSM; disco cifrado |
 | Limitaciones conocidas | Todo escala junto (un pico de ingesta afecta a los reportes y al panel), un solo servidor, broker MQTT y Redis administrados a mano, IP pública sin Elastic IP, respaldos manuales |

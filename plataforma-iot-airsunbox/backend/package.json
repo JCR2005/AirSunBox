@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js",
-    "test": "node --test tests/smoke.mjs"
+    "test": "node --test tests/unit/*.test.mjs",
+    "test:smoke": "node --test tests/smoke.mjs tests/seguridad.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-ssm": "^3.1157.0",

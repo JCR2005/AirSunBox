@@ -33,8 +33,12 @@ node_modules/
 dist/
 
 # Documentación: los .odt de docs/entregables se regeneran con docs/build.py
-# (en el repo quedan las fuentes .md, los diagramas, las capturas y los PDF)
-docs/entregables/*.odt
+# (en el repo quedan las fuentes .md, los diagramas, las capturas y los PDF).
+# Los .docx originales de la fase 2 se publican convertidos a PDF y el manual
+# de usuario anterior quedó reemplazado por el actual.
+docs/entregables/**/*.odt
+docs/entregables/*.docx
+docs/entregables/Manual de usuario(orgas independientes).pdf
 screenshots/
 MANUAL_INDEPENDIENTES.*
 build_manual.cjs

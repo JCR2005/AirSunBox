@@ -1,0 +1,24 @@
+@startuml
+title Secuencia de Pantallas - Reportes
+
+start
+
+:Dashboard;
+:Reports;
+
+if (¿Consultar reporte?) then (Sí)
+    :Seleccionar parámetros;
+    :Visualizar reporte;
+
+    if (¿Realizar otra consulta?) then (Sí)
+        :Reports;
+    else (No)
+        :Finalizar consulta;
+    endif
+
+else (No)
+    :Continuar en Reports;
+endif
+
+stop
+@enduml

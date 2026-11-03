@@ -124,7 +124,9 @@ plataforma-iot-airsunbox/
 │   └── nginx.conf            # HTTPS, cabeceras de seguridad y proxy a la API
 ├── database/                 # Migraciones SQL idempotentes (init, v2 … v24)
 │   └── initdb/00-schema.sh   # Aplica las migraciones en orden
-├── tools/simulate-station.mjs  # Generador de series realistas para pruebas
+├── tools/
+│   ├── simulate-station.mjs  # Generador de series realistas para pruebas
+│   └── smtp_real.mjs         # Envía un correo de prueba con la configuración SMTP
 └── whatsapp-bot/             # Prototipo de bot de WhatsApp
 ```
 

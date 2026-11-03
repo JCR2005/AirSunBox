@@ -1,0 +1,25 @@
+@startuml
+title Secuencia de Pantallas - Acceso y Recuperación
+
+start
+
+:Landing;
+:Login;
+
+if (¿Olvidó la contraseña?) then (Sí)
+    :ForgotPassword;
+    :ResetPassword;
+    :Login;
+else (No)
+
+    if (¿Credenciales válidas?) then (Sí)
+        :Dashboard;
+    else (No)
+        :Mostrar error de autenticación;
+        :Login;
+    endif
+
+endif
+
+stop
+@enduml

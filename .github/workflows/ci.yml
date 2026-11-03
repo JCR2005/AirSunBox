@@ -82,6 +82,10 @@ jobs:
         working-directory: plataforma-iot-airsunbox/backend
         run: npm run build
 
+      - name: Run backend unit tests
+        working-directory: plataforma-iot-airsunbox/backend
+        run: npm test
+
       - name: Start backend for smoke tests
         working-directory: plataforma-iot-airsunbox/backend
         env:
@@ -108,11 +112,18 @@ jobs:
           cat /tmp/airsunbox-backend.log
           exit 1
 
-      - name: Run backend smoke tests
+      # Humo y seguridad (revocación de sesiones y aislamiento entre
+      # organizaciones). La base se usa para fijar un enlace de recuperación
+      # conocido; DB_PASSWORD viene del paso de credenciales efímeras.
+      - name: Run backend smoke and security tests
         working-directory: plataforma-iot-airsunbox/backend
         env:
           SMOKE_BASE_URL: http://127.0.0.1:3000
-        run: npm test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: iot_user
+          DB_NAME: iot_platform
+        run: npm run test:smoke
 
   frontend:
     runs-on: ubuntu-latest

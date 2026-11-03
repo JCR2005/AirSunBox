@@ -1,0 +1,23 @@
+@startuml
+title Secuencia de Pantallas - Alertas
+
+start
+
+:Dashboard;
+:Alerts;
+
+if (¿Consultar alertas?) then (Sí)
+    :Revisar información de las alertas;
+
+    if (¿Continuar consultando?) then (Sí)
+        :Alerts;
+    else (No)
+        :Finalizar consulta;
+    endif
+
+else (No)
+    :Continuar en Alerts;
+endif
+
+stop
+@enduml
