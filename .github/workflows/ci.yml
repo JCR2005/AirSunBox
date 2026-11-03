@@ -82,6 +82,10 @@ jobs:
         working-directory: plataforma-iot-airsunbox/backend
         run: npm run build
 
+      - name: Run backend unit tests
+        working-directory: plataforma-iot-airsunbox/backend
+        run: npm test
+
       - name: Start backend for smoke tests
         working-directory: plataforma-iot-airsunbox/backend
         env:
@@ -112,7 +116,7 @@ jobs:
         working-directory: plataforma-iot-airsunbox/backend
         env:
           SMOKE_BASE_URL: http://127.0.0.1:3000
-        run: npm test
+        run: npm run test:smoke
 
   frontend:
     runs-on: ubuntu-latest
