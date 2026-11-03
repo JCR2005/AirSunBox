@@ -1,0 +1,36 @@
+@startuml
+title Secuencia de Pantallas - Variables y Equipo
+
+start
+
+:Admin Dashboard;
+
+if (¿Qué desea gestionar?) then (Variables)
+    :Variables;
+
+    if (¿Seleccionar variable?) then (Sí)
+        :VariableDetail;
+
+        if (¿Regresar a variables?) then (Sí)
+            :Variables;
+        else (No)
+            :Continuar consultando variable;
+        endif
+
+    else (No)
+        :Continuar en Variables;
+    endif
+
+elseif (Equipo)
+    :Team;
+
+    if (¿Continuar consultando equipo?) then (Sí)
+        :Team;
+    else (No)
+        :Finalizar consulta;
+    endif
+
+endif
+
+stop
+@enduml

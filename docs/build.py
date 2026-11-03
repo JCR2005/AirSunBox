@@ -26,7 +26,7 @@ from xml.sax.saxutils import escape
 import markdown
 
 DOCS = Path(__file__).resolve().parent
-OUT = DOCS / "entregables"
+OUT = DOCS / "entregables" / "fase-3"
 FECHA = "Martes, 27 de octubre, 2026"
 FASE = "Fase 3"
 VERTICAL = dict(plantilla="plantilla-oficial.odt", titulo_plantilla="iniciales",

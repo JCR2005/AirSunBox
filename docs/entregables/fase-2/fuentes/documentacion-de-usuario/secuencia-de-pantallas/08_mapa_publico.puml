@@ -1,0 +1,29 @@
+@startuml
+title Secuencia de Pantallas - Mapa Público
+
+start
+
+:Landing;
+
+if (¿Consultar mapa público?) then (Sí)
+    :PublicMap;
+
+    if (¿Consultar estación?) then (Sí)
+        :Visualizar información de la estación;
+
+        if (¿Consultar otra estación?) then (Sí)
+            :PublicMap;
+        else (No)
+            :Finalizar consulta;
+        endif
+
+    else (No)
+        :Continuar en PublicMap;
+    endif
+
+else (No)
+    :Continuar en Landing;
+endif
+
+stop
+@enduml

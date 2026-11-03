@@ -1,0 +1,30 @@
+@startuml
+title Secuencia de Pantallas - Navegación Principal
+
+start
+
+:Login;
+:Dashboard;
+
+if (¿Qué desea consultar?) then (Dispositivos)
+    :Devices;
+    :DeviceDetail;
+
+elseif (Espacios)
+    :Spaces;
+    :SpaceDetail;
+    :SpaceAqi;
+
+elseif (Alertas)
+    :Alerts;
+
+elseif (Reportes)
+    :Reports;
+
+elseif (Perfil)
+    :Profile;
+
+endif
+
+stop
+@enduml

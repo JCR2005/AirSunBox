@@ -1,0 +1,23 @@
+@startuml
+title Secuencia de Pantallas - Administración de Solicitudes
+
+start
+
+:Admin Dashboard;
+:Requests;
+
+if (¿Consultar solicitudes?) then (Sí)
+    :Revisar solicitudes;
+
+    if (¿Continuar gestionando solicitudes?) then (Sí)
+        :Requests;
+    else (No)
+        :Finalizar gestión;
+    endif
+
+else (No)
+    :Continuar en Requests;
+endif
+
+stop
+@enduml

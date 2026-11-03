@@ -1,0 +1,23 @@
+@startuml
+title Secuencia de Pantallas - Administración de Dispositivos
+
+start
+
+:Admin Dashboard;
+:Devices;
+
+if (¿Seleccionar dispositivo?) then (Sí)
+    :DeviceDetail;
+
+    if (¿Regresar al listado?) then (Sí)
+        :Devices;
+    else (No)
+        :Continuar consultando dispositivo;
+    endif
+
+else (No)
+    :Continuar en Devices;
+endif
+
+stop
+@enduml

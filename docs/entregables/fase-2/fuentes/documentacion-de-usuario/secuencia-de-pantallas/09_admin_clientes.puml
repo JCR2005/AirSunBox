@@ -1,0 +1,23 @@
+@startuml
+title Secuencia de Pantallas - Administración de Clientes
+
+start
+
+:Admin Dashboard;
+:Clients;
+
+if (¿Seleccionar cliente?) then (Sí)
+    :ClientDetail;
+
+    if (¿Regresar al listado?) then (Sí)
+        :Clients;
+    else (No)
+        :Continuar consultando cliente;
+    endif
+
+else (No)
+    :Continuar en Clients;
+endif
+
+stop
+@enduml
